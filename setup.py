@@ -24,4 +24,5 @@ setup(name='calmjs',
       entry_points="""
       # -*- Entry points: -*-
       """,
+      test_suite="calmjs.tests.test_suite",
       )
