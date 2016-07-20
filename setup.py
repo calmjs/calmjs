@@ -6,8 +6,7 @@ version = '0.0'
 setup(name='calmjs',
       version=version,
       description="Toolchain for deploying JavaScript with Python modules.",
-      long_description="""\
-""",
+      long_description=open('README.rst').read(),
       classifiers=[], # Get strings from http://pypi.python.org/pypi?%3Aaction=list_classifiers
       keywords='',
       author='Tommy Yu',
@@ -19,7 +18,7 @@ setup(name='calmjs',
       include_package_data=True,
       zip_safe=False,
       install_requires=[
-          # -*- Extra requirements: -*-
+          'setuptools>=11.3',
       ],
       entry_points="""
       # -*- Entry points: -*-
