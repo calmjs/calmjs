@@ -9,6 +9,11 @@ point system.
 
 from logging import getLogger
 
+try:
+    from pkg_resources import working_set
+except ImportError:  # pragma: no cover
+    working_set = None
+
 logger = getLogger(__name__)
 
 
@@ -83,26 +88,28 @@ class BaseModuleRegistry(object):
         Other arguments are passed to the default init method.
         """
 
-        entry_points = {}
-
         if cls.entry_point_name is NotImplemented:
             raise NotImplementedError(
                 '%s must provide a valid ``entry_point_name`` attribute',
                 cls.__name__
             )
 
-        entry_point_name = cls.entry_point_name
+        # used for testing and/or very implementation specific stuff.
+        _working_set = kw.pop('_working_set', None)
 
-        try:
-            from pkg_resources import iter_entry_points
-        except ImportError:  # pragma: no cover
-            logger.error(
-                'The `%s` registry is disabled as the setuptools '
-                'package is missing the `pkg_resources` module', registry_name
-            )
-        else:
-            # Just capture all the relevant entry points for this name.
-            entry_points = list(iter_entry_points(entry_point_name))
+        if _working_set is None:
+            if working_set is None:
+                logger.error(
+                    'Autoloading of the `%s` registry is disabled as the '
+                    'available setuptools package is missing the '
+                    '`pkg_resources` module.  Registry will empty.',
+                    registry_name,
+                )
+            else:
+                _working_set = working_set
+
+        entry_points = [] if _working_set is None else list(
+            _working_set.iter_entry_points(cls.entry_point_name))
 
         # Then create the default registry based on that.
         inst = cls(registry_name, *a, **kw)
