@@ -23,6 +23,27 @@ class GlobLoaderTestCase(unittest.TestCase):
     def tearDown(self):
         pass
 
+    def test_get_modpath_single_empty(self):
+        module = ModuleType('nothing')
+        self.assertEqual(loader.modpath_single(module), [])
+
+    def test_get_modpath_single_multi(self):
+        module = ModuleType('nothing')
+        module.__path__ = ['/path/to/here', '/path/to/there']
+        self.assertEqual(loader.modpath_single(module), ['/path/to/there'])
+
+    def test_get_modpath_all_empty(self):
+        module = ModuleType('nothing')
+        self.assertEqual(loader.modpath_all(module), [])
+
+    def test_get_modpath_all_multi(self):
+        module = ModuleType('nothing')
+        module.__path__ = ['/path/to/here', '/path/to/there']
+        self.assertEqual(
+            loader.modpath_all(module),
+            ['/path/to/here', '/path/to/there'],
+        )
+
     def test_module1_loader_default(self):
         from calmjs.testing import module1
         results = {
