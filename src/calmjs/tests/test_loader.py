@@ -74,3 +74,18 @@ class LoaderTestCase(unittest.TestCase):
         self.assertEqual(results, {
             'calmjs.testing.module1.hello': 'calmjs/testing/module1/hello.js',
         })
+
+    def test_module2_recursive_es6(self):
+        from calmjs.testing import module2
+        results = {
+            k: relpath(v, calmjs_base_dir)
+            for k, v in loader.mapper(module2, globber='recursive').items()
+        }
+        self.assertEqual(results, {
+            'calmjs/testing/module2/index':
+                'calmjs/testing/module2/index.js',
+            'calmjs/testing/module2/helper':
+                'calmjs/testing/module2/helper.js',
+            'calmjs/testing/module2/mod/helper':
+                'calmjs/testing/module2/mod/helper.js',
+        })

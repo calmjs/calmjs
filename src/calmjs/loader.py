@@ -154,11 +154,12 @@ def modname_python(fragments):
     return '.'.join(fragments)
 
 
-def mapper(module, modpath, globber, modname, registry=_utils):
+def mapper(module, modpath='last', globber='root', modname='es6',
+           registry=_utils):
     """
     General mapper
 
-    Loads from registry.
+    Loads components from the micro registry.
     """
 
     modname_f = _utils['modname'][modname]
