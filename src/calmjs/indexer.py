@@ -16,8 +16,6 @@ logger = getLogger(__name__)
 
 JS_EXT = '.js'
 
-_marker = object()
-
 _utils = {
     'modpath': {},
     'globber': {},

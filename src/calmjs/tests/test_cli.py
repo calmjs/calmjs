@@ -8,6 +8,7 @@ from os.path import dirname
 from shutil import rmtree
 
 from calmjs import cli
+from calmjs.testing.utils import mkdtemp
 
 
 def fake_error(exception):
@@ -46,10 +47,6 @@ class CliTestCase(unittest.TestCase):
         # other default values
         self.check_output_answer = None
 
-        # tempdir
-        self.tmpdir = tempfile.mkdtemp()
-        os.chdir(self.tmpdir)
-
     def tearDown(self):
         # restore original os.environ from copy
         os.environ.clear()
@@ -60,7 +57,6 @@ class CliTestCase(unittest.TestCase):
         cli.check_output = self.original_check_output
 
         os.chdir(self.cwd)
-        rmtree(self.tmpdir)
 
     def test_get_bin_version_long(self):
         cli.check_output = self._fake_check_output
@@ -123,27 +119,34 @@ class CliTestCase(unittest.TestCase):
 
     @unittest.skipIf(cli.get_npm_version() is None, 'npm not found.')
     def test_npm_install_package_json(self):
+        tmpdir = mkdtemp(self)
+        os.chdir(tmpdir)
+
         # This is faked.
         cli.npm_install()
         # However we make sure that it's been fake called
         self.assertEqual(self.call_args, ((['npm', 'install'],), {}))
         # And that the JSON file was written to the temp dir as that was
         # set to be the current working directory by setup.
-        with open(join(self.tmpdir, 'package.json')) as fd:
+
+        with open(join(tmpdir, 'package.json')) as fd:
             config = json.load(fd)
 
         self.assertEqual(config, cli.make_package_json())
 
     @unittest.skipIf(cli.get_npm_version() is None, 'npm not found.')
     def test_npm_install_package_json_no_overwrite(self):
+        tmpdir = mkdtemp(self)
+        os.chdir(tmpdir)
+
         # We are going to have a fake package.json
-        with open(join(self.tmpdir, 'package.json'), 'w') as fd:
+        with open(join(tmpdir, 'package.json'), 'w') as fd:
             json.dump({}, fd)
 
         # This is faked.
         cli.npm_install()
 
-        with open(join(self.tmpdir, 'package.json')) as fd:
+        with open(join(tmpdir, 'package.json')) as fd:
             config = json.load(fd)
         # This should remain unchanged.
         self.assertEqual(config, {})
