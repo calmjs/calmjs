@@ -6,7 +6,6 @@ Various loaders.
 import fnmatch
 
 from logging import getLogger
-from itertools import chain
 from glob import iglob
 from os.path import join
 from os.path import relpath
@@ -55,11 +54,13 @@ def _modgen(module,
     registry
         The "registry" to extract the functions from
 
-    Returns a 3-tuple of
+    Yields 3-tuples of
 
-    - raw list of module names
+    - raw list of module name fragments
     - the source base path to the python module (equivalent to module)
     - the relative path to the actual module
+
+    For each of the module basepath and source files the globber finds.
     """
 
     globber_f = registry['globber'][globber]
@@ -169,6 +170,7 @@ def mapper(module, modpath='last', globber='root', modname='es6',
         for modname_fragments, base, subpath in _modgen(
             module, modpath, globber)
     }
+
 
 @register('mapper')
 def mapper_es6(module):
