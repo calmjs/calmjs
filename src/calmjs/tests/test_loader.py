@@ -15,7 +15,7 @@ from calmjs import loader
 calmjs_base_dir = abspath(join(dirname(calmjs.__file__), pardir))
 
 
-class GlobLoaderTestCase(unittest.TestCase):
+class LoaderTestCase(unittest.TestCase):
 
     def setUp(self):
         pass
@@ -23,14 +23,25 @@ class GlobLoaderTestCase(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def test_get_modpath_single_empty(self):
-        module = ModuleType('nothing')
-        self.assertEqual(loader.modpath_single(module), [])
+    def test_register(self):
+        def bar_something():
+            pass
 
-    def test_get_modpath_single_multi(self):
+        registry = {'foo': {}, 'bar': {}}
+        with self.assertRaises(TypeError):
+            loader.register('foo', registry=registry)(bar_something)
+
+        loader.register('bar', registry=registry)(bar_something)
+        self.assertEqual(registry['bar']['something'], bar_something)
+
+    def test_get_modpath_last_empty(self):
+        module = ModuleType('nothing')
+        self.assertEqual(loader.modpath_last(module), [])
+
+    def test_get_modpath_last_multi(self):
         module = ModuleType('nothing')
         module.__path__ = ['/path/to/here', '/path/to/there']
-        self.assertEqual(loader.modpath_single(module), ['/path/to/there'])
+        self.assertEqual(loader.modpath_last(module), ['/path/to/there'])
 
     def test_get_modpath_all_empty(self):
         module = ModuleType('nothing')
@@ -44,21 +55,21 @@ class GlobLoaderTestCase(unittest.TestCase):
             ['/path/to/here', '/path/to/there'],
         )
 
-    def test_module1_loader_default(self):
+    def test_module1_loader_es6(self):
         from calmjs.testing import module1
         results = {
             k: relpath(v, calmjs_base_dir)
-            for k, v in loader.default(module1).items()
+            for k, v in loader.mapper_es6(module1).items()
         }
         self.assertEqual(results, {
             'calmjs/testing/module1/hello': 'calmjs/testing/module1/hello.js',
         })
 
-    def test_module1_loader_default_py(self):
+    def test_module1_loader_python(self):
         from calmjs.testing import module1
         results = {
             k: relpath(v, calmjs_base_dir)
-            for k, v in loader.default_py(module1).items()
+            for k, v in loader.mapper_python(module1).items()
         }
         self.assertEqual(results, {
             'calmjs.testing.module1.hello': 'calmjs/testing/module1/hello.js',

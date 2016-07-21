@@ -19,12 +19,88 @@ JS_EXT = '.js'
 
 _marker = object()
 
+_utils = {
+    'modpath': {},
+    'globber': {},
+    'modname': {},
+    'mapper': {},
+}
 
-def module_mapper(f):
-    f._marker = _marker
-    return f
+
+def _modgen(module,
+            modpath='last', globber='root', fext=JS_EXT,
+            registry=_utils):
+    """
+    JavaScript styled module location listing generator.
+
+    Arguments:
+
+    module
+        The Python module to start fetching from.
+
+    Optional Arguments:
+
+    modpath
+        The name to the registered modpath function that will fetch the
+        paths belonging to the module.  Defaults to 'last', which only
+        extracts the latest path registered to the module.
+
+    globber
+        The name to the registered file globbing function.  Defaults to
+        one that will only glob the local path.
+
+    fext
+        The filename extension to match.  Defaults to `.js`.
+
+    registry
+        The "registry" to extract the functions from
+
+    Returns a 3-tuple of
+
+    - raw list of module names
+    - the source base path to the python module (equivalent to module)
+    - the relative path to the actual module
+    """
+
+    globber_f = registry['globber'][globber]
+    modpath_f = registry['modpath'][modpath]
+
+    logger.debug(
+        'modgen generating file listing for module %s',
+        module.__name__,
+    )
+
+    module_frags = module.__name__.split('.')
+    module_base_paths = modpath_f(module)
+
+    for module_base_path in module_base_paths:
+        logger.debug('searching for *%s files in %s', fext, module_base_path)
+        for path in globber_f(module_base_path, '*' + fext):
+            mod_path = (relpath(path, module_base_path))
+            yield (
+                module_frags + mod_path[:-len(fext)].split(sep),
+                module_base_path,
+                mod_path,
+            )
 
 
+def register(util_type, registry=_utils):
+    """
+    Crude, local registration decorator for a crude local registry of
+    all utilities local to this module.
+    """
+
+    def marker(f):
+        mark = util_type + '_'
+        if not f.__name__.startswith(mark):
+            raise TypeError(
+                'not registering %s to %s' % (f.__name__, util_type))
+        registry[util_type][f.__name__[len(mark):]] = f
+        return f
+    return marker
+
+
+@register('modpath')
 def modpath_all(module):
     module_paths = getattr(module, '__path__', [])
     if not module_paths:
@@ -37,7 +113,8 @@ def modpath_all(module):
     return module_paths
 
 
-def modpath_single(module):
+@register('modpath')
+def modpath_last(module):
     module_paths = modpath_all(module)
     if len(module_paths) > 1:
         logger.info(
@@ -47,66 +124,53 @@ def modpath_single(module):
     return module_paths[-1:]
 
 
-def glob_current(root, patt):
+@register('globber')
+def globber_root(root, patt):
     return iglob(join(root, patt))
 
 
-def glob_recursive(root, patt):
+@register('globber')
+def globber_recursive(root, patt):
     for root, dirnames, filenames in walk(root):
         for filename in fnmatch.filter(filenames, patt):
             yield join(root, filename)
 
 
-def _modgen(module, modpath=modpath_single, globber=glob_current, fext=JS_EXT):
+@register('modname')
+def modname_es6(fragments):
     """
-    JavaScript styled module location listing generator.
-
-    Arguments:
-
-    module
-        The Python module to start fetching from.
-
-    Optional Arguments:
-
-    modpath
-        The function that will fetch where the module lives.  Defaults
-        to the one that extracts a single, latest path.
-
-    globber
-        The file globbing function.  Defaults to one that will only glob
-        the local path.
-
-    fext
-        The filename extension to extract files from.
-
-    Returns a 3-tuple of
-
-    - raw list of module names
-    - the source base path to the python module (equivalent to module)
-    - the relative path to the actual module
+    Generates ES6 styled module names from fragments.
     """
 
-    logger.debug(
-        'modgen generating file listing for module %s',
-        module.__name__,
-    )
-
-    module_frags = module.__name__.split('.')
-    module_base_paths = modpath(module)
-
-    for module_base_path in module_base_paths:
-        logger.debug('searching for *%s files in %s', fext, module_base_path)
-        for path in globber(module_base_path, '*' + fext):
-            mod_path = (relpath(path, module_base_path))
-            yield (
-                module_frags + mod_path[:-len(fext)].split(sep),
-                module_base_path,
-                mod_path,
-            )
+    return '/'.join(fragments)
 
 
-@module_mapper
-def default(module):
+@register('modname')
+def modname_python(fragments):
+    """
+    Generates Python styled module names from fragments.
+    """
+
+    return '.'.join(fragments)
+
+
+def mapper(module, modpath, globber, modname, registry=_utils):
+    """
+    General mapper
+
+    Loads from registry.
+    """
+
+    modname_f = _utils['modname'][modname]
+
+    return {
+        modname_f(modname_fragments): '/'.join((base, subpath))
+        for modname_fragments, base, subpath in _modgen(
+            module, modpath, globber)
+    }
+
+@register('mapper')
+def mapper_es6(module):
     """
     Default mapper
 
@@ -114,14 +178,11 @@ def default(module):
     a list of importable JS modules using the es6 module import format.
     """
 
-    return {
-        '/'.join(modname): '/'.join((base, subpath))
-        for modname, base, subpath in _modgen(module)
-    }
+    return mapper(module, 'last', 'root', 'es6')
 
 
-@module_mapper
-def default_py(module):
+@register('mapper')
+def mapper_python(module):
     """
     Default mapper using python style globber
 
@@ -129,7 +190,4 @@ def default_py(module):
     a list of importable JS modules using the es6 module import format.
     """
 
-    return {
-        '.'.join(modname): '/'.join((base, subpath))
-        for modname, base, subpath in _modgen(module)
-    }
+    return mapper(module, 'last', 'root', 'python')
