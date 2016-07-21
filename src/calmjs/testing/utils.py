@@ -15,9 +15,13 @@ def mkdtemp(testcase_inst):
     running test.  Requires a TestCase instance.
     """
 
-    if not (isinstance(testcase_inst, TestCase) and
-            callable(getattr(testcase_inst, 'addCleanup', None))):
+    if not isinstance(testcase_inst, TestCase):
         raise TypeError('Must be called with a TestCase instance')
+
+    if not callable(getattr(testcase_inst, 'addCleanup', None)):
+        raise TypeError(
+            '%s does not support addCleanup; package requires python2.7+ or '
+            'unittest2.' % testcase_inst)
 
     # create the temporary dir and add the cleanup for that immediately.
     tmpdir = tempfile.mkdtemp()
