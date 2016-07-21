@@ -166,7 +166,7 @@ def mapper(module, modpath='last', globber='root', modname='es6',
     modname_f = _utils['modname'][modname]
 
     return {
-        modname_f(modname_fragments): '/'.join((base, subpath))
+        modname_f(modname_fragments): join(base, subpath)
         for modname_fragments, base, subpath in _modgen(
             module, modpath, globber)
     }
