@@ -22,6 +22,11 @@ setup(name='calmjs',
       ],
       entry_points="""
       # -*- Entry points: -*-
+      [distutils.setup_keywords]
+      package_json = calmjs.dist:validate_package_json
+
+      [egg_info.writers]
+      package.json = calmjs.dist:write_package_json
       """,
       test_suite="calmjs.tests.test_suite",
       )
