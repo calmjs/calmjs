@@ -51,6 +51,17 @@ class IndexerTestCase(unittest.TestCase):
             ['/path/to/here', '/path/to/there'],
         )
 
+    def test_get_modpath_pkg_resources_valid(self):
+        from calmjs.testing import module3
+        result = indexer.modpath_pkg_resources(module3)
+        self.assertEqual(len(result), 1)
+        self.assertTrue(result[0].endswith('calmjs/testing/module3'))
+
+    def test_get_modpath_pkg_resources_invalid(self):
+        self.assertEqual([], indexer.modpath_pkg_resources(None))
+        module = ModuleType('nothing')
+        self.assertEqual([], indexer.modpath_pkg_resources(module))
+
     def test_module1_loader_es6(self):
         from calmjs.testing import module1
         results = {

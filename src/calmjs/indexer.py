@@ -4,6 +4,7 @@ Various loaders.
 """
 
 import fnmatch
+import pkg_resources
 
 from logging import getLogger
 from glob import iglob
@@ -101,6 +102,11 @@ def register(util_type, registry=_utils):
 
 @register('modpath')
 def modpath_all(module):
+    """
+    Provides the raw __path__.  Incompatible with PEP 302-based import
+    hooks and incompatible with zip_safe packages.
+    """
+
     module_paths = getattr(module, '__path__', [])
     if not module_paths:
         logger.warning(
@@ -114,6 +120,11 @@ def modpath_all(module):
 
 @register('modpath')
 def modpath_last(module):
+    """
+    Provides the raw __path__.  Incompatible with PEP 302-based import
+    hooks and incompatible with zip_safe packages.
+    """
+
     module_paths = modpath_all(module)
     if len(module_paths) > 1:
         logger.info(
@@ -121,6 +132,24 @@ def modpath_last(module):
             module.__name__, module_paths[-1],
         )
     return module_paths[-1:]
+
+
+@register('modpath')
+def modpath_pkg_resources(module):
+    """
+    Goes through pkg_resources for compliance with various PEPs.
+
+    This one accepts a module as argument.
+    """
+
+    try:
+        return [pkg_resources.resource_filename(module.__name__, '')]
+    except ImportError:
+        logger.warning('%s could not be located as a module', module)
+    except Exception:
+        logger.warning('%s does not appear to be a valid module', module)
+
+    return []
 
 
 @register('globber')
