@@ -208,7 +208,7 @@ def mapper_es6(module):
     a list of importable JS modules using the es6 module import format.
     """
 
-    return mapper(module, 'last', 'root', 'es6')
+    return mapper(module, 'pkg_resources', 'root', 'es6')
 
 
 @register('mapper')
@@ -220,4 +220,4 @@ def mapper_python(module):
     a list of importable JS modules using the es6 module import format.
     """
 
-    return mapper(module, 'last', 'root', 'python')
+    return mapper(module, 'pkg_resources', 'root', 'python')
