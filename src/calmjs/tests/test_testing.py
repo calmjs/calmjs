@@ -2,6 +2,9 @@
 import unittest
 import tempfile
 
+from pkg_resources import WorkingSet
+from pkg_resources import Requirement
+
 from os.path import exists
 from os.path import join
 
@@ -99,3 +102,39 @@ class TestingUtilsTestCase(unittest.TestCase):
         with open(fn) as fd:
             result = fd.read()
         self.assertEqual(result, 'these are actually metadata')
+
+    def tests_make_dummy_dist_working_set(self):
+        """
+        Dummy distributions should work with pkg_resources.WorkingSet
+        """
+
+        # This also shows how WorkingSet might work.
+        # A WorkingSet is basically a way to get to a collection of
+        # distributions via the list of specified paths.  By default it
+        # will go for sys.path, but for testing purposes we can control
+        # this by creating our own instance on a temporary directory.
+
+        parentpkg = make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([
+            ])),
+        ), 'parentpkg', '0.8')
+
+        childpkg = make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([
+                'parentpkg>=0.8',
+            ])),
+        ), 'childpkg', '0.1')
+
+        grandchildpkg = make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([
+                'childpkg>=0.1',
+                'parentpkg>=0.8',
+            ])),
+        ), 'childpkg', '0.8')
+
+        working_set = WorkingSet([self._calmjs_testing_tmpdir])
+        distributions = working_set.resolve(grandchildpkg.requires())
+        self.assertEqual(len(distributions), 2)
+        self.assertEqual(distributions[0].requires(), [])
+        self.assertEqual(distributions[1].requires(), [
+            Requirement.parse('parentpkg>=0.8')])
