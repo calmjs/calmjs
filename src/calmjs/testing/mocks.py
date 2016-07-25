@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from pkg_resources import Distribution
 from pkg_resources import EntryPoint
+from pkg_resources import EmptyProvider
 
 from setuptools.command.egg_info import egg_info
 
@@ -32,3 +33,22 @@ class Mock_egg_info(egg_info):
         """
 
         self.called[filename] = data
+
+
+class MockProvider(EmptyProvider):
+    """
+    Extends upon the emptiness of that.
+    """
+
+    def __init__(self, metadata):
+        self._metadata = {}
+        self._metadata.update(metadata)
+
+    def has_metadata(self, name):
+        return name in self._metadata
+
+    def get_metadata(self, name):
+        results = self._metadata.get(name)
+        if results is None:
+            raise IOError('emulating an IOError')
+        return results
