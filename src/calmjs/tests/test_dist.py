@@ -10,6 +10,7 @@ import pkg_resources
 from calmjs import dist as calmjs_dist
 from calmjs.testing.mocks import Mock_egg_info
 from calmjs.testing.mocks import MockProvider
+from calmjs.testing.utils import make_dummy_dist
 
 
 class DistTestCase(unittest.TestCase):
@@ -116,3 +117,18 @@ class DistTestCase(unittest.TestCase):
         results = calmjs_dist.get_dist_package_json(mock_dist)
         # Should still not fail.
         self.assertIsNone(results)
+
+    def test_get_dist_package_fs(self):
+        """
+        Use the make_dummy_dist testing util to generate a working
+        distribution based on upstream library.
+        """
+
+        package_json = {"dependencies": {"left-pad": "~1.1.1"}}
+        mock_dist = make_dummy_dist(
+            self, (
+                ('package.json', json.dumps(package_json)),
+            ), pkgname='dummydist'
+        )
+        results = calmjs_dist.get_dist_package_json(mock_dist)
+        self.assertEqual(results['dependencies']['left-pad'], '~1.1.1')
