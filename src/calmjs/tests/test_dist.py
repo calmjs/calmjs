@@ -132,3 +132,96 @@ class DistTestCase(unittest.TestCase):
         )
         results = calmjs_dist.get_dist_package_json(mock_dist)
         self.assertEqual(results['dependencies']['left-pad'], '~1.1.1')
+
+    def tests_flatten_package_json_deps(self):
+        make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([
+            ])),
+        ), 'security', '9999')
+
+        make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([
+                'security',
+            ])),
+            ('package.json', json.dumps({
+                'name': 'framework',
+                'description': 'some framework',
+                'dependencies': {
+                    'left-pad': '~1.1.1',
+                },
+                'devDependencies': {
+                    'sinon': '~1.15.0',
+                },
+            })),
+        ), 'framework', '2.4')
+
+        make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([
+                'framework>=2.1',
+            ])),
+            ('package.json', json.dumps({
+                'dependencies': {
+                    'jquery': '~2.0.0',
+                    'underscore': '~1.7.0',
+                },
+            })),
+        ), 'widget', '1.1')
+
+        make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([
+                'framework>=2.2',
+                'widget>=1.0',
+            ])),
+            ('package.json', json.dumps({
+                'dependencies': {
+                    'backbone': '~1.3.0',
+                    'jquery-ui': '~1.12.0',
+                },
+            })),
+        ), 'forms', '1.6')
+
+        make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([
+                'framework>=2.1',
+            ])),
+            ('package.json', json.dumps({
+                'dependencies': {
+                    'underscore': '~1.8.0',
+                },
+                'devDependencies': {
+                    'sinon': '~1.17.0',
+                },
+            })),
+        ), 'service', '1.1')
+
+        site = make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([
+                'framework>=2.1',
+                'widget>=1.1',
+                'forms>=1.6',
+                'service>=1.1',
+            ])),
+            ('package.json', json.dumps({
+                'name': 'site',
+                'dependencies': {
+                    'underscore': '~1.8.0',
+                    'jquery': '~1.9.0',
+                },
+            })),
+        ), 'site', '2.0')
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+        result = calmjs_dist.flatten_dist_package_json(site, working_set)
+        self.assertEqual(result, {
+            'name': 'site',
+            'dependencies': {
+                'left-pad': '~1.1.1',
+                'jquery': '~1.9.0',
+                'backbone': '~1.3.0',
+                'jquery-ui': '~1.12.0',
+                'underscore': '~1.8.0',
+            },
+            'devDependencies': {
+                'sinon': '~1.17.0',
+            },
+        })

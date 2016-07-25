@@ -95,3 +95,49 @@ def read_package_json(pkg_name, filename='package.json'):
 
     dist = get_pkg_dist(pkg_name)
     return get_dist_package_json(dist, filename)
+
+
+def flatten_dist_package_json(
+        source_dist, working_set=pkg_resources.working_set):
+    """
+    Resolve a distribution's (dev)dependencies through the working set
+    and generate a flattened version package.json, returned as a dict,
+    from the resolved distributions.
+
+    Default working set is the one from pkg_resources.
+
+    The generated package.json dict is done by grabbing all package.json
+    metadata from all parent Python packages, starting from the highest
+    level and down to the lowest.  The current distribution's
+    dependencies will be layered on top along with its other package
+    information.  This has the effect of child packages overriding
+    node/npm dependencies which is by the design of this function.  If
+    nested dependencies are desired, just rely on npm only for all
+    dependency management.
+
+    Flat is better than nested.
+    """
+
+    dependencies = {}
+    devDependencies = {}
+
+    # Go from the earliest package down to the latest one, as we will
+    # flatten children's d(evD)ependencies on top of parent's.
+    for dist in reversed(working_set.resolve(source_dist.requires())):
+        obj = get_dist_package_json(dist)
+        if not obj:
+            continue
+
+        dependencies.update(obj.get('dependencies', {}))
+        devDependencies.update(obj.get('devDependencies', {}))
+
+    # ensure that we have a dict.
+    obj = get_dist_package_json(source_dist) or {}
+    # Layer on top
+    dependencies.update(obj.get('dependencies', {}))
+    devDependencies.update(obj.get('devDependencies', {}))
+
+    obj['dependencies'] = dependencies
+    obj['devDependencies'] = devDependencies
+
+    return obj
