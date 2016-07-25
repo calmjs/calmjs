@@ -11,10 +11,12 @@ from pkg_resources import Distribution
 from calmjs.testing import module3
 
 
-def _cleanup_mkdtemp(testcase_inst, tmpdir):
-    rmtree(tmpdir)
-    if hasattr(testcase_inst, '_calmjs_testing_tmpdir'):
-        delattr(testcase_inst, '_calmjs_testing_tmpdir')
+TMPDIR_ID = '_calmjs_testing_tmpdir'
+
+
+def _cleanup_mkdtemp_mark(testcase_inst):
+    if hasattr(testcase_inst, TMPDIR_ID):
+        delattr(testcase_inst, TMPDIR_ID)
 
 
 def mkdtemp(testcase_inst):
@@ -34,9 +36,28 @@ def mkdtemp(testcase_inst):
 
     # create the temporary dir and add the cleanup for that immediately.
     tmpdir = tempfile.mkdtemp()
-    testcase_inst._calmjs_testing_tmpdir = tmpdir
-    testcase_inst.addCleanup(_cleanup_mkdtemp, testcase_inst, tmpdir)
+    testcase_inst.addCleanup(rmtree, tmpdir)
+    return tmpdir
+
+
+def mkdtemp_single(testcase_inst):
+    """
+    A temporary directory creation helper function that cleans itself up
+    by removing itself after the TestCase instance completes the current
+    running test.  This one will reuse the initial returned path on all
+    subsequent calls.  Requires a TestCase instance.
+    """
+
+    if getattr(testcase_inst, TMPDIR_ID, None):
+        # If already exist, return that.
+        return getattr(testcase_inst, TMPDIR_ID)
+
+    tmpdir = mkdtemp(testcase_inst)
+    testcase_inst.addCleanup(_cleanup_mkdtemp_mark, testcase_inst)
+
     # mark the testcase with it
+    setattr(testcase_inst, TMPDIR_ID, tmpdir)
+
     return tmpdir
 
 
@@ -85,7 +106,7 @@ def make_dummy_dist(testcase_inst, metadata_map=(),
     uses PathMetadata for the foundation for integration level testing.
     """
 
-    tmpdir = mkdtemp(testcase_inst)
+    tmpdir = mkdtemp_single(testcase_inst)
     egg_info = '%s-%s.egg-info' % (pkgname, version)
     egg_info_dir = join(tmpdir, egg_info)
     makedirs(egg_info_dir)
