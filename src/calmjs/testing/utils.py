@@ -5,7 +5,16 @@ from shutil import rmtree
 from types import ModuleType
 from unittest import TestCase
 
+from pkg_resources import PathMetadata
+from pkg_resources import Distribution
+
 from calmjs.testing import module3
+
+
+def _cleanup_mkdtemp(testcase_inst, tmpdir):
+    rmtree(tmpdir)
+    if hasattr(testcase_inst, '_calmjs_testing_tmpdir'):
+        delattr(testcase_inst, '_calmjs_testing_tmpdir')
 
 
 def mkdtemp(testcase_inst):
@@ -25,7 +34,9 @@ def mkdtemp(testcase_inst):
 
     # create the temporary dir and add the cleanup for that immediately.
     tmpdir = tempfile.mkdtemp()
-    testcase_inst.addCleanup(rmtree, tmpdir)
+    testcase_inst._calmjs_testing_tmpdir = tmpdir
+    testcase_inst.addCleanup(_cleanup_mkdtemp, testcase_inst, tmpdir)
+    # mark the testcase with it
     return tmpdir
 
 
@@ -65,3 +76,24 @@ def make_multipath_module3(testcase_inst):
     module.__path__ = fake_modpath
 
     return module, index_js
+
+
+def make_dummy_dist(testcase_inst, metadata_map=(),
+                    pkgname='dummydist', version='0.0'):
+    """
+    Test case helper function for creating a distribution dummy that
+    uses PathMetadata for the foundation for integration level testing.
+    """
+
+    tmpdir = mkdtemp(testcase_inst)
+    egg_info = '%s-%s.egg-info' % (pkgname, version)
+    egg_info_dir = join(tmpdir, egg_info)
+    makedirs(egg_info_dir)
+    metadata = PathMetadata(tmpdir, egg_info_dir)
+
+    for fn, data in metadata_map:
+        with open(join(egg_info_dir, fn), 'w') as fd:
+            fd.write(data)
+
+    return Distribution(
+        tmpdir, project_name=pkgname, metadata=metadata, version=version)
