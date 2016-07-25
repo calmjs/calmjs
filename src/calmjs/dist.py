@@ -10,9 +10,9 @@ from distutils.core import Command
 from distutils.errors import DistutilsSetupError
 from distutils import log
 
+import pkg_resources
 from pkg_resources import Environment
 from pkg_resources import Requirement
-from pkg_resources import WorkingSet
 from pkg_resources import resource_string
 from pkg_resources import resource_stream
 
@@ -50,13 +50,13 @@ def write_package_json(cmd, basename, filename):
     cmd.write_or_delete_file(argname, filename, value, force=True)
 
 
-def get_pkg_dist(pkg_name):
+def get_pkg_dist(pkg_name, env=None, working_set=pkg_resources.working_set):
     """
     Locate a package's distribution by its name.
     """
 
-    env = Environment()
-    working_set = WorkingSet()
+    if env is None:
+        env = Environment()
     req = Requirement.parse(pkg_name)
     return env.best_match(req, working_set)
 
