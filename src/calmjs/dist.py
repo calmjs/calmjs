@@ -13,8 +13,6 @@ from distutils import log
 import pkg_resources
 from pkg_resources import Environment
 from pkg_resources import Requirement
-from pkg_resources import resource_string
-from pkg_resources import resource_stream
 
 import json
 
@@ -68,7 +66,7 @@ def get_dist_package_json(dist, filename='package.json'):
 
     # Then use the package's distribution to acquire the file.
     if not dist.has_metadata(filename):
-        log.debug("No '%s' found for '%s'.", filename, dist)
+        log.debug("No '%s' for '%s'.", filename, dist)
         return
 
     try:
@@ -79,11 +77,12 @@ def get_dist_package_json(dist, filename='package.json'):
 
     try:
         obj = json.loads(result)
-    except (TypeError, ValueError) as e:
+    except (TypeError, ValueError):
         log.error(
             "The '%s' found in '%s' is not a valid json.", filename, dist)
         return
 
+    log.debug("Found '%s' for '%s'.", filename, dist)
     return obj
 
 
@@ -98,7 +97,8 @@ def read_package_json(pkg_name, filename='package.json'):
 
 
 def flatten_dist_package_json(
-        source_dist, working_set=pkg_resources.working_set):
+        source_dist, filename='package.json',
+        working_set=pkg_resources.working_set):
     """
     Resolve a distribution's (dev)dependencies through the working set
     and generate a flattened version package.json, returned as a dict,
@@ -124,7 +124,7 @@ def flatten_dist_package_json(
     # Go from the earliest package down to the latest one, as we will
     # flatten children's d(evD)ependencies on top of parent's.
     for dist in reversed(working_set.resolve(source_dist.requires())):
-        obj = get_dist_package_json(dist)
+        obj = get_dist_package_json(dist, filename)
         if not obj:
             continue
 
@@ -132,7 +132,7 @@ def flatten_dist_package_json(
         devDependencies.update(obj.get('devDependencies', {}))
 
     # ensure that we have a dict.
-    obj = get_dist_package_json(source_dist) or {}
+    obj = get_dist_package_json(source_dist, filename) or {}
     # Layer on top
     dependencies.update(obj.get('dependencies', {}))
     devDependencies.update(obj.get('devDependencies', {}))
@@ -141,3 +141,15 @@ def flatten_dist_package_json(
     obj['devDependencies'] = devDependencies
 
     return obj
+
+
+def flatten_package_json(
+        pkg_name, filename='package.json',
+        working_set=pkg_resources.working_set):
+    """
+    Generate a flattened package.json of a package `pkg_name` that's
+    already installed within the current Python environment.
+    """
+
+    dist = get_pkg_dist(pkg_name, working_set=working_set)
+    return flatten_dist_package_json(dist, filename, working_set)

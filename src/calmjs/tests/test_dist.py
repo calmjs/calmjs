@@ -137,6 +137,7 @@ class DistTestCase(unittest.TestCase):
         make_dummy_dist(self, (
             ('requires.txt', '\n'.join([
             ])),
+            ('package.json', 'This is very NOT a package.json.'),
         ), 'security', '9999')
 
         make_dummy_dist(self, (
@@ -210,9 +211,7 @@ class DistTestCase(unittest.TestCase):
             })),
         ), 'site', '2.0')
 
-        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
-        result = calmjs_dist.flatten_dist_package_json(site, working_set)
-        self.assertEqual(result, {
+        answer = {
             'name': 'site',
             'dependencies': {
                 'left-pad': '~1.1.1',
@@ -224,4 +223,13 @@ class DistTestCase(unittest.TestCase):
             'devDependencies': {
                 'sinon': '~1.17.0',
             },
-        })
+        }
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+        result = calmjs_dist.flatten_dist_package_json(
+            site, working_set=working_set)
+        self.assertEqual(result, answer)
+
+        result = calmjs_dist.flatten_package_json(
+            'site', working_set=working_set)
+        self.assertEqual(result, answer)
