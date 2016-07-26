@@ -11,12 +11,13 @@ from distutils.errors import DistutilsSetupError
 from distutils import log
 
 import pkg_resources
-from pkg_resources import Environment
 from pkg_resources import Requirement
+from pkg_resources import working_set as default_working_set
 
 import json
 
 from calmjs.npm import verify_package_json
+from calmjs.npm import PACKAGE_JSON
 
 
 def validate_package_json(dist, attr, value):
@@ -48,18 +49,16 @@ def write_package_json(cmd, basename, filename):
     cmd.write_or_delete_file(argname, filename, value, force=True)
 
 
-def get_pkg_dist(pkg_name, env=None, working_set=pkg_resources.working_set):
+def get_pkg_dist(pkg_name, working_set=default_working_set):
     """
     Locate a package's distribution by its name.
     """
 
-    if env is None:
-        env = Environment()
     req = Requirement.parse(pkg_name)
-    return env.best_match(req, working_set)
+    return working_set.find(req)
 
 
-def get_dist_package_json(dist, filename='package.json'):
+def get_dist_package_json(dist, filename=PACKAGE_JSON):
     """
     Safely get a package_json from a distribution.
     """
@@ -86,19 +85,19 @@ def get_dist_package_json(dist, filename='package.json'):
     return obj
 
 
-def read_package_json(pkg_name, filename='package.json'):
+def read_package_json(pkg_name,
+        filename=PACKAGE_JSON, working_set=default_working_set):
     """
     Read the package.json of a package identified by `pkg_name` that's
     already installed within the current Python environment.
     """
 
-    dist = get_pkg_dist(pkg_name)
+    dist = get_pkg_dist(pkg_name, working_set=working_set)
     return get_dist_package_json(dist, filename)
 
 
 def flatten_dist_package_json(
-        source_dist, filename='package.json',
-        working_set=pkg_resources.working_set):
+        source_dist, filename=PACKAGE_JSON, working_set=default_working_set):
     """
     Resolve a distribution's (dev)dependencies through the working set
     and generate a flattened version package.json, returned as a dict,
@@ -144,12 +143,16 @@ def flatten_dist_package_json(
 
 
 def flatten_package_json(
-        pkg_name, filename='package.json',
-        working_set=pkg_resources.working_set):
+        pkg_name, filename=PACKAGE_JSON, working_set=default_working_set):
     """
     Generate a flattened package.json of a package `pkg_name` that's
-    already installed within the current Python environment.
+    already installed within the current Python environment (defaults
+    to the current global working_set which should have been set up
+    correctly by pkg_resources).
     """
 
     dist = get_pkg_dist(pkg_name, working_set=working_set)
+    if not dist:
+        # No distribution, return a completely empty "package.json".
+        return {}
     return flatten_dist_package_json(dist, filename, working_set)

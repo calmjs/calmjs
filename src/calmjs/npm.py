@@ -7,6 +7,8 @@ Provides some helper functions that deal with package.json
 
 import json
 
+PACKAGE_JSON = 'package.json'
+
 
 def verify_package_json(value):
     """

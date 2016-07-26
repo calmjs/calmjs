@@ -133,6 +133,36 @@ class DistTestCase(unittest.TestCase):
         results = calmjs_dist.get_dist_package_json(mock_dist)
         self.assertEqual(results['dependencies']['left-pad'], '~1.1.1')
 
+    def test_get_dist_package_json_alternative_name_args(self):
+        package_json = {"dependencies": {"left-pad": "~1.1.1"}}
+
+        # We will mock up a Distribution object with some fake metadata.
+        mock_provider = MockProvider({
+            'bower.json': json.dumps(package_json),
+        })
+
+        mock_dist = pkg_resources.Distribution(
+            metadata=mock_provider, project_name='dummydist', version='0.0.0')
+
+        results = calmjs_dist.get_dist_package_json(
+            mock_dist, filename='bower.json')
+
+        self.assertEqual(results, package_json)
+
+        working_set = pkg_resources.WorkingSet()
+        working_set.add(mock_dist)
+
+        self.assertEqual(package_json, calmjs_dist.read_package_json(
+            'dummydist', filename='bower.json', working_set=working_set))
+
+        # Finally do the flattening
+        flattened_json = {
+            "dependencies": {"left-pad": "~1.1.1"}, "devDependencies": {}}
+        self.assertEqual(flattened_json, calmjs_dist.flatten_dist_package_json(
+            mock_dist, filename='bower.json', working_set=working_set))
+        self.assertEqual(flattened_json, calmjs_dist.flatten_package_json(
+            'dummydist', filename='bower.json', working_set=working_set))
+
     def tests_flatten_package_json_deps(self):
         make_dummy_dist(self, (
             ('requires.txt', '\n'.join([
@@ -225,11 +255,123 @@ class DistTestCase(unittest.TestCase):
             },
         }
 
+        # WorkingSet is a frozen representation of the versions and
+        # locations of all available package presented through sys.path
+        # by default.  Here we just emulate it using our temporary path
+        # created by our mock package definitions above.
+
         working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+
+        # Ensure that this works with a raw requirement object
         result = calmjs_dist.flatten_dist_package_json(
             site, working_set=working_set)
         self.assertEqual(result, answer)
 
+        # Also a raw requirement (package) string on the other function.
         result = calmjs_dist.flatten_package_json(
             'site', working_set=working_set)
         self.assertEqual(result, answer)
+
+    def tests_flatten_package_json_multi_version(self):
+        """
+        Need to ensure the *correct* version is picked.
+        """
+
+        uilib_1_1 = make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([])),
+            ('package.json', json.dumps({
+                'dependencies': {'jquery': '~1.0.0'},
+            })),
+        ), 'uilib', '1.1.0')
+
+        uilib_1_4 = make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([])),
+            ('package.json', json.dumps({
+                'dependencies': {'jquery': '~1.4.0'},
+            })),
+        ), 'uilib', '1.4.0')
+
+        uilib_1_9 = make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([])),
+            ('package.json', json.dumps({
+                'dependencies': {'jquery': '~1.9.0'},
+            })),
+        ), 'uilib', '1.9.0')
+
+        app = make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([
+                'uilib>=1.0',
+            ])),
+        ), 'app', '2.0')
+
+        # Instead of passing in the tmpdir like the previous test, this
+        # working set will be manually created as the situation here
+        # should not happen normally - a raw (dist|site)-packages dir
+        # with multiple versions of egg-info available for a single
+        # importable path - a situation that results in the uilib's
+        # actual version being ambiguous.  Anyway, each of these
+        # "versions" should be in their own .egg directory with an
+        # "EGG-INFO" subdir underneath, with the top level egg path
+        # being added to sys.path either through a site.py or some kind
+        # of generated program entry point that does that.  For all
+        # intents and purposes if the manual Requirements are added to
+        # the WorkingSet like so, the expected values presented in the
+        # system can be created to behave as if they really exist.
+
+        working_set = pkg_resources.WorkingSet()
+        working_set.add(uilib_1_9, self._calmjs_testing_tmpdir)
+        working_set.add(app, self._calmjs_testing_tmpdir)
+
+        answer = {
+            'dependencies': {
+                'jquery': '~1.9.0',
+            },
+            'devDependencies': {},
+        }
+        result = calmjs_dist.flatten_package_json(
+            'app', working_set=working_set)
+        self.assertEqual(result, answer)
+
+        # Now emulate an older version, with a different working set.
+
+        working_set = pkg_resources.WorkingSet()
+        working_set.add(uilib_1_4, self._calmjs_testing_tmpdir)
+        # this shouldn't override the previous.
+        working_set.add(uilib_1_1, self._calmjs_testing_tmpdir)
+        working_set.add(app, self._calmjs_testing_tmpdir)
+
+        answer = {
+            'dependencies': {
+                'jquery': '~1.4.0',
+            },
+            'devDependencies': {},
+        }
+        result = calmjs_dist.flatten_package_json(
+            'app', working_set=working_set)
+        self.assertEqual(result, answer)
+
+    def tests_flatten_package_json_missing_complete(self):
+        """
+        A completely missing egg should not just blow up.
+        """
+
+        working_set = pkg_resources.WorkingSet()
+        self.assertEqual({}, calmjs_dist.flatten_package_json(
+            'nosuchpkg', working_set=working_set))
+
+    def tests_flatten_package_json_missing_deps(self):
+        """
+        Missing depedencies should not cause a hard failure.
+        """
+
+        make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([
+                'uilib>=1.0',
+            ])),
+        ), 'app', '2.0')
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+
+        # Python dependency acquisition failures should fail hard.
+        with self.assertRaises(pkg_resources.DistributionNotFound):
+            calmjs_dist.flatten_package_json('app', working_set=working_set)

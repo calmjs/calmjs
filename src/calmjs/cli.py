@@ -11,6 +11,8 @@ from shutil import rmtree
 from subprocess import check_output
 from subprocess import call
 
+from calmjs.npm import PACKAGE_JSON
+
 __all__ = [
     'get_node_version', 'get_npm_version', 'npm_install',
     'make_package_json',
