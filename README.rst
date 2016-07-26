@@ -1,8 +1,15 @@
 calmjs
 ======
 
-A utility package that provides a set of tools that allows JavaScript to
-be used more easily alongside with Python.
+A toolchain for working with JavaScript from a Python-based environment,
+from the definition of modules, to import system and the deployment of
+the final module package for distribution in a way that is painless for
+developers, integrators and end-users to consume.
+
+.. image:: https://travis-ci.org/calmjs/calmjs.svg?branch=master
+    :target: https://travis-ci.org/calmjs/calmjs
+.. image:: https://coveralls.io/repos/github/calmjs/calmjs/badge.svg?branch=master
+    :target: https://coveralls.io/github/calmjs/calmjs?branch=master
 
 Introduction
 ============
@@ -21,6 +28,16 @@ that set up a working nodejs environment for bunding other dependencies
 reachable through npm, and also sets up test environments for running
 JavaScript unit/functional/integration tests.
 
+Currently, with the usage of calmjs setuptools command hooks, it is
+possible to declare npm dependencies in a ``setup.py`` file by setting a
+``package_json`` attribute to the ``setup`` call within that file.
+Through the use of ``setup.py npm --init``, a ``package.json`` will be
+generated from the dependencies declared not only the current package,
+but also from all Python module dependencies that have been been
+declared.  The dependency declaration within the ``package.json`` will
+of course be flattened as per Python's module/import/distutils system,
+thus the resulting dependencies required by all npm packages will be
+installed alongside the top level Python package.
 
 Installation
 ------------
