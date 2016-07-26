@@ -118,3 +118,39 @@ def make_dummy_dist(testcase_inst, metadata_map=(),
 
     return Distribution(
         tmpdir, project_name=pkgname, metadata=metadata, version=version)
+
+
+def stub_mod_call(testcase_inst, mod, f=None):
+    def fake_call(*a, **kw):
+        testcase_inst.call_args = (a, kw)
+
+    # if f:
+    #     fake_call = f
+
+    call, mod.call = mod.call, fake_call
+    testcase_inst.call_args = None
+
+    def cleanup():
+        # Restore original module level functions
+        mod.call = call
+        delattr(testcase_inst, 'call_args')
+
+    testcase_inst.addCleanup(cleanup)
+
+
+def stub_mod_check_output(testcase_inst, mod, f=None):
+    def fake_check_output(*a, **kw):
+        testcase_inst.check_output_args = (a, kw)
+        return testcase_inst.check_output_answer
+
+    if f:
+        fake_check_output = f
+
+    check_output, mod.check_output = mod.check_output, fake_check_output
+    testcase_inst.check_output_answer = None
+
+    def cleanup():
+        mod.check_output = check_output
+        delattr(testcase_inst, 'check_output_answer')
+
+    testcase_inst.addCleanup(cleanup)
