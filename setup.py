@@ -22,6 +22,9 @@ setup(name='calmjs',
       ],
       entry_points="""
       # -*- Entry points: -*-
+      [distutils.commands]
+      npm = calmjs.command:npm
+
       [distutils.setup_keywords]
       package_json = calmjs.dist:validate_package_json
 

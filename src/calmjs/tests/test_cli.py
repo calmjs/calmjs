@@ -2,10 +2,8 @@
 import unittest
 import json
 import os
-import tempfile
 from os.path import join
-from os.path import dirname
-from shutil import rmtree
+from os.path import exists
 
 from calmjs import cli
 from calmjs.testing.utils import mkdtemp
@@ -93,7 +91,7 @@ class CliTestCase(unittest.TestCase):
         self.assertIsNotNone(version)
 
     def test_set_node_path(self):
-        custom_cli = cli.Cli(node_path='./node_mods')
+        cli.Cli(node_path='./node_mods')
         # environment locally here overridden.
         self.assertEqual(os.environ['NODE_PATH'], './node_mods')
 
@@ -107,13 +105,7 @@ class CliTestCase(unittest.TestCase):
         cli.npm_install()
         # However we make sure that it's been fake called
         self.assertEqual(self.call_args, ((['npm', 'install'],), {}))
-        # And that the JSON file was written to the temp dir as that was
-        # set to be the current working directory by setup.
-
-        with open(join(tmpdir, 'package.json')) as fd:
-            config = json.load(fd)
-
-        self.assertEqual(config, cli.make_package_json())
+        self.assertFalse(exists(join(tmpdir, 'package.json')))
 
     @unittest.skipIf(cli.get_npm_version() is None, 'npm not found.')
     def test_npm_install_package_json_no_overwrite(self):

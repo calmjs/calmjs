@@ -6,11 +6,9 @@ Provides functions and classes that enable the management of npm
 dependencies for JavaScript sources that lives in Python packages.
 """
 
-from distutils.core import Command
 from distutils.errors import DistutilsSetupError
 from distutils import log
 
-import pkg_resources
 from pkg_resources import Requirement
 from pkg_resources import working_set as default_working_set
 
@@ -85,8 +83,8 @@ def get_dist_package_json(dist, filename=PACKAGE_JSON):
     return obj
 
 
-def read_package_json(pkg_name,
-        filename=PACKAGE_JSON, working_set=default_working_set):
+def read_package_json(
+        pkg_name, filename=PACKAGE_JSON, working_set=default_working_set):
     """
     Read the package.json of a package identified by `pkg_name` that's
     already installed within the current Python environment.
@@ -120,9 +118,17 @@ def flatten_dist_package_json(
     dependencies = {}
     devDependencies = {}
 
+    # ensure that we have at least a dummy value
+    if source_dist:
+        requires = source_dist.requires()
+        root = get_dist_package_json(source_dist, filename) or {}
+    else:
+        requires = []
+        root = {}
+
     # Go from the earliest package down to the latest one, as we will
     # flatten children's d(evD)ependencies on top of parent's.
-    for dist in reversed(working_set.resolve(source_dist.requires())):
+    for dist in reversed(working_set.resolve(requires)):
         obj = get_dist_package_json(dist, filename)
         if not obj:
             continue
@@ -130,16 +136,14 @@ def flatten_dist_package_json(
         dependencies.update(obj.get('dependencies', {}))
         devDependencies.update(obj.get('devDependencies', {}))
 
-    # ensure that we have a dict.
-    obj = get_dist_package_json(source_dist, filename) or {}
     # Layer on top
-    dependencies.update(obj.get('dependencies', {}))
-    devDependencies.update(obj.get('devDependencies', {}))
+    dependencies.update(root.get('dependencies', {}))
+    devDependencies.update(root.get('devDependencies', {}))
 
-    obj['dependencies'] = dependencies
-    obj['devDependencies'] = devDependencies
+    root['dependencies'] = dependencies
+    root['devDependencies'] = devDependencies
 
-    return obj
+    return root
 
 
 def flatten_package_json(
@@ -152,7 +156,4 @@ def flatten_package_json(
     """
 
     dist = get_pkg_dist(pkg_name, working_set=working_set)
-    if not dist:
-        # No distribution, return a completely empty "package.json".
-        return {}
     return flatten_dist_package_json(dist, filename, working_set)

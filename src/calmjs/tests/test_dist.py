@@ -356,8 +356,10 @@ class DistTestCase(unittest.TestCase):
         """
 
         working_set = pkg_resources.WorkingSet()
-        self.assertEqual({}, calmjs_dist.flatten_package_json(
-            'nosuchpkg', working_set=working_set))
+        self.assertEqual(
+            {'dependencies': {}, 'devDependencies': {}},
+            calmjs_dist.flatten_package_json(
+                'nosuchpkg', working_set=working_set))
 
     def tests_flatten_package_json_missing_deps(self):
         """
