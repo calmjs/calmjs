@@ -35,11 +35,9 @@ class DistTestCase(unittest.TestCase):
             calmjs_dist.validate_package_json(
                 self.dist, self.optname, "{},")
 
-        self.assertEqual(
-            str(e.exception),
-            "'package_json' JSON decoding error: "
-            "Extra data: line 1 column 3 - line 1 column 4 (char 2 - 3)"
-        )
+        self.assertTrue(str(e.exception).startswith(
+            "'package_json' JSON decoding error:"
+        ))
 
     def test_write_package_json(self):
         self.dist.package_json = '{}'

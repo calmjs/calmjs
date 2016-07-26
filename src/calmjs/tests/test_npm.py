@@ -4,6 +4,11 @@ import unittest
 from calmjs import npm
 
 
+class _marker(object):
+    def __repr__(self):
+        return '<marker>'
+
+
 class NpmTestCase(unittest.TestCase):
     """
     calmjs.npm module test case.
@@ -17,12 +22,12 @@ class NpmTestCase(unittest.TestCase):
 
     def test_check_package_json_bad_type(self):
         with self.assertRaises(ValueError) as e:
-            npm.verify_package_json(object)
+            npm.verify_package_json(_marker())
 
         self.assertEqual(
             str(e.exception),
             'must be a JSON serializable object: '
-            '<type \'object\'> is not JSON serializable'
+            '<marker> is not JSON serializable'
         )
 
     def test_check_package_json_bad_type_in_dict(self):
@@ -68,11 +73,7 @@ class NpmTestCase(unittest.TestCase):
                 '}'
             )
 
-        self.assertEqual(
-            str(e.exception),
-            'JSON decoding error: '
-            'Expecting property name: line 1 column 59 (char 58)'
-        )
+        self.assertTrue(str(e.exception).startswith('JSON decoding error:'))
 
     def test_check_package_json_good_str(self):
         result = npm.verify_package_json(
