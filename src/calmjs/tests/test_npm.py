@@ -95,3 +95,14 @@ class NpmTestCase(unittest.TestCase):
             },
         )
         self.assertTrue(result)
+
+    def test_check_package_json_good_dict_with_none(self):
+        # Possible to specify a null requirement to remove things.
+        result = npm.verify_package_json(
+            {
+                "devDependencies": {
+                    "left-pad": None
+                },
+            },
+        )
+        self.assertTrue(result)

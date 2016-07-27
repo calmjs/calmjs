@@ -140,8 +140,10 @@ def flatten_dist_package_json(
     dependencies.update(root.get('dependencies', {}))
     devDependencies.update(root.get('devDependencies', {}))
 
-    root['dependencies'] = dependencies
-    root['devDependencies'] = devDependencies
+    root['dependencies'] = {
+        k: v for k, v in dependencies.items() if v is not None}
+    root['devDependencies'] = {
+        k: v for k, v in devDependencies.items() if v is not None}
 
     return root
 

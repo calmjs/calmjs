@@ -375,3 +375,43 @@ class DistTestCase(unittest.TestCase):
         # Python dependency acquisition failures should fail hard.
         with self.assertRaises(pkg_resources.DistributionNotFound):
             calmjs_dist.flatten_package_json('app', working_set=working_set)
+
+    def tests_flatten_package_json_nulled(self):
+        """
+        Need to ensure the *correct* version is picked.
+        """
+
+        lib = make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([])),
+            ('package.json', json.dumps({
+                'dependencies': {
+                    'jquery': '~3.0.0',
+                    'left-pad': '1.1.1',
+                },
+            })),
+        ), 'lib', '1.0.0')
+
+        app = make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([
+                'lib>=1.0.0',
+            ])),
+            ('package.json', json.dumps({
+                'dependencies': {
+                    'jquery': '~3.0.0',
+                    'left-pad': None,
+                },
+            })),
+        ), 'app', '2.0')
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+
+        answer = {
+            'dependencies': {
+                'jquery': '~3.0.0',
+                # left-pad will be absent as app removed via None.
+            },
+            'devDependencies': {},
+        }
+        result = calmjs_dist.flatten_package_json(
+            'app', working_set=working_set)
+        self.assertEqual(result, answer)
