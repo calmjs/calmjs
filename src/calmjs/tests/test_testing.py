@@ -130,7 +130,7 @@ class TestingUtilsTestCase(unittest.TestCase):
                 'childpkg>=0.1',
                 'parentpkg>=0.8',
             ])),
-        ), 'childpkg', '0.8')
+        ), 'grandchildpkg', '0.8')
 
         working_set = WorkingSet([self._calmjs_testing_tmpdir])
         distributions = working_set.resolve(grandchildpkg.requires())
