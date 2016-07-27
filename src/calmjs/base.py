@@ -35,6 +35,12 @@ class BaseModuleRegistry(object):
         """
 
         self.registry_name = registry_name
+        self._init()
+
+    def _init(self):
+        """
+        Subclasses can override this instead to set instance attributes.
+        """
 
     def register_entry_points(self, entry_points):
         """
