@@ -1,10 +1,8 @@
 calmjs
 ======
 
-A toolchain for working with JavaScript from a Python-based environment,
-from the definition of modules, to import system and the deployment of
-the final module package for distribution in a way that is painless for
-developers, integrators and end-users to consume.
+A framework for building toolchains and machineries for working with
+JavaScript from the Python environment.
 
 .. image:: https://travis-ci.org/calmjs/calmjs.svg?branch=master
     :target: https://travis-ci.org/calmjs/calmjs
@@ -14,37 +12,126 @@ developers, integrators and end-users to consume.
 Introduction
 ============
 
-This package provides a toolchain that builds JavaScript files from
-available Python packages into a single bundle.
+At its core, calmjs provides a set of extension to |setuptools|_ that
+assists with the tracking and management of dependencies of JavaScript
+packages (such as ones through |npm|_) for a given Python package.  It
+also provides a number of base classes that can be used to build custom
+toolchains that implement different strategies for managing and
+compiling required JavaScript code and related assets into the
+deployment bundle file that an application server may use.  Related
+packages that make use of this framework implementing the most commonly
+used patterns for the various use cases will become available to
+facilitate painless and easy deployment of JavaScript and assets to
+servers for developers and integrators to use.  These use cases will
+include the management of testing frameworks, to the bundling of APM
+modules.
+
+.. |setuptools| replace:: ``setuptools``
+.. |npm| replace:: ``npm``
+.. _setuptools: https://pypi.python.org/pypi/setuptools
+.. _npm: https://www.npmjs.com/
+
+The name calmjs was originally derived from the steps in the first
+iteration of the toolchain which involves the steps compile, assemble,
+and linkage into a module of JavaScript using the namespace from the
+host Python package.  The logo (whenever this can be gotten around to)
+will involve a bunny rabbit, ears represented by the `m` letter.  This
+is choosen for their dietary habits, which is akin to how JavaScript is
+typically worked into a state that resembles a usable level.
 
 
 Features
 --------
 
-The core of the package is a toolchain that will load and compile all
-registered JavaScript files within a python (virtual) environment and
-bundle everything into a single file.  It also provides helper utilities
-that set up a working nodejs environment for bunding other dependencies
-reachable through npm, and also sets up test environments for running
-JavaScript unit/functional/integration tests.
+Record and generate ``package.json`` for consumption by |npm|_
+    This is done through the usage of |setuptools|_ command hooks, it is
+    possible to declare npm package dependencies in a ``setup.py`` file
+    by setting a ``package_json`` attribute to the ``setup`` call within
+    that file.  These dependencies will be persisted as egg-info
+    metadata which will be usable by other packages depending on the
+    declaring one; their dependencies will naturally be layered on top
+    of all their parents' ``package.json`` as Python and |setuptools|_
+    support a flat dependency structure.  The packages from which the
+    tool is invoked (this can be done typically through ``setup.py npm
+    --init``) will be able to override all the ``dependencies`` /
+    ``devDependencies`` that may have been specified by their parent
+    packages.  Naturally, this package should be usable by any other
+    compatible package managers and/or repositories.
 
-Currently, with the usage of calmjs setuptools command hooks, it is
-possible to declare npm dependencies in a ``setup.py`` file by setting a
-``package_json`` attribute to the ``setup`` call within that file.
-Through the use of ``setup.py npm --init``, a ``package.json`` will be
-generated from the dependencies declared not only the current package,
-but also from all Python module dependencies that have been been
-declared.  The dependency declaration within the ``package.json`` will
-of course be flattened as per Python's module/import/distutils system,
-thus the resulting dependencies required by all npm packages will be
-installed alongside the top level Python package.
+Better integration of JavaScript toolchains with Python environment
+    This basically is a framework for building toolchains for working
+    with JavaScript that integrates well with existing Python packages
+    and environment.
+
+    There are no limitations as to how or what this can be done, as this
+    is left as an implementation detail.  For an example (when this is
+    done) please refer to the ``calmjs.rjs`` package.
+
+    Generally, toolchains can be built to find and load all Python
+    packages that have any JavaScript source files, and those will be
+    extracted, go through the appropriate transpilers (if any) in order
+    to build a deployable bundle/minified file.  Test harnesses can be
+    set up to aid with running of unit tests, functional testing and
+    naturally the final integration tests needed for a successful
+    deployment.
+
 
 Installation
 ------------
 
 Currently under development, please install by cloning this repository
-and run ``python setup.py develop`` within your environment, or follow
-your framework's method on installation of development packages.
+and run ``python setup.py develop`` within a working Python environment,
+or follow the local framework or operating system's default method on
+installation of development packages that have pulled this package in.
+
+
+Usage
+-----
+
+If a package wish to declare dependencies for an |npm|_ package, it may
+do this in its ``setup.py``::
+
+    from setuptools import setup
+
+    package_json = {
+        "dependencies": {
+            "jquery": "~3.0.0",
+            "underscore": "~1.8.0",
+        }
+    }
+
+    setup(
+        name='example.package',
+        ...
+        install_requires=[
+            'calmjs',
+            ...
+        ],
+        package_json=package_json,
+        ...
+    )
+
+
+Documentation on how to extend the Toolchain class to support use cases
+will need to be done, though the focus right now is to provide a working
+``calmjs.rjs`` package.
+
+
+Dealing with |npm|_ dependencies with Python package dependencies
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Remember, flat is better than nested.  So all ``dependencies`` (and
+``devDependencies``) declared can be overriden by subsequent packages,
+and doing so flattens the dependencies for the final package to consume,
+with the desired toolchain to make use of the declared information to
+generate their JavaScript bundle.
+
+Of course, if the nested style of packages and dependency in the same
+style as npm is desired, no one is forced to use this, they are free to
+split their packages up to Python and JavaScript bits and have them be
+deployed and hosted both pypi (for pip) and npm (respectively) and then
+figure out how to bring them back together in a coherent manner.  Don't
+ask the author how this option is easier or better.
 
 
 Contribute
