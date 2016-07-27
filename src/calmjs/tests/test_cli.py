@@ -6,15 +6,10 @@ from os.path import join
 from os.path import exists
 
 from calmjs import cli
+from calmjs.testing.utils import fake_error
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import stub_mod_call
 from calmjs.testing.utils import stub_mod_check_output
-
-
-def fake_error(exception):
-    def stub(*a, **kw):
-        raise exception
-    return stub
 
 
 class CliTestCase(unittest.TestCase):

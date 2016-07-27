@@ -4,9 +4,6 @@ import json
 import os
 import re
 from os.path import exists
-from os.path import isdir
-from os.path import join
-from shutil import rmtree
 
 from subprocess import check_output
 from subprocess import call
@@ -88,6 +85,7 @@ class Cli(object):
                 json.dump(package_json, fd)
 
         call([self.npm_bin, 'install'])
+
 
 _inst = Cli()
 get_node_version = _inst.get_node_version

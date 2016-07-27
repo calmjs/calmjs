@@ -19,6 +19,12 @@ def _cleanup_mkdtemp_mark(testcase_inst):
         delattr(testcase_inst, TMPDIR_ID)
 
 
+def fake_error(exception):
+    def stub(*a, **kw):
+        raise exception
+    return stub
+
+
 def mkdtemp(testcase_inst):
     """
     A temporary directory creation helper function that cleans itself up
@@ -78,7 +84,7 @@ def make_multipath_module3(testcase_inst):
     # First create a tmpdir where the "alternative" module path will
     # be provided with a dummy JavaScript module file
     target = join(tmpdir, 'calmjs.testing.module3', 'src',
-                'calmjs', 'testing', 'module3')
+                  'calmjs', 'testing', 'module3')
     makedirs(target)
     index_js = join(target, 'index.js')
 
@@ -144,7 +150,7 @@ def stub_mod_check_output(testcase_inst, mod, f=None):
         return testcase_inst.check_output_answer
 
     if f:
-        fake_check_output = f
+        fake_check_output = f   # noqa: F811
 
     check_output, mod.check_output = mod.check_output, fake_check_output
     testcase_inst.check_output_answer = None
