@@ -15,11 +15,13 @@ setup(name='calmjs',
       license='GPL',
       packages=find_packages('src', exclude=['ez_setup']),
       package_dir={'': 'src'},
+      namespace_packages=['calmjs'],
       include_package_data=True,
       zip_safe=False,
       install_requires=[
           'setuptools>=11.3',
       ],
+      python_requires='>=2.7,!=3.0.*,!=3.1.*,!=3.2.*',
       entry_points="""
       # -*- Entry points: -*-
       [distutils.commands]
