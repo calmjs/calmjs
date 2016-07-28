@@ -3,11 +3,25 @@ from setuptools import find_packages
 
 version = '0.0'
 
+classifiers = """\
+Development Status :: 4 - Beta
+Environment :: Console
+Framework :: Setuptools Plugin
+Intended Audience :: Developers
+License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)
+Operating System :: OS Independent
+Programming Language :: JavaScript
+Programming Language :: Python :: 2.7
+Programming Language :: Python :: 3.3
+Programming Language :: Python :: 3.4
+Programming Language :: Python :: 3.5
+""".splitlines()
+
 setup(name='calmjs',
       version=version,
       description="Toolchain for deploying JavaScript with Python modules.",
       long_description=open('README.rst').read(),
-      classifiers=[],
+      classifiers=classifiers,
       keywords='',
       author='Tommy Yu',
       author_email='tommy.yu@auckland.ac.nz',
