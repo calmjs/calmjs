@@ -15,6 +15,34 @@ except ImportError:  # pragma: no cover
     working_set = None
 
 logger = getLogger(__name__)
+_marker = object()
+
+
+class _ModuleRegistry(object):
+    """
+    This is the "meta" registry - provides a class method to access the
+    really private "registry" of registeries stored in the main base
+    class.
+    """
+
+    __registry_instances = {}
+
+    @classmethod
+    def register(cls, name, registry):
+        if not isinstance(registry, BaseModuleRegistry):
+            raise TypeError('registration on module registries only.')
+
+        if name in cls.__registry_instances:
+            raise KeyError('%s already exists in registry.' % name)
+
+        cls.__registry_instances[name] = registry
+
+    @classmethod
+    def get(cls, name, default=_marker):
+        result = cls.__registry_instances.get(name, default)
+        if result is _marker:
+            raise LookupError('module registry %s not found' % name)
+        return result
 
 
 class BaseModuleRegistry(object):
@@ -25,7 +53,6 @@ class BaseModuleRegistry(object):
     """
 
     entry_point_name = NotImplemented
-    __registry_instances = {}
 
     def __init__(self, registry_name):
         """
@@ -132,7 +159,8 @@ class BaseModuleRegistry(object):
         Other arguments are passed to the default init method.
         """
 
-        old_inst = BaseModuleRegistry.__registry_instances.get(registry_name)
+        old_inst = _ModuleRegistry.get(registry_name, None)
+
         if old_inst:
             if type(old_inst) == cls:
                 logger.debug(
@@ -152,5 +180,5 @@ class BaseModuleRegistry(object):
                 '%s already exists for a different registry' % registry_name)
 
         inst = cls._initialize(registry_name, *a, **kw)
-        BaseModuleRegistry.__registry_instances[registry_name] = inst
+        _ModuleRegistry.register(registry_name, inst)
         return inst

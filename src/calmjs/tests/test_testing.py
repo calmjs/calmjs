@@ -138,3 +138,18 @@ class TestingUtilsTestCase(unittest.TestCase):
         self.assertEqual(distributions[0].requires(), [])
         self.assertEqual(distributions[1].requires(), [
             Requirement.parse('parentpkg>=0.8')])
+
+    def test_setup_testing_module_registry(self):
+        # Get the registry.
+        from calmjs.base import _ModuleRegistry
+        self.assertTrue(isinstance(
+            _ModuleRegistry._ModuleRegistry__registry_instances, dict))
+        original = {}
+        original.update(_ModuleRegistry._ModuleRegistry__registry_instances)
+
+        utils.setup_testing_module_registry(self)
+        _ModuleRegistry._ModuleRegistry__registry_instances['foo'] = 'bar'
+
+        self.doCleanups()
+        self.assertNotIn(
+            'foo', _ModuleRegistry._ModuleRegistry__registry_instances)

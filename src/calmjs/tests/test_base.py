@@ -4,6 +4,7 @@ from pkg_resources import EntryPoint
 
 from calmjs import base
 from calmjs.testing import mocks
+from calmjs.testing import utils
 
 
 class DummyRegistry(base.BaseModuleRegistry):
@@ -20,11 +21,26 @@ class RegistryTestCase(unittest.TestCase):
 
     def setUp(self):
         self.original_working_set = base.working_set
+        utils.setup_testing_module_registry(self)
 
     def tearDown(self):
         base.working_set = self.original_working_set
-        # cleans up the really private registry
-        base.BaseModuleRegistry._BaseModuleRegistry__registry_instances.clear()
+
+    def test_module_registry_registration(self):
+        registry = base.BaseModuleRegistry('some_name')
+        base._ModuleRegistry.register('some_name', registry)
+        self.assertEqual(base._ModuleRegistry.get('some_name'), registry)
+
+        with self.assertRaises(KeyError):
+            # no duplicates.
+            base._ModuleRegistry.register('some_name', registry)
+
+        with self.assertRaises(TypeError):
+            base._ModuleRegistry.register('some_other_name', None)
+
+        with self.assertRaises(LookupError):
+            # no duplicates.
+            base._ModuleRegistry.get('this_not_exist')
 
     def test_base_module_registry(self):
         registry = base.BaseModuleRegistry('some_name')
