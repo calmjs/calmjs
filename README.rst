@@ -88,8 +88,10 @@ installation of development packages that have pulled this package in.
 Usage
 -----
 
-If a package wish to declare dependencies for an |npm|_ package, it may
-do this in its ``setup.py``::
+If a package wish to declare dependencies for |npm|_ packages, it may do
+something like this in its ``setup.py``:
+
+.. code:: python
 
     from setuptools import setup
 
@@ -121,7 +123,7 @@ Dealing with |npm|_ dependencies with Python package dependencies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Remember, flat is better than nested.  So all ``dependencies`` (and
-``devDependencies``) declared can be overriden by subsequent packages,
+``devDependencies``) declared can be overridden by subsequent packages,
 and doing so flattens the dependencies for the final package to consume,
 with the desired toolchain to make use of the declared information to
 generate their JavaScript bundle.
