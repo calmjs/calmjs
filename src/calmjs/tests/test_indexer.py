@@ -14,6 +14,7 @@ from calmjs import indexer
 
 from calmjs.testing.utils import make_multipath_module3
 
+# XXX should avoid usage of module.__file__
 calmjs_base_dir = abspath(join(dirname(calmjs.__file__), pardir))
 
 
@@ -21,7 +22,7 @@ class IndexerTestCase(unittest.TestCase):
 
     def test_register(self):
         def bar_something():
-            pass
+            "dummy method"
 
         registry = {'foo': {}, 'bar': {}}
         with self.assertRaises(TypeError):
