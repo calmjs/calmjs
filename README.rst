@@ -9,10 +9,11 @@ JavaScript from the Python environment.
 .. image:: https://coveralls.io/repos/github/calmjs/calmjs/badge.svg?branch=master
     :target: https://coveralls.io/github/calmjs/calmjs?branch=master
 
-Introduction
-============
 
-At its core, calmjs provides a set of extension to |setuptools|_ that
+Introduction
+------------
+
+In essence, ``calmjs`` provides a set of extension to |setuptools|_ that
 assists with the tracking and management of dependencies of JavaScript
 packages (such as ones through |npm|_) for a given Python package.  It
 also provides a number of base classes that can be used to build custom
@@ -31,7 +32,7 @@ modules.
 .. _setuptools: https://pypi.python.org/pypi/setuptools
 .. _npm: https://www.npmjs.com/
 
-The name calmjs was originally derived from the steps in the first
+The name ``calmjs`` was originally derived from the steps in the first
 iteration of the toolchain which involves the steps compile, assemble,
 and linkage into a module of JavaScript using the namespace from the
 host Python package.  The logo (whenever this can be gotten around to)
@@ -43,20 +44,29 @@ typically worked into a state that resembles a usable level.
 Features
 --------
 
-Record and generate ``package.json`` for consumption by |npm|_
-    This is done through the usage of |setuptools|_ command hooks, it is
-    possible to declare npm package dependencies in a ``setup.py`` file
-    by setting a ``package_json`` attribute to the ``setup`` call within
-    that file.  These dependencies will be persisted as egg-info
-    metadata which will be usable by other packages depending on the
-    declaring one; their dependencies will naturally be layered on top
-    of all their parents' ``package.json`` as Python and |setuptools|_
-    support a flat dependency structure.  The packages from which the
-    tool is invoked (this can be done typically through ``setup.py npm
-    --init``) will be able to override all the ``dependencies`` /
-    ``devDependencies`` that may have been specified by their parent
-    packages.  Naturally, this package should be usable by any other
-    compatible package managers and/or repositories.
+Manage dependencies on JavaScript modules (hosted by ``npm`` or others).
+    By providing ``setuptools`` command hooks, ``calmjs`` enables the
+    management of the ``package.json`` for Python modules.  In the
+    typical use case, this means the management of ``dependencies`` /
+    ``devDependencies`` for the declaration of required JavaScript
+    packages needed by a given Python project.
+
+    The command hooks also have the ability to follow through the list
+    of Python package requirements to generate a comprehensive
+    ``package.json`` for a current project.  This means all upstream
+    dependencies on JavaScript packages will also be used when
+    generating the final ``package.json`` needed by any given project.
+
+Expose JavaScript code in a Python module as proper namespace modules
+    A given Python package that may have included JavaScript code
+    associated for that project will be able to declare those code as
+    JavaScript modules with the exact same namespace through
+    ``setuptools`` entry points.
+
+    These declarations will be available through registries exposed by
+    ``calmjs`` for other packages to turn those declarations through the
+    API available into working JavaScript code following the same
+    declared module structures.
 
 Better integration of JavaScript toolchains with Python environment
     This basically is a framework for building toolchains for working
@@ -88,8 +98,11 @@ installation of development packages that have pulled this package in.
 Usage
 -----
 
-If a package wish to declare dependencies for |npm|_ packages, it may do
-something like this in its ``setup.py``:
+Declare a ``package.json`` for a given Python package
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If a package wish to declare dependencies for ``npm`` packages, it may
+do something like this in its ``setup.py``:
 
 .. code:: python
 
@@ -113,14 +126,74 @@ something like this in its ``setup.py``:
         ...
     )
 
+Running ``setup.py install`` will write that ``package_json`` fragment
+into the package's egg-info metadata section.
+
+All packages that ultimately depending on this ``example.package`` will
+have the option to pick up this ``package.json`` egg-info metadata.
+One way to do this is through that package's ``setup.py``.  By invoking
+``setup.py npm --init`` from there, a new ``package.json`` will be
+written to the current directory as if running ``npm init`` with all the
+dependencies declared through the Python package dependency tree for the
+given Python package.
+
+Expose JavaScript code from a Python module
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Furthering the previous example, say within ``example.package`` its
+files and directories are laid out like so::
+
+    .
+    ├── example
+    │   ├── __init__.py
+    │   └── package
+    │       ├── __init__.py
+    │       ├── content.py
+    │       ├── form.py
+    │       ├── ui.js
+    │       ├── ui.py
+    │       └── widget.js
+    └── setup.py
+
+To declare the JavaScript source files within ``./example/package``
+as JavaScript modules through ``calmjs``, an entry point can be declared
+like so in the ``setup.py`` file:
+
+.. code:: python
+
+    setup(
+        ...
+        entry_points="""
+        [calmjs.module]
+        example.package = example.package
+        """
+        ...
+    )
+
+The default method will expose the two source files with the following
+names::
+
+    - 'example/package/ui'
+    - 'example/package/widget'
+
+It is possible to use the ``.`` for separating out modules if a more
+Pythonic namespace module style is desired, however this may have
+consequences with how other packages interact with this code through
+specific import and/or transpiler systems within the JavaScript
+ecosystem; ``calmjs`` will also provide tools that work with this
+module registry.  Also this is awfully not documented and very
+unsupported at the moment.  Need to finalize the toolchains for working
+with this before more can happen.
+
+Toolchain
+~~~~~~~~~
 
 Documentation on how to extend the Toolchain class to support use cases
 will need to be done, though the focus right now is to provide a working
 ``calmjs.rjs`` package.
 
-
-Dealing with |npm|_ dependencies with Python package dependencies
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Dealing with ``npm`` dependencies with Python package dependencies
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Remember, flat is better than nested.  So all ``dependencies`` (and
 ``devDependencies``) declared can be overridden by subsequent packages,
@@ -146,4 +219,4 @@ Contribute
 License
 -------
 
-The project is licensed under the GPLv2 or later.
+The ``calmjs`` project is licensed under the GPLv2 or later.
