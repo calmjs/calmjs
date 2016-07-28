@@ -193,7 +193,7 @@ class NullToolchainTestCase(unittest.TestCase):
         self.assertEqual(spec, {
             'build_dir': build_dir,
             'transpile_source_map': {
-                'namespace.dummy.source':join(source_dir, 'source')
+                'namespace.dummy.source': join(source_dir, 'source')
             },
 
             'bundled_paths': {},
@@ -221,7 +221,7 @@ class NullToolchainTestCase(unittest.TestCase):
                 # note that the convention in nodejs tools, the .js
                 # suffix is completely omitted.
                 'bundle1': join(source_dir, 'source'),
-                'bundle2': join(source_dir,bundled_dir),
+                'bundle2': join(source_dir, bundled_dir),
             },
         )
         self.toolchain(spec)

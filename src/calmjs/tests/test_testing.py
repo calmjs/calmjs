@@ -85,7 +85,7 @@ class TestingUtilsTestCase(unittest.TestCase):
         self.assertFalse(hasattr(self, '_calmjs_testing_tmpdir'))
 
     def tests_make_dummy_dist(self):
-        target = make_dummy_dist(
+        target = make_dummy_dist(  # noqa: F841
             self, (
                 ('dummyinfo', 'hello world'),
                 ('fakeinfo', 'these are actually metadata'),
@@ -114,12 +114,12 @@ class TestingUtilsTestCase(unittest.TestCase):
         # will go for sys.path, but for testing purposes we can control
         # this by creating our own instance on a temporary directory.
 
-        parentpkg = make_dummy_dist(self, (
+        parentpkg = make_dummy_dist(self, (  # noqa: F841
             ('requires.txt', '\n'.join([
             ])),
         ), 'parentpkg', '0.8')
 
-        childpkg = make_dummy_dist(self, (
+        childpkg = make_dummy_dist(self, (  # noqa: F841
             ('requires.txt', '\n'.join([
                 'parentpkg>=0.8',
             ])),

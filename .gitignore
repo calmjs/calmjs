@@ -13,3 +13,4 @@ lib/
 node_modules/
 .env
 package.json
+build/

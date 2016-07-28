@@ -6,9 +6,10 @@ python:
   - "3.5"
   - "pypy"
 install:
-  - pip install nose coverage
+  - pip install nose coverage flake8
   - python setup.py develop
 script: 
+  - flake8 setup.py src
   - nosetests --with-coverage --cover-package=calmjs --with-doctest --doctest-options=+ELLIPSIS
 after_success:
   - pip install coveralls

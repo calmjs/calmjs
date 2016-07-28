@@ -381,7 +381,7 @@ class DistTestCase(unittest.TestCase):
         Need to ensure the *correct* version is picked.
         """
 
-        lib = make_dummy_dist(self, (
+        lib = make_dummy_dist(self, (  # noqa: F841
             ('requires.txt', '\n'.join([])),
             ('package.json', json.dumps({
                 'dependencies': {
@@ -391,7 +391,7 @@ class DistTestCase(unittest.TestCase):
             })),
         ), 'lib', '1.0.0')
 
-        app = make_dummy_dist(self, (
+        app = make_dummy_dist(self, (  # noqa: F841
             ('requires.txt', '\n'.join([
                 'lib>=1.0.0',
             ])),
