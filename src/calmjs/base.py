@@ -25,6 +25,7 @@ class BaseModuleRegistry(object):
     """
 
     entry_point_name = NotImplemented
+    __registry_instances = {}
 
     def __init__(self, registry_name):
         """
@@ -35,9 +36,8 @@ class BaseModuleRegistry(object):
         """
 
         self.registry_name = registry_name
-        self._init()
 
-    def _init(self):
+    def _init(self, *a, **kw):
         """
         Subclasses can override this instead to set instance attributes.
         """
@@ -81,17 +81,9 @@ class BaseModuleRegistry(object):
         raise NotImplementedError
 
     @classmethod
-    def initialize(cls, registry_name, *a, **kw):
+    def _initialize(cls, registry_name, *a, **kw):
         """
-        Default registry constructor that will load all the entry points
-        identified by the class attribute ``entry_point_name``.
-
-        Arguments:
-
-        registry_name
-            The name for this registry
-
-        Other arguments are passed to the default init method.
+        Private class initialize method that ignores the shared registry.
         """
 
         if cls.entry_point_name is NotImplemented:
@@ -118,6 +110,47 @@ class BaseModuleRegistry(object):
             _working_set.iter_entry_points(cls.entry_point_name))
 
         # Then create the default registry based on that.
-        inst = cls(registry_name, *a, **kw)
+        inst = cls(registry_name)
+        inst._init(*a, **kw)
         inst.register_entry_points(entry_points)
+        return inst
+
+    @classmethod
+    def initialize(cls, registry_name, *a, **kw):
+        """
+        Default registry constructor that will load all the entry points
+        identified by the class attribute ``entry_point_name``.  The
+        constructor will also check to see if another registry of the
+        same type has been created, and if so that will be returned, if
+        not, a ValueError will be raised.
+
+        Arguments:
+
+        registry_name
+            The name for this registry
+
+        Other arguments are passed to the default init method.
+        """
+
+        old_inst = BaseModuleRegistry.__registry_instances.get(registry_name)
+        if old_inst:
+            if type(old_inst) == cls:
+                logger.debug(
+                    "returning registry '%s' for class '%s'",
+                    registry_name, cls.__name__
+                )
+                if a or kw:
+                    logger.warning(
+                        "Registry initialize method found an existing "
+                        "registry '%s' for class '%s'; new arguments passed "
+                        "will not be invoked with the registry class's init "
+                        "method", registry_name, cls.__name__
+                    )
+                return old_inst
+
+            raise ValueError(
+                '%s already exists for a different registry' % registry_name)
+
+        inst = cls._initialize(registry_name, *a, **kw)
+        BaseModuleRegistry.__registry_instances[registry_name] = inst
         return inst

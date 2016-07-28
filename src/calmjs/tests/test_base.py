@@ -6,6 +6,13 @@ from calmjs import base
 from calmjs.testing import mocks
 
 
+class DummyRegistry(base.BaseModuleRegistry):
+    entry_point_name = 'clamjs.dummy_fake_name'
+
+    def _init(self, arg):
+        self.arg = arg
+
+
 class RegistryTestCase(unittest.TestCase):
     """
     Test the base registry.
@@ -16,6 +23,8 @@ class RegistryTestCase(unittest.TestCase):
 
     def tearDown(self):
         base.working_set = self.original_working_set
+        # cleans up the really private registry
+        base.BaseModuleRegistry._BaseModuleRegistry__registry_instances.clear()
 
     def test_base_module_registry(self):
         registry = base.BaseModuleRegistry('some_name')
@@ -23,29 +32,26 @@ class RegistryTestCase(unittest.TestCase):
 
     def test_base_module_registry_register_no_such_mod(self):
         registry = base.BaseModuleRegistry('some_name')
+        # `__builtin__.NoSuchThing` is not a valid item, thus it only
+        # warns rather than invoking _register_entry_point_module which
+        # triggers NotImplementedError
         registry.register_entry_points([
-            EntryPoint.parse('calmjs.test = calmjs.no_such_mod')
+            EntryPoint.parse('calmjs.test = __builtin__.NoSuchThing')
         ])
+        # no exceptions raised, but we got nothing to validate against.
 
     def test_base_module_registry_register_not_implemented(self):
         registry = base.BaseModuleRegistry('some_name')
-
         with self.assertRaises(NotImplementedError):
+            # valid name, triggers the exception as outlined above.
             registry.register_entry_points([
                 EntryPoint.parse('calmjs = calmjs')])
 
     def test_base_module_registry_initialize_not_imp(self):
         with self.assertRaises(NotImplementedError):
-            base.BaseModuleRegistry.initialize('some_name')
+            base.BaseModuleRegistry.initialize('not_implemented')
 
     def test_base_module_registry_initialize_subclassed(self):
-        class DummyRegistry(base.BaseModuleRegistry):
-            entry_point_name = 'clamjs.dummy_fake_name'
-
-            def __init__(self, name, arg):
-                self.arg = arg
-                super(DummyRegistry, self).__init__(name)
-
         registry = DummyRegistry.initialize('some_name', 'some_arg')
         self.assertTrue(isinstance(registry, DummyRegistry))
         self.assertEqual(registry.registry_name, 'some_name')
@@ -54,14 +60,6 @@ class RegistryTestCase(unittest.TestCase):
     def test_base_module_registry_missing_pkg_resources(self):
         # emulate initial import failure
         base.working_set = None
-
-        class DummyRegistry(base.BaseModuleRegistry):
-            entry_point_name = 'clamjs.dummy_fake_name'
-
-            def __init__(self, name, arg):
-                self.arg = arg
-                super(DummyRegistry, self).__init__(name)
-
         registry = DummyRegistry.initialize('some_name', 'some_arg')
         self.assertTrue(isinstance(registry, DummyRegistry))
         self.assertEqual(registry.registry_name, 'some_name')
@@ -69,14 +67,13 @@ class RegistryTestCase(unittest.TestCase):
 
     def test_base_module_registry_dummy_working_set(self):
 
-        class DummyRegistry(base.BaseModuleRegistry):
+        class DummyRegistryAlt(base.BaseModuleRegistry):
             entry_point_name = 'clamjs.dummy_fake_name'
 
-            def __init__(self, name, arg):
+            def _init(self, arg):
                 self.arg = arg
                 self.entry_points = []
                 self.modules = []
-                super(DummyRegistry, self).__init__(name)
 
             def _register_entry_point_module(self, entry_point, module):
                 self.entry_points.append(entry_point)
@@ -88,9 +85,9 @@ class RegistryTestCase(unittest.TestCase):
             'module3 = calmjs.testing.module3',
         ])
 
-        registry = DummyRegistry.initialize(
+        registry = DummyRegistryAlt.initialize(
             'some_name', 'some_arg', _working_set=working_set)
-        self.assertTrue(isinstance(registry, DummyRegistry))
+        self.assertTrue(isinstance(registry, DummyRegistryAlt))
         self.assertEqual(registry.registry_name, 'some_name')
         self.assertEqual(registry.arg, 'some_arg')
 
@@ -99,3 +96,36 @@ class RegistryTestCase(unittest.TestCase):
 
         self.assertEqual(
             registry.modules[0].__name__, 'calmjs.testing.module1')
+
+    def test_base_module_registry_registry_singleton(self):
+        """
+        Since using the same initialization pattern results in the
+        singleton registry of the same name, this should be tested.
+        """
+
+        class DummyRegistryAlt(base.BaseModuleRegistry):
+            entry_point_name = 'clamjs.dummy_fake_alt'
+
+            def _init(self, arg):
+                self.arg = arg
+
+        registry1 = DummyRegistryAlt.initialize('some_name', 'some_arg')
+        registry2 = DummyRegistryAlt.initialize('some_name', 'different_arg')
+        self.assertTrue(isinstance(registry1, DummyRegistryAlt))
+        # they should be the same object, even though registry2 got a
+        # completely different initialization argument.
+        self.assertEqual(registry1, registry2)
+        # Note that the _init method will NOT be called again.
+        self.assertEqual(registry2.arg, 'some_arg')
+
+        # initializing a same registry using a different type but to the
+        # same name should trigger a value error
+        with self.assertRaises(ValueError):
+            DummyRegistry.initialize('some_name')
+
+        # Ditto for subclasses
+        class DummyRegistryAltExt(base.BaseModuleRegistry):
+            entry_point_name = 'clamjs.dummy_fake_alt_ext'
+
+        with self.assertRaises(ValueError):
+            DummyRegistryAltExt.initialize('some_name')
