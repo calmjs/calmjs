@@ -44,6 +44,8 @@ def _get_bin_version(bin_path, version_flag='-v', _from=None, _to=None):
 
 class Cli(object):
 
+    indent = 4
+
     def __init__(self, node_bin=NODE, npm_bin=NPM,
                  node_path=None):
         """
@@ -82,7 +84,7 @@ class Cli(object):
                 package_name, filename=PACKAGE_JSON)
 
             with open(PACKAGE_JSON, 'w') as fd:
-                json.dump(package_json, fd)
+                json.dump(package_json, fd, indent=self.indent)
 
         call([self.npm_bin, 'install'])
 
