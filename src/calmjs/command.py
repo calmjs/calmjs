@@ -6,13 +6,9 @@ setuptools
 
 from distutils.core import Command
 from distutils.errors import DistutilsOptionError
-from distutils import log
-
-import json
 
 from calmjs.npm import PACKAGE_JSON
 from calmjs import cli
-from calmjs.dist import flatten_package_json
 
 
 # class names in lower case simply due to setuptools using this verbatim
@@ -30,6 +26,10 @@ class npm(Command):
     user_options = [
         ('init', None,
          "generate package.json and write to current dir"),
+        ('overwrite', None,
+         "overwrite configuration files (such as package.json)"),
+        ('merge', None,
+         "merge configuration files if possible (such as package.json)"),
         ('install', None,
          "runs npm install with package.json in current directory"),
     ]
@@ -46,15 +46,12 @@ class npm(Command):
 
     def do_init(self):
         pkg_name = self.distribution.get_name()
-        with open(PACKAGE_JSON, 'w') as fd:
-            log.info(
-                "Generating a flattened '%s' for '%s'",
-                self.package_json, pkg_name)
-            json.dump(
-                flatten_package_json(
-                    pkg_name, filename=self.package_json,
-                ),
-                fd, indent=self.indent)
+        # TODO figure out best practices to get the logs from the cli
+        # module/class outputting via here.
+        # log.info(
+        #     "Generating a flattened '%s' for '%s'",
+        #     cli.package_json, pkg_name)
+        cli.npm_init(pkg_name, overwrite=self.overwrite, merge=self.merge)
 
     def finalize_options(self):
         opts = [i for i in (getattr(self, k) for k in self._opt_keys()) if i]

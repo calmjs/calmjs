@@ -316,3 +316,4 @@ get_node_version = _inst.get_node_version
 get_npm_version = _inst.get_pkg_manager_version
 npm_init = _inst.pkg_manager_init
 npm_install = _inst.pkg_manager_install
+package_json = _inst.pkgdef_filename

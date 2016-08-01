@@ -9,7 +9,6 @@ from distutils.errors import DistutilsOptionError
 from setuptools.dist import Distribution
 import pkg_resources
 
-from calmjs import command
 from calmjs import cli
 from calmjs.testing.utils import make_dummy_dist
 from calmjs.testing.utils import mkdtemp
@@ -37,7 +36,7 @@ class DistCommandTestCase(unittest.TestCase):
 
         # Stub out the flatten_package_json calls with one that uses our
         # custom working_set here.
-        stub_dist_flatten_package_json(self, [command, cli], working_set)
+        stub_dist_flatten_package_json(self, [cli], working_set)
 
     def tearDown(self):
         os.chdir(self.cwd)
@@ -54,7 +53,7 @@ class DistCommandTestCase(unittest.TestCase):
         with self.assertRaises(DistutilsOptionError):
             dist.run_commands()
 
-    def test_init(self):
+    def test_init_no_overwrite(self):
         tmpdir = mkdtemp(self)
 
         with open(os.path.join(tmpdir, 'package.json'), 'w') as fd:
@@ -74,8 +73,60 @@ class DistCommandTestCase(unittest.TestCase):
 
         # gets overwritten anyway.
         self.assertEqual(result, {
+            'dependencies': {},
+            'devDependencies': {},
+        })
+
+    def test_init_overwrite(self):
+        tmpdir = mkdtemp(self)
+
+        with open(os.path.join(tmpdir, 'package.json'), 'w') as fd:
+            json.dump({'dependencies': {}, 'devDependencies': {}}, fd)
+
+        os.chdir(tmpdir)
+        dist = Distribution(dict(
+            script_name='setup.py',
+            script_args=['npm', '--init', '--overwrite'],
+            name='foo',
+        ))
+        dist.parse_command_line()
+        dist.run_commands()
+
+        with open(os.path.join(tmpdir, 'package.json')) as fd:
+            result = json.load(fd)
+
+        # gets overwritten anyway.
+        self.assertEqual(result, {
             'dependencies': {'jquery': '~1.11.0'},
             'devDependencies': {},
+        })
+
+    def test_init_merge(self):
+        tmpdir = mkdtemp(self)
+
+        with open(os.path.join(tmpdir, 'package.json'), 'w') as fd:
+            json.dump({'dependencies': {
+                'underscore': '~1.8.0',
+            }, 'devDependencies': {
+                'sinon': '~1.17.0',
+            }}, fd)
+
+        os.chdir(tmpdir)
+        dist = Distribution(dict(
+            script_name='setup.py',
+            script_args=['npm', '--init', '--merge'],
+            name='foo',
+        ))
+        dist.parse_command_line()
+        dist.run_commands()
+
+        with open(os.path.join(tmpdir, 'package.json')) as fd:
+            result = json.load(fd)
+
+        # gets overwritten anyway.
+        self.assertEqual(result, {
+            'dependencies': {'jquery': '~1.11.0', 'underscore': '~1.8.0'},
+            'devDependencies': {'sinon': '~1.17.0'},
         })
 
     def test_install_no_init(self):
