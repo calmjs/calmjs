@@ -12,9 +12,9 @@ from calmjs.testing.utils import stub_mod_call
 from calmjs.testing.utils import stub_mod_check_output
 
 
-class CliTestCase(unittest.TestCase):
+class CliDriverTestCase(unittest.TestCase):
     """
-    Base cli class test case.
+    Base cli driver class test case.
     """
 
     def setUp(self):
@@ -87,13 +87,21 @@ class CliTestCase(unittest.TestCase):
 
     def test_set_node_path(self):
         stub_mod_call(self, cli)
-        cli_env = cli.Cli(node_path='./node_mods')
+        driver = cli.Driver(node_path='./node_mods')
 
         # ensure env is passed into the call.
-        cli_env.npm_install()
+        driver.pkg_manager_install()  # npm install
         self.assertEqual(self.call_args, ((['npm', 'install'],), {
             'env': {'NODE_PATH': './node_mods'},
         }))
+
+    def test_set_binary(self):
+        stub_mod_call(self, cli)
+        driver = cli.Driver(pkg_manager_bin='bower')
+
+        # this will call ``bower install`` instead.
+        driver.pkg_manager_install()
+        self.assertEqual(self.call_args, ((['bower', 'install'],), {}))
 
     @unittest.skipIf(cli.get_npm_version() is None, 'npm not found.')
     def test_npm_install_package_json(self):
