@@ -11,20 +11,10 @@ import pkg_resources
 
 from calmjs import command
 from calmjs import cli
-from calmjs import dist
-from calmjs import npm
 from calmjs.testing.utils import make_dummy_dist
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import stub_mod_call
-
-
-def make_flatten_package_json(working_set):
-
-    def flatten_package_json(pkg_name, filename=npm.PACKAGE_JSON):
-        return dist.flatten_package_json(
-            pkg_name, filename=filename, working_set=working_set)
-
-    return flatten_package_json
+from calmjs.testing.utils import stub_dist_flatten_package_json
 
 
 class DistCommandTestCase(unittest.TestCase):
@@ -47,14 +37,10 @@ class DistCommandTestCase(unittest.TestCase):
 
         # Stub out the flatten_package_json calls with one that uses our
         # custom working_set here.
-        new_flatten_package_json = make_flatten_package_json(working_set)
-        command.flatten_package_json = new_flatten_package_json
-        cli.flatten_package_json = new_flatten_package_json
+        stub_dist_flatten_package_json(self, [command, cli], working_set)
 
     def tearDown(self):
         os.chdir(self.cwd)
-        command.flatten_package_json = dist.flatten_package_json
-        cli.flatten_package_json = dist.flatten_package_json
 
     def test_no_args(self):
         tmpdir = mkdtemp(self)

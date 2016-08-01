@@ -153,3 +153,12 @@ class TestingUtilsTestCase(unittest.TestCase):
         self.doCleanups()
         self.assertNotIn(
             'foo', _ModuleRegistry._ModuleRegistry__registry_instances)
+
+    def test_stub_dist_flatten_package_json(self):
+        from calmjs import dist
+        original = dist.flatten_package_json
+        self.assertIs(dist.flatten_package_json, original)
+        utils.stub_dist_flatten_package_json(self, [dist], None)
+        self.assertIsNot(dist.flatten_package_json, original)
+        self.doCleanups()
+        self.assertIs(dist.flatten_package_json, original)

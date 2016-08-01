@@ -8,7 +8,9 @@ from unittest import TestCase
 from pkg_resources import PathMetadata
 from pkg_resources import Distribution
 
-from calmjs.testing import module3
+# Do not invoke/import the calmjs namespace here.  If they are needed
+# please import from a scope.
+from . import module3
 
 
 TMPDIR_ID = '_calmjs_testing_tmpdir'
@@ -124,6 +126,29 @@ def make_dummy_dist(testcase_inst, metadata_map=(),
 
     return Distribution(
         tmpdir, project_name=pkgname, metadata=metadata, version=version)
+
+
+def stub_dist_flatten_package_json(testcase_inst, modules, working_set):
+    """
+    Replace the flatten_package_json import from dist for the specified
+    modules.
+    """
+
+    from calmjs import dist
+    from calmjs import npm
+
+    original_flatten_package_json = dist.flatten_package_json
+
+    def flatten_package_json(pkg_name, filename=npm.PACKAGE_JSON):
+        return original_flatten_package_json(
+            pkg_name, filename=filename, working_set=working_set)
+
+    def restore(module):
+        module.flatten_package_json = original_flatten_package_json
+
+    for module in modules:
+        module.flatten_package_json = flatten_package_json
+        testcase_inst.addCleanup(restore, module)
 
 
 def stub_mod_call(testcase_inst, mod, f=None):
