@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
 import json
-import os
 import re
 from os.path import exists
 
@@ -19,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 version_expr = re.compile('((?:\d+)(?:\.\d+)*)')
 
+NODE_PATH = 'NODE_PATH'
 NODE = 'node'
 NPM = 'npm'
 
@@ -59,9 +59,7 @@ class Cli(object):
             Overrides NODE_PATH environment variable.
         """
 
-        if node_path:
-            os.environ['NODE_PATH'] = node_path
-
+        self.node_path = node_path
         self.node_bin = node_bin
         self.npm_bin = npm_bin
 
@@ -73,10 +71,9 @@ class Cli(object):
 
     def npm_install(self, package_name=None):
         """
-        Installs node_modules into the current working directory.
-
-        Will be nice if there's a clean way to redirect this to some
-        other directory.
+        Installs node_modules into the current working directory for the
+        specific package.  With an already available ``package.json``
+        file, the init process will be skipped.
         """
 
         if package_name and not exists(PACKAGE_JSON):
@@ -86,7 +83,16 @@ class Cli(object):
             with open(PACKAGE_JSON, 'w') as fd:
                 json.dump(package_json, fd, indent=self.indent)
 
-        call([self.npm_bin, 'install'])
+        kw = {}
+        env = {}
+
+        if self.node_path:
+            env[NODE_PATH] = self.node_path
+
+        if env:
+            kw['env'] = env
+
+        call([self.npm_bin, 'install'], **kw)
 
 
 _inst = Cli()

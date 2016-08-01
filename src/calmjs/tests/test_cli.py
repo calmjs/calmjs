@@ -86,9 +86,14 @@ class CliTestCase(unittest.TestCase):
         self.assertIsNotNone(version)
 
     def test_set_node_path(self):
-        cli.Cli(node_path='./node_mods')
-        # environment locally here overridden.
-        self.assertEqual(os.environ['NODE_PATH'], './node_mods')
+        stub_mod_call(self, cli)
+        cli_env = cli.Cli(node_path='./node_mods')
+
+        # ensure env is passed into the call.
+        cli_env.npm_install()
+        self.assertEqual(self.call_args, ((['npm', 'install'],), {
+            'env': {'NODE_PATH': './node_mods'},
+        }))
 
     @unittest.skipIf(cli.get_npm_version() is None, 'npm not found.')
     def test_npm_install_package_json(self):
