@@ -286,6 +286,8 @@ class Driver(object):
             with open(self.pkgdef_filename, 'w') as fd:
                 json.dump(package_json, fd, indent=self.indent)
 
+        return True
+
     def pkg_manager_install(self, package_name=None):
         """
         If this class is initiated using standard procedures, this will

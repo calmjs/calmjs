@@ -334,7 +334,7 @@ class CliDriverInitTestCase(unittest.TestCase):
         tmpdir = mkdtemp(self)
         os.chdir(tmpdir)
 
-        cli.npm_init('foo')
+        self.assertTrue(cli.npm_init('foo'))
         with open(join(tmpdir, 'package.json')) as fd:
             result = json.load(fd)
 
@@ -351,7 +351,7 @@ class CliDriverInitTestCase(unittest.TestCase):
             json.dump({'dependencies': {}, 'devDependencies': {}}, fd)
 
         os.chdir(tmpdir)
-        cli.npm_init('foo')
+        self.assertFalse(cli.npm_init('foo'))
 
         with open(join(tmpdir, 'package.json')) as fd:
             result = json.load(fd)
@@ -373,7 +373,7 @@ class CliDriverInitTestCase(unittest.TestCase):
             }, 'devDependencies': {}}, fd)
 
         os.chdir(tmpdir)
-        cli.npm_init('foo', overwrite=True)
+        self.assertTrue(cli.npm_init('foo', overwrite=True))
 
         with open(join(tmpdir, 'package.json')) as fd:
             result = json.load(fd)
@@ -396,7 +396,7 @@ class CliDriverInitTestCase(unittest.TestCase):
             }, 'name': 'dummy'}, fd, indent=0)
 
         os.chdir(tmpdir)
-        cli.npm_init('foo', merge=True)
+        self.assertTrue(cli.npm_init('foo', merge=True))
 
         with open(join(tmpdir, 'package.json')) as fd:
             with self.assertRaises(ValueError):
@@ -429,7 +429,7 @@ class CliDriverInitTestCase(unittest.TestCase):
             }, 'name': 'dummy'}, fd, indent=None)
 
         os.chdir(tmpdir)
-        cli.npm_init('foo', merge=True)
+        self.assertTrue(cli.npm_init('foo', merge=True))
 
         with open(join(tmpdir, 'package.json')) as fd:
             # Notes that we initial wrote a file within a line with
@@ -455,7 +455,7 @@ class CliDriverInitTestCase(unittest.TestCase):
         with open(join(tmpdir, 'package.json'), 'w') as fd:
             fd.write('{')
         os.chdir(tmpdir)
-        cli.npm_init('foo')
+        self.assertFalse(cli.npm_init('foo'))
         with open(join(tmpdir, 'package.json')) as fd:
             self.assertEqual('{', fd.read())
 
@@ -465,7 +465,7 @@ class CliDriverInitTestCase(unittest.TestCase):
         with open(join(tmpdir, 'package.json'), 'w') as fd:
             fd.write('{')
         os.chdir(tmpdir)
-        cli.npm_init('foo', overwrite=True)
+        self.assertTrue(cli.npm_init('foo', overwrite=True))
 
         with open(join(tmpdir, 'package.json')) as fd:
             result = json.load(fd)
