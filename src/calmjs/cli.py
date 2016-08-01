@@ -14,7 +14,7 @@ from calmjs.npm import PACKAGE_JSON
 from calmjs.dist import flatten_package_json
 
 __all__ = [
-    'Driver', 'get_node_version', 'get_npm_version', 'npm_install',
+    'Driver', 'get_node_version', 'get_npm_version', 'npm_init', 'npm_install',
 ]
 
 logger = logging.getLogger(__name__)
@@ -24,6 +24,7 @@ version_expr = re.compile('((?:\d+)(?:\.\d+)*)')
 NODE_PATH = 'NODE_PATH'
 NODE = 'node'
 NPM = 'npm'
+DEP_KEYS = ('dependencies', 'devDependencies')
 
 
 if sys.version_info < (3,):  # pragma: no cover
@@ -49,6 +50,17 @@ def _get_bin_version(bin_path, version_flag='-v', _from=None, _to=None):
         return None
     logger.info('Found %s version %s', bin_path, version_str)
     return version
+
+
+def generate_merge_dict(keys, *dicts):
+    result = {}
+    for key in keys:
+        for d in dicts:
+            if key not in d:
+                continue
+            result[key] = result.get(key, {})
+            result[key].update(d[key])
+    return result
 
 
 def null_validator(value):
@@ -195,6 +207,85 @@ class Driver(object):
     def get_pkg_manager_version(self):
         return _get_bin_version(self.pkg_manager_bin)
 
+    def pkg_manager_init(
+            self, package_name=None,
+            overwrite=False, merge=False):
+        """
+        If this class is initiated using standard procedures, this will
+        emulate the functionality of ``npm init`` for the generation of
+        a working ``package.json``, but without asking users for input
+        but instead uses information available through the distribution
+        packages within ``setuptools``.
+
+        Arguments:
+
+        package_name
+            The python package to source the package.json from.
+
+        overwrite
+            Boolean flag; if set, overwrite package.json with the newly
+            generated ``package.json``.
+
+        merge
+            Boolean flag; if set, implies overwrite.  However this will
+            keep details defined in existing ``package.json`` and only
+            merge dependencies/devDependencies defined by the specified
+            Python package.
+
+        Returns True if successful; can be achieved by writing a new
+        file or that the existing one matches with the expected version.
+        Returns False otherwise.
+        """
+
+        # this will be modified in place
+        original_json = {}
+        # package_json is the one that will get written out, if needed.
+        package_json = flatten_package_json(
+            package_name, filename=self.pkgdef_filename)
+
+        existed = exists(self.pkgdef_filename)
+
+        if existed:
+            try:
+                with open(self.pkgdef_filename, 'r') as fd:
+                    original_json = json.load(fd)
+            except ValueError:
+                logger.warning(
+                    "Ignoring existing malformed 'package.json'.")
+            except (IOError, OSError):
+                logger.error(
+                    "Reading of existing 'package.json' failed; "
+                    "please confirm that it is a file and/or permissions to "
+                    "read and write is permitted before retrying."
+                )
+                # Cowardly giving up.
+                raise
+
+            if merge:
+                # Merge the generated on top of the original.
+                overwrite = True  # implied, as documented.
+                updates = generate_merge_dict(
+                    DEP_KEYS, original_json, package_json,
+                )
+                final = {}
+                final.update(original_json)
+                final.update(package_json)
+                final.update(updates)
+                package_json = final
+
+            if original_json == package_json:
+                # Well, if original existing one is identical with the
+                # generated version, we got it, and we are done here.
+                return True
+
+            if not overwrite:
+                return False
+
+        if package_json:
+            # Only write one if we actually got data.
+            with open(self.pkgdef_filename, 'w') as fd:
+                json.dump(package_json, fd, indent=self.indent)
+
     def pkg_manager_install(self, package_name=None):
         """
         If this class is initiated using standard procedures, this will
@@ -204,11 +295,7 @@ class Driver(object):
         """
 
         if package_name and not exists(self.pkgdef_filename):
-            package_json = flatten_package_json(
-                package_name, filename=self.pkgdef_filename)
-
-            with open(self.pkgdef_filename, 'w') as fd:
-                json.dump(package_json, fd, indent=self.indent)
+            self.pkg_manager_init(package_name)
 
         kw = {}
         env = {}
@@ -227,4 +314,5 @@ get_node_version = _inst.get_node_version
 # Defaults rely on npm.  The same Driver class should be usable with
 # bower when constructed with the relevant reference to its binary.
 get_npm_version = _inst.get_pkg_manager_version
+npm_init = _inst.pkg_manager_init
 npm_install = _inst.pkg_manager_install

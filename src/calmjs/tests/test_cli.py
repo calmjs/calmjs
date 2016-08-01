@@ -8,11 +8,79 @@ import os
 from os.path import join
 from os.path import exists
 
+from pkg_resources import WorkingSet
+
 from calmjs import cli
 from calmjs.testing.utils import fake_error
 from calmjs.testing.utils import mkdtemp
+from calmjs.testing.utils import make_dummy_dist
 from calmjs.testing.utils import stub_mod_call
 from calmjs.testing.utils import stub_mod_check_output
+from calmjs.testing.utils import stub_dist_flatten_package_json
+
+
+class CliGenerateMergeDictTestCase(unittest.TestCase):
+
+    def test_merge(self):
+        result = cli.generate_merge_dict(
+            ['key'], {'key': {'foo': 1}}, {'baz': 1}, {'key': {'bar': 1}})
+        self.assertEqual(result, {'key': {
+            'foo': 1,
+            'bar': 1,
+        }})
+
+    def test_merge_multi(self):
+        result = cli.generate_merge_dict(
+            ['key', 'mm'],
+            {'key': {'foo': 1}},
+            {'mm': {'snek': 'best'}},
+            {'key': {'foo': 2}})
+        self.assertEqual(result, {
+            'key': {'foo': 2},
+            'mm': {'snek': 'best'},
+        })
+
+    def test_merge_none_matched(self):
+        result = cli.generate_merge_dict(
+            ['none', 'match'], {'key': 'foo'}, {'bar': 1}, {'key': 'bar'})
+        self.assertEqual(result, {})
+
+    def test_using_actual_use_case(self):
+        spec1 = {
+            'dependencies': {
+                'jquery': '~3.0.0',
+                'underscore': '~1.8.0',
+            },
+            'devDependencies': {
+                'sinon': '~1.17.0'
+            },
+            'name': 'foo',
+        }
+
+        spec2 = {
+            'dependencies': {
+                'jquery': '~1.11.0',
+            },
+            'devDependencies': {},
+            'name': 'bar',
+        }
+
+        answer = {
+            'dependencies': {
+                'jquery': '~1.11.0',
+                'underscore': '~1.8.0',
+            },
+            'devDependencies': {
+                'sinon': '~1.17.0'
+            },
+        }
+
+        result = cli.generate_merge_dict(
+            ('dependencies', 'devDependencies'), spec1, spec2)
+
+        # Naturally, the 'name' is missing and will need to be
+        # reconciled separately... will figure this out later.
+        self.assertEqual(result, answer)
 
 
 class MakeChoiceValidatorTestCase(unittest.TestCase):
@@ -208,7 +276,6 @@ class CliDriverTestCase(unittest.TestCase):
         driver.pkg_manager_install()
         self.assertEqual(self.call_args, ((['bower', 'install'],), {}))
 
-    @unittest.skipIf(cli.get_npm_version() is None, 'npm not found.')
     def test_npm_install_package_json(self):
         stub_mod_call(self, cli)
         tmpdir = mkdtemp(self)
@@ -220,7 +287,6 @@ class CliDriverTestCase(unittest.TestCase):
         self.assertEqual(self.call_args, ((['npm', 'install'],), {}))
         self.assertFalse(exists(join(tmpdir, 'package.json')))
 
-    @unittest.skipIf(cli.get_npm_version() is None, 'npm not found.')
     def test_npm_install_package_json_no_overwrite(self):
         stub_mod_call(self, cli)
         tmpdir = mkdtemp(self)
@@ -237,3 +303,182 @@ class CliDriverTestCase(unittest.TestCase):
             config = json.load(fd)
         # This should remain unchanged.
         self.assertEqual(config, {})
+
+
+class CliDriverInitTestCase(unittest.TestCase):
+    """
+    Test driver init workflow separately, due to complexities involved.
+    """
+
+    def setUp(self):
+        # save working directory
+        self.cwd = os.getcwd()
+
+        # All the pre-made setup.
+        stub_mod_call(self, cli)
+        app = make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([])),
+            ('package.json', json.dumps({
+                'dependencies': {'jquery': '~1.11.0'},
+            })),
+        ), 'foo', '1.9.0')
+        working_set = WorkingSet()
+        working_set.add(app, self._calmjs_testing_tmpdir)
+        stub_dist_flatten_package_json(self, [cli], working_set)
+
+    def tearDown(self):
+        # restore original os.environ from copy
+        os.chdir(self.cwd)
+
+    def test_npm_init_new(self):
+        tmpdir = mkdtemp(self)
+        os.chdir(tmpdir)
+
+        cli.npm_init('foo')
+        with open(join(tmpdir, 'package.json')) as fd:
+            result = json.load(fd)
+
+        self.assertEqual(result, {
+            'dependencies': {'jquery': '~1.11.0'},
+            'devDependencies': {},
+        })
+
+    def test_npm_init_existing_standard(self):
+        tmpdir = mkdtemp(self)
+
+        # Write an initial thing
+        with open(join(tmpdir, 'package.json'), 'w') as fd:
+            json.dump({'dependencies': {}, 'devDependencies': {}}, fd)
+
+        os.chdir(tmpdir)
+        cli.npm_init('foo')
+
+        with open(join(tmpdir, 'package.json')) as fd:
+            result = json.load(fd)
+
+        # Does not overwrite by default.
+        self.assertEqual(result, {
+            'dependencies': {},
+            'devDependencies': {},
+        })
+
+    def test_npm_init_existing_overwrite(self):
+        tmpdir = mkdtemp(self)
+
+        # Write an initial thing
+        with open(join(tmpdir, 'package.json'), 'w') as fd:
+            json.dump({'dependencies': {
+                'jquery': '~3.0.0',
+                'underscore': '~1.8.0',
+            }, 'devDependencies': {}}, fd)
+
+        os.chdir(tmpdir)
+        cli.npm_init('foo', overwrite=True)
+
+        with open(join(tmpdir, 'package.json')) as fd:
+            result = json.load(fd)
+
+        self.assertEqual(result, {
+            'dependencies': {'jquery': '~1.11.0'},
+            'devDependencies': {},
+        })
+
+    def test_npm_init_existing_merge(self):
+        tmpdir = mkdtemp(self)
+
+        # Write an initial thing
+        with open(join(tmpdir, 'package.json'), 'w') as fd:
+            json.dump({'dependencies': {
+                'jquery': '~3.0.0',
+                'underscore': '~1.8.0',
+            }, 'devDependencies': {
+                'sinon': '~1.17.0'
+            }, 'name': 'dummy'}, fd, indent=0)
+
+        os.chdir(tmpdir)
+        cli.npm_init('foo', merge=True)
+
+        with open(join(tmpdir, 'package.json')) as fd:
+            with self.assertRaises(ValueError):
+                json.loads(fd.readline())
+            fd.seek(0)
+            result = json.load(fd)
+
+        # Merge results shouldn't have written
+        self.assertEqual(result, {
+            'dependencies': {
+                'jquery': '~1.11.0',
+                'underscore': '~1.8.0',
+            },
+            'devDependencies': {
+                'sinon': '~1.17.0'
+            },
+            'name': 'dummy',
+        })
+
+    def test_npm_init_no_overwrite_if_semantically_identical(self):
+        tmpdir = mkdtemp(self)
+
+        # Write an initial thing
+        with open(join(tmpdir, 'package.json'), 'w') as fd:
+            json.dump({'dependencies': {
+                'jquery': '~1.11.0',
+                'underscore': '~1.8.0',
+            }, 'devDependencies': {
+                'sinon': '~1.17.0'
+            }, 'name': 'dummy'}, fd, indent=None)
+
+        os.chdir(tmpdir)
+        cli.npm_init('foo', merge=True)
+
+        with open(join(tmpdir, 'package.json')) as fd:
+            # Notes that we initial wrote a file within a line with
+            # explicitly no indent, so this should parse everything to
+            # show that the indented serializer did not trigger.
+            result = json.loads(fd.readline())
+
+        # Merge results shouldn't have written
+        self.assertEqual(result, {
+            'dependencies': {
+                'jquery': '~1.11.0',
+                'underscore': '~1.8.0',
+            },
+            'devDependencies': {
+                'sinon': '~1.17.0'
+            },
+            'name': 'dummy',
+        })
+
+    def test_npm_init_existing_broken_no_overwrite(self):
+        tmpdir = mkdtemp(self)
+        # Broken json
+        with open(join(tmpdir, 'package.json'), 'w') as fd:
+            fd.write('{')
+        os.chdir(tmpdir)
+        cli.npm_init('foo')
+        with open(join(tmpdir, 'package.json')) as fd:
+            self.assertEqual('{', fd.read())
+
+    def test_npm_init_existing_broken_yes_overwrite(self):
+        tmpdir = mkdtemp(self)
+        # Broken json
+        with open(join(tmpdir, 'package.json'), 'w') as fd:
+            fd.write('{')
+        os.chdir(tmpdir)
+        cli.npm_init('foo', overwrite=True)
+
+        with open(join(tmpdir, 'package.json')) as fd:
+            result = json.load(fd)
+
+        self.assertEqual(result, {
+            'dependencies': {'jquery': '~1.11.0'},
+            'devDependencies': {},
+        })
+
+    def test_npm_init_existing_not_readable_as_file(self):
+        tmpdir = mkdtemp(self)
+        # Nobody expects a package.json as a directory
+        os.mkdir(join(tmpdir, 'package.json'))
+        os.chdir(tmpdir)
+        with self.assertRaises(IOError):
+            cli.npm_init('foo')
