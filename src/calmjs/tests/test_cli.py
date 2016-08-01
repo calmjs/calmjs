@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import unittest
+from io import StringIO
 import json
 import os
 from os.path import join
@@ -10,6 +13,108 @@ from calmjs.testing.utils import fake_error
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import stub_mod_call
 from calmjs.testing.utils import stub_mod_check_output
+
+
+class MakeChoiceValidatorTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.validator = cli.make_choice_validator([
+            ('foo', 'Foo'),
+            ('bar', 'Bar'),
+            ('baz', 'Baz'),
+            ('YES', 'Yes'),
+            ('yes', 'yes'),
+        ], default=True)
+
+    def test_default(self):
+        self.assertTrue(self.validator(''))
+
+    def test_matched(self):
+        self.assertEqual(self.validator('f'), 'Foo')
+        self.assertEqual(self.validator('foo'), 'Foo')
+
+    def test_no_normalize(self):
+        self.assertEqual(self.validator('Y'), 'Yes')
+        self.assertEqual(self.validator('y'), 'yes')
+
+    def test_ambiguous(self):
+        with self.assertRaises(ValueError) as e:
+            self.validator('ba')
+
+        self.assertEqual(
+            str(e.exception), 'Choice ambiguous between (bar, baz)')
+
+    def test_normalized(self):
+        validator = cli.make_choice_validator([
+            ('Yes', True),
+            ('No', False),
+        ], normalizer=cli.lower)
+        with self.assertRaises(ValueError) as e:
+            validator('ba')
+
+        self.assertEqual(
+            str(e.exception), 'Invalid choice.')
+
+    def test_null_validator(self):
+        # doesn't really belong in this class but similar enough topic
+        self.assertEqual(cli.null_validator('test'), 'test')
+
+
+class CliPromptTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.stdout = StringIO()
+
+    def prompt(self, question, answer,
+               validator=None, choices=None,
+               default_value=None, normalizer=None):
+        stdin = StringIO(answer)
+        return cli.prompt(
+            question, validator, choices, default_value,
+            _stdin=stdin, _stdout=self.stdout)
+
+    def test_prompt_basic(self):
+        result = self.prompt('How are you?', 'I am fine thank you.\n')
+        self.assertEqual(result, 'I am fine thank you.')
+
+    def test_prompt_basic_choice_overridden(self):
+        # Extra choices with a specific validator will not work
+        result = self.prompt(
+            'How are you?', 'I am fine thank you.\n', choices=(
+                ('a', 'A'),
+                ('b', 'B'),
+                ('c', 'C'),
+            ),
+            # explicit validator negates the choices
+            validator=cli.null_validator,
+        )
+        self.assertEqual(result, 'I am fine thank you.')
+        self.assertEqual(self.stdout.getvalue(), 'How are you? ')
+
+    def test_prompt_choices_only(self):
+        # Extra choices with a specific validator will not work
+        result = self.prompt(
+            'How are you?', 'I am fine thank you.\n',
+            choices=(
+                ('a', 'A'),
+                ('b', 'B'),
+                ('c', 'C'),
+            ),
+            default_value=None,
+        )
+        self.assertIsNone(result, None)
+        self.assertEqual(
+            self.stdout.getvalue(),
+            'How are you? (a/b/c) Invalid choice. (a/b/c) ')
+
+    def test_prompt_choices_canceled(self):
+        # Extra choices with a specific validator will not work
+        result = self.prompt(
+            'How are you?', '', validator=fake_error(KeyboardInterrupt))
+        self.assertIsNone(result, None)
+        self.assertEqual(
+            self.stdout.getvalue(),
+            'How are you? Aborted.\n')
 
 
 class CliDriverTestCase(unittest.TestCase):
