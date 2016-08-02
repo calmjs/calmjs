@@ -67,7 +67,8 @@ def null_validator(value):
     return value
 
 
-def make_choice_validator(choices, default=NotImplemented, normalizer=None):
+def make_choice_validator(
+        choices, default_key=None, normalizer=None):
     """
     Returns a callable that accepts the choices provided.
 
@@ -88,7 +89,7 @@ def make_choice_validator(choices, default=NotImplemented, normalizer=None):
     """
 
     def normalize_all(_choices):
-        # lowercase all the keys for easier comparison
+        # normalize all the keys for easier comparison
         if normalizer:
             _choices = [(normalizer(key), value) for key, value in choices]
         return _choices
@@ -98,8 +99,8 @@ def make_choice_validator(choices, default=NotImplemented, normalizer=None):
     def choice_validator(value):
         if normalizer:
             value = normalizer(value)
-        if not value and default is not NotImplemented:
-            return default
+        if not value and default_key:
+            value = choices[default_key][0]
         results = []
         for choice, mapped in choices:
             if value == choice:
@@ -120,10 +121,11 @@ def make_choice_validator(choices, default=NotImplemented, normalizer=None):
 
 
 def prompt(question, validator=None,
-           choices=None, default_value=NotImplemented, normalizer=str.lower,
-           _stdin=sys.stdin, _stdout=sys.stdout):
+           choices=None, default_key=NotImplemented,
+           normalizer=str.lower,
+           _stdin=None, _stdout=None):
     """
-    Provide a command line prompt.
+    Prompt user for question, maybe choices, and get answer.
 
     Arguments:
 
@@ -143,6 +145,12 @@ def prompt(question, validator=None,
         Defaults to str.lower.  See above.
     """
 
+    if _stdin is None:  # pragma: no cover
+        _stdin = sys.stdin
+
+    if _stdout is None:  # pragma: no cover
+        _stdout = sys.stdout
+
     _stdout.write(question)
     _stdout.write(' ')
 
@@ -151,7 +159,7 @@ def prompt(question, validator=None,
     if validator is None:
         if choices:
             validator = make_choice_validator(
-                choices, default_value, normalizer)
+                choices, default_key, normalizer)
             choice_keys = [choice for choice, mapped in choices]
         else:
             validator = null_validator
@@ -162,11 +170,16 @@ def prompt(question, validator=None,
             _stdout.write('(')
             _stdout.write('/'.join(choice_keys))
             _stdout.write(') ')
+            if default_key:
+                _stdout.write('[')
+                _stdout.write(choice_keys[default_key])
+                _stdout.write('] ')
         _stdout.flush()
         try:
             answer = validator(_stdin.readline().strip())
         except ValueError as e:
-            _stdout.write('%s' % e)
+            _stdout.write('%s\n' % e)
+            _stdout.write(question.splitlines()[-1])
             _stdout.write(' ')
         except KeyboardInterrupt:
             _stdout.write('Aborted.\n')

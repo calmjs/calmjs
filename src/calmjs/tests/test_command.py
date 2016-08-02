@@ -39,7 +39,6 @@ class DistLoggerTestCase(unittest.TestCase):
         logger.addHandler(distutils_log_handler)
         logger.log(9001, 'Over 9000 will definitely not work')
         self.assertEqual(sys.stdout.getvalue(), '')
-        value = sys.stderr.getvalue()
         self.assertTrue(sys.stderr.getvalue().startswith(
             'Failed to convert <LogRecord: calmjs.testing.dummy, 9001'))
 

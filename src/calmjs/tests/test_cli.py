@@ -92,10 +92,15 @@ class MakeChoiceValidatorTestCase(unittest.TestCase):
             ('baz', 'Baz'),
             ('YES', 'Yes'),
             ('yes', 'yes'),
-        ], default=True)
+        ])
 
-    def test_default(self):
-        self.assertTrue(self.validator(''))
+    def test_default_choice(self):
+        self.validator = cli.make_choice_validator([
+            ('foo', 'Foo'),
+            ('bar', 'Bar'),
+            ('baz', 'Baz'),
+        ], default_key=2)
+        self.assertEqual(self.validator(''), 'Baz')
 
     def test_matched(self):
         self.assertEqual(self.validator('f'), 'Foo')
@@ -135,10 +140,10 @@ class CliPromptTestCase(unittest.TestCase):
 
     def prompt(self, question, answer,
                validator=None, choices=None,
-               default_value=None, normalizer=None):
+               default_key=None, normalizer=None):
         stdin = StringIO(answer)
         return cli.prompt(
-            question, validator, choices, default_value,
+            question, validator, choices, default_key,
             _stdin=stdin, _stdout=self.stdout)
 
     def test_prompt_basic(self):
@@ -162,18 +167,22 @@ class CliPromptTestCase(unittest.TestCase):
     def test_prompt_choices_only(self):
         # Extra choices with a specific validator will not work
         result = self.prompt(
-            'How are you?', 'I am fine thank you.\n',
+            'Nice day today.\nHow are you?', 'I am fine thank you.\n',
             choices=(
                 ('a', 'A'),
                 ('b', 'B'),
                 ('c', 'C'),
             ),
-            default_value=None,
+            default_key=1,
         )
-        self.assertIsNone(result, None)
+        self.assertEqual(result, 'B')
         self.assertEqual(
             self.stdout.getvalue(),
-            'How are you? (a/b/c) Invalid choice. (a/b/c) ')
+            'Nice day today.\n'
+            'How are you? (a/b/c) [b] '  # I am fine thank you.\n
+            'Invalid choice.\n'
+            'How are you? (a/b/c) [b] '
+        )
 
     def test_prompt_choices_canceled(self):
         # Extra choices with a specific validator will not work
