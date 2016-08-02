@@ -10,7 +10,6 @@ from distutils.core import Command
 from distutils.errors import DistutilsOptionError
 from distutils import log
 
-from calmjs.npm import PACKAGE_JSON
 from calmjs import cli
 
 
@@ -58,7 +57,6 @@ class npm(Command):
     """
 
     description = "npm compatibility helper"
-    package_json = PACKAGE_JSON
     indent = 4
 
     user_options = [
@@ -68,8 +66,10 @@ class npm(Command):
          "overwrite configuration files (such as package.json)"),
         ('merge', None,
          "merge configuration files if possible (such as package.json)"),
+        # this is implicit because otherwise no difference from running
+        # ``npm init`` directly from the shell.
         ('install', None,
-         "runs npm install with package.json in current directory"),
+         "runs npm install with generated package.json; implies --init"),
     ]
     # TODO implement support for other install args like specifying the
     # location of stuff.
@@ -84,12 +84,11 @@ class npm(Command):
 
     def do_init(self):
         pkg_name = self.distribution.get_name()
-        # TODO figure out best practices to get the logs from the cli
-        # module/class outputting via here.
-        # log.info(
-        #     "Generating a flattened '%s' for '%s'",
-        #     cli.package_json, pkg_name)
         cli.npm_init(pkg_name, overwrite=self.overwrite, merge=self.merge)
+
+    def do_install(self):
+        pkg_name = self.distribution.get_name()
+        cli.npm_install(pkg_name, overwrite=self.overwrite, merge=self.merge)
 
     def finalize_options(self):
         opts = [i for i in (getattr(self, k) for k in self._opt_keys()) if i]
@@ -99,6 +98,10 @@ class npm(Command):
                 'must specify an action flag; see %s --help' % name)
 
     def run(self):
+        # We are really only interested in this module.
+        logger = logging.getLogger('calmjs.cli')
+        logger.addHandler(distutils_log_handler)
+        logger.setLevel(logging.DEBUG)
         self.run_command('egg_info')
         if self.dry_run:
             # Everything else will do a lot of naughty things so...
@@ -106,6 +109,5 @@ class npm(Command):
 
         if self.init:
             self.do_init()
-
-        if self.install:
-            cli.npm_install(package_name=self.distribution.get_name())
+        elif self.install:
+            self.do_install()

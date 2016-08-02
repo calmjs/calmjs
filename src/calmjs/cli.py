@@ -237,6 +237,10 @@ class Driver(object):
         Returns False otherwise.
         """
 
+        logger.info(
+            "generating a flattened '%s' for '%s'",
+            self.pkgdef_filename, package_name)
+
         # this will be modified in place
         original_json = {}
         # package_json is the one that will get written out, if needed.
@@ -279,6 +283,9 @@ class Driver(object):
                 return True
 
             if not overwrite:
+                logger.warning(
+                    'existing package.json detected; not overwriting.'
+                )
                 return False
 
         if package_json:
@@ -288,16 +295,33 @@ class Driver(object):
 
         return True
 
-    def pkg_manager_install(self, package_name=None):
+    def pkg_manager_install(self, package_name=None, *a, **kw):
         """
-        If this class is initiated using standard procedures, this will
-        install node_modules into the current working directory for the
-        specific package.  With an already available ``package.json``
-        file, the init process will be skipped.
+        This will install all dependencies into the current working
+        directory for the specific Python package from the selected
+        JavaScript package manager; this requires that this package
+        manager's package definition file to be properly generated
+        first, otherwise the process will be aborted.  All other
+        arguments to this method will be passed forward to the
+        pkg_manager_init method.
+
+        If no package_name was supplied then just continue with the
+        process anyway, to still enable the shorthand calling.
         """
 
-        if package_name and not exists(self.pkgdef_filename):
-            self.pkg_manager_init(package_name)
+        if package_name:
+            result = self.pkg_manager_init(package_name, *a, **kw)
+            if not result:
+                logger.warn(
+                    "not continuing with '%s install' as the generation of "
+                    "'%s' failed", self.pkg_manager_bin, self.pkgdef_filename
+                )
+                return
+        else:
+            logger.warn(
+                "no package name supplied, but continuing with '%s install'",
+                self.pkg_manager_bin
+            )
 
         kw = {}
         env = {}
