@@ -5,6 +5,7 @@ import unittest
 from io import StringIO
 import json
 import os
+import sys
 from os.path import join
 from os.path import exists
 
@@ -81,6 +82,25 @@ class CliGenerateMergeDictTestCase(unittest.TestCase):
         # Naturally, the 'name' is missing and will need to be
         # reconciled separately... will figure this out later.
         self.assertEqual(result, answer)
+
+
+class CliCheckInteractiveTestCase(unittest.TestCase):
+
+    def test_check_interactive_fail(self):
+        self.assertFalse(cli._check_interactive(StringIO(), StringIO()))
+
+    def test_check_interactive_not_stdin(self):
+        tempdir = mkdtemp(self)
+        fn = join(tempdir, 'test')
+        with open(fn, 'w') as fd1:
+            self.assertFalse(cli._check_interactive(fd1))
+
+        with open(fn) as fd2:
+            self.assertFalse(cli._check_interactive(fd2, fd1))
+
+    @unittest.skipIf(sys.__stdin__.name != '<stdin>', 'stdin is modified')
+    def test_check_interactive_good(self):
+        self.assertTrue(cli._check_interactive(sys.__stdin__, sys.__stdout__))
 
 
 class MakeChoiceValidatorTestCase(unittest.TestCase):

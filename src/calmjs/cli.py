@@ -5,7 +5,9 @@ import logging
 import json
 import re
 import sys
+from os import fstat
 from os.path import exists
+from stat import S_ISCHR
 
 from subprocess import check_output
 from subprocess import call
@@ -61,6 +63,23 @@ def generate_merge_dict(keys, *dicts):
             result[key] = result.get(key, {})
             result[key].update(d[key])
     return result
+
+
+def _check_interactive(*descriptors):
+    for desc in descriptors:
+        try:
+            if not S_ISCHR(fstat(desc.fileno()).st_mode):
+                return False
+        except Exception:
+            # Anything broken we are going to pretend this is not
+            # interactive
+            return False
+
+    return True  # pragma: no cover
+
+
+def check_interactive():  # pragma: no cover
+    return _check_interactive(sys.stdin, sys.stdout)
 
 
 def null_validator(value):
