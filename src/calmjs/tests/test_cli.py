@@ -18,6 +18,8 @@ from calmjs.testing.utils import make_dummy_dist
 from calmjs.testing.utils import stub_mod_call
 from calmjs.testing.utils import stub_mod_check_output
 from calmjs.testing.utils import stub_dist_flatten_package_json
+from calmjs.testing.utils import stub_stdin
+from calmjs.testing.utils import stub_stdouts
 
 
 class CliGenerateMergeDictTestCase(unittest.TestCase):
@@ -226,7 +228,12 @@ class CliDriverTestCase(unittest.TestCase):
         # working directory
         self.cwd = os.getcwd()
 
+        # Forcibly enable interactive mode.
+        self.inst_interactive, cli._inst.interactive = (
+            cli._inst.interactive, True)
+
     def tearDown(self):
+        cli._inst.interactive = self.inst_interactive
         # restore original os.environ from copy
         os.environ.clear()
         os.environ.update(self.original_env)
@@ -316,22 +323,80 @@ class CliDriverTestCase(unittest.TestCase):
         self.assertEqual(self.call_args, ((['npm', 'install'],), {}))
         self.assertFalse(exists(join(tmpdir, 'package.json')))
 
-    def test_npm_install_package_json_no_overwrite(self):
+    def test_npm_install_package_json_no_overwrite_interactive(self):
+        # Testing the implied init call
         stub_mod_call(self, cli)
+        stub_stdouts(self)
+        stub_stdin(self, 'n\n')
         tmpdir = mkdtemp(self)
         os.chdir(tmpdir)
+
+        # All the pre-made setup.
+        app = make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([])),
+            ('package.json', json.dumps({
+                'dependencies': {'jquery': '~1.11.0'},
+            })),
+        ), 'foo', '1.9.0')
+        working_set = WorkingSet()
+        working_set.add(app, self._calmjs_testing_tmpdir)
+        stub_dist_flatten_package_json(self, [cli], working_set)
 
         # We are going to have a fake package.json
         with open(join(tmpdir, 'package.json'), 'w') as fd:
             json.dump({}, fd)
 
         # This is faked.
-        cli.npm_install()
+        cli.npm_install('foo')
+
+        self.assertTrue(sys.stdout.getvalue().endswith(
+            'Overwrite? (Yes/No) [No] '))
+        # No log level set.
+        self.assertEqual(sys.stderr.getvalue(), '')
+
+        with open(join(tmpdir, 'package.json')) as fd:
+            result = fd.read()
+        # This should remain unchanged as no to overwrite is default.
+        self.assertEqual(result, '{}')
+
+    def test_npm_install_package_json_overwrite_interactive(self):
+        # Testing the implied init call
+        stub_mod_call(self, cli)
+        stub_stdin(self, 'y\n')
+        stub_stdouts(self)
+        tmpdir = mkdtemp(self)
+        os.chdir(tmpdir)
+
+        # All the pre-made setup.
+        app = make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([])),
+            ('package.json', json.dumps({
+                'dependencies': {'jquery': '~1.11.0'},
+            })),
+        ), 'foo', '1.9.0')
+        working_set = WorkingSet()
+        working_set.add(app, self._calmjs_testing_tmpdir)
+        stub_dist_flatten_package_json(self, [cli], working_set)
+
+        # We are going to have a fake package.json
+        with open(join(tmpdir, 'package.json'), 'w') as fd:
+            json.dump({}, fd)
+
+        # This is faked.
+        cli.npm_install('foo', overwrite=True)
 
         with open(join(tmpdir, 'package.json')) as fd:
             config = json.load(fd)
-        # This should remain unchanged.
-        self.assertEqual(config, {})
+
+        # Overwritten
+        self.assertEqual(config, {
+            'dependencies': {'jquery': '~1.11.0'},
+            'devDependencies': {},
+        })
+
+        # No log level set.
+        self.assertEqual(sys.stdout.getvalue(), '')
+        self.assertEqual(sys.stderr.getvalue(), '')
 
 
 class CliDriverInitTestCase(unittest.TestCase):
@@ -342,6 +407,7 @@ class CliDriverInitTestCase(unittest.TestCase):
     def setUp(self):
         # save working directory
         self.cwd = os.getcwd()
+        self.inst_interactive = cli._inst.interactive
 
         # All the pre-made setup.
         stub_mod_call(self, cli)
@@ -357,13 +423,14 @@ class CliDriverInitTestCase(unittest.TestCase):
 
     def tearDown(self):
         # restore original os.environ from copy
+        cli._inst.interactive = self.inst_interactive
         os.chdir(self.cwd)
 
-    def test_npm_init_new(self):
+    def test_npm_init_new_non_interactive(self):
         tmpdir = mkdtemp(self)
         os.chdir(tmpdir)
 
-        self.assertTrue(cli.npm_init('foo'))
+        self.assertTrue(cli.npm_init('foo', interactive=False))
         with open(join(tmpdir, 'package.json')) as fd:
             result = json.load(fd)
 
@@ -372,7 +439,7 @@ class CliDriverInitTestCase(unittest.TestCase):
             'devDependencies': {},
         })
 
-    def test_npm_init_existing_standard(self):
+    def test_npm_init_existing_standard_non_interactive(self):
         tmpdir = mkdtemp(self)
 
         # Write an initial thing
@@ -380,7 +447,29 @@ class CliDriverInitTestCase(unittest.TestCase):
             json.dump({'dependencies': {}, 'devDependencies': {}}, fd)
 
         os.chdir(tmpdir)
-        self.assertFalse(cli.npm_init('foo'))
+        self.assertFalse(cli.npm_init('foo', interactive=False))
+
+        with open(join(tmpdir, 'package.json')) as fd:
+            result = json.load(fd)
+
+        # Does not overwrite by default.
+        self.assertEqual(result, {
+            'dependencies': {},
+            'devDependencies': {},
+        })
+
+    def test_npm_init_existing_standard_interactive_canceled(self):
+        stub_stdouts(self)
+        stub_stdin(self, 'N')
+        tmpdir = mkdtemp(self)
+        # Write an initial thing
+        with open(join(tmpdir, 'package.json'), 'w') as fd:
+            json.dump({'dependencies': {}, 'devDependencies': {}}, fd)
+        os.chdir(tmpdir)
+
+        # force interactivity to be True
+        cli._inst.interactive = True
+        self.assertFalse(cli.npm_init('foo', interactive=True))
 
         with open(join(tmpdir, 'package.json')) as fd:
             result = json.load(fd)
@@ -402,6 +491,7 @@ class CliDriverInitTestCase(unittest.TestCase):
             }, 'devDependencies': {}}, fd)
 
         os.chdir(tmpdir)
+        # Should be a concrete option overriding interactive
         self.assertTrue(cli.npm_init('foo', overwrite=True))
 
         with open(join(tmpdir, 'package.json')) as fd:
@@ -425,6 +515,7 @@ class CliDriverInitTestCase(unittest.TestCase):
             }, 'name': 'dummy'}, fd, indent=0)
 
         os.chdir(tmpdir)
+        # Should be a concrete option overriding interactive
         self.assertTrue(cli.npm_init('foo', merge=True))
 
         with open(join(tmpdir, 'package.json')) as fd:
@@ -478,7 +569,9 @@ class CliDriverInitTestCase(unittest.TestCase):
             'name': 'dummy',
         })
 
-    def test_npm_init_existing_broken_no_overwrite(self):
+    def test_npm_init_existing_broken_no_overwrite_non_interactive(self):
+        cli._inst.interactive = False
+
         tmpdir = mkdtemp(self)
         # Broken json
         with open(join(tmpdir, 'package.json'), 'w') as fd:

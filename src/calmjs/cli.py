@@ -78,7 +78,7 @@ def _check_interactive(*descriptors):
     return True  # pragma: no cover
 
 
-def check_interactive():  # pragma: no cover
+def check_interactive():
     return _check_interactive(sys.stdin, sys.stdout)
 
 
@@ -164,10 +164,10 @@ def prompt(question, validator=None,
         Defaults to str.lower.  See above.
     """
 
-    if _stdin is None:  # pragma: no cover
+    if _stdin is None:
         _stdin = sys.stdin
 
-    if _stdout is None:  # pragma: no cover
+    if _stdout is None:
         _stdout = sys.stdout
 
     _stdout.write(question)
@@ -213,6 +213,7 @@ class Driver(object):
 
     def __init__(self, node_bin=NODE, pkg_manager_bin=NPM,
                  node_path=None, pkgdef_filename=PACKAGE_JSON,
+                 prompt=prompt,
                  ):
         """
         Optional Arguments:
@@ -226,12 +227,17 @@ class Driver(object):
         pkgdef_filename
             The file name of the package.json file - defaults to
             ``package.json``.
+        prompt
+            The interactive prompt function.  See above.
         """
 
         self.node_path = node_path
         self.node_bin = node_bin
         self.pkg_manager_bin = pkg_manager_bin
         self.pkgdef_filename = pkgdef_filename
+        self.prompt = prompt
+
+        self.interactive = check_interactive()
 
     def get_node_version(self):
         return _get_bin_version(self.node_bin, _from=1)
@@ -241,6 +247,7 @@ class Driver(object):
 
     def pkg_manager_init(
             self, package_name=None,
+            interactive=None,
             overwrite=False, merge=False):
         """
         If this class is initiated using standard procedures, this will
@@ -253,6 +260,10 @@ class Driver(object):
 
         package_name
             The python package to source the package.json from.
+
+        interactive
+            Boolean flag; if set, prompts user on what to do when choice
+            needs to be made.  Defaults to None, which is auto-detect.
 
         overwrite
             Boolean flag; if set, overwrite package.json with the newly
@@ -272,6 +283,11 @@ class Driver(object):
         logger.info(
             "generating a flattened '%s' for '%s'",
             self.pkgdef_filename, package_name)
+
+        if interactive is None:
+            interactive = self.interactive
+        # both autodetection AND manual specification must be true.
+        interactive = interactive & self.interactive
 
         # this will be modified in place
         original_json = {}
@@ -314,9 +330,24 @@ class Driver(object):
                 # generated version, we got it, and we are done here.
                 return True
 
+            if interactive and not overwrite:
+                # Only complain if the generated file differs
+                overwrite = prompt(
+                    "Generated '%s' differs from one in current working "
+                    "directory.\nOverwrite?" % (
+                        self.pkgdef_filename,
+                    ),
+                    choices=(
+                        ('Yes', True),
+                        ('No', False),
+                    ),
+                    default_key=1,
+                )
+
             if not overwrite:
                 logger.warning(
-                    'existing package.json detected; not overwriting.'
+                    "not overwriting existing 'package.json' "
+                    "in current directory"
                 )
                 return False
 

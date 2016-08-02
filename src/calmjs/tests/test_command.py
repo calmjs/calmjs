@@ -19,6 +19,7 @@ from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import stub_mod_call
 from calmjs.testing.utils import stub_dist_flatten_package_json
 from calmjs.testing.utils import stub_stdouts
+from calmjs.testing.utils import stub_stdin
 
 
 class DistLoggerTestCase(unittest.TestCase):
@@ -99,9 +100,13 @@ class DistCommandTestCase(unittest.TestCase):
         stub_dist_flatten_package_json(self, [cli], working_set)
         # Quiet stdout from distutils logs
         stub_stdouts(self)
+        # Forcibly enable interactive mode.
+        self.inst_interactive, cli._inst.interactive = (
+            cli._inst.interactive, True)
 
     def tearDown(self):
         os.chdir(self.cwd)
+        cli._inst.interactive = self.inst_interactive
 
     def test_no_args(self):
         tmpdir = mkdtemp(self)
@@ -115,11 +120,13 @@ class DistCommandTestCase(unittest.TestCase):
         with self.assertRaises(DistutilsOptionError):
             dist.run_commands()
 
-    def test_init_no_overwrite(self):
+    def test_init_no_overwrite_default_input(self):
         tmpdir = mkdtemp(self)
+        stub_stdin(self, u'')  # default should be no
 
         with open(os.path.join(tmpdir, 'package.json'), 'w') as fd:
-            json.dump({'dependencies': {}, 'devDependencies': {}}, fd)
+            json.dump(
+                {'dependencies': {}, 'devDependencies': {}}, fd, indent=None)
 
         os.chdir(tmpdir)
         dist = Distribution(dict(
@@ -131,13 +138,26 @@ class DistCommandTestCase(unittest.TestCase):
         dist.run_commands()
 
         with open(os.path.join(tmpdir, 'package.json')) as fd:
-            result = json.load(fd)
+            # Should not have overwritten
+            result = json.loads(fd.readline())
 
-        # gets overwritten anyway.
         self.assertEqual(result, {
             'dependencies': {},
             'devDependencies': {},
         })
+
+        stdout = sys.stdout.getvalue()
+        self.assertTrue(stdout.startswith("running npm\n"))
+
+        self.assertIn(
+            "generating a flattened 'package.json' for 'foo'\n"
+            "Generated 'package.json' differs from one in current working "
+            "directory.\n", stdout
+        )
+
+        self.assertTrue(sys.stderr.getvalue().endswith(
+            "not overwriting existing 'package.json' in current directory\n"
+        ))
 
     def test_init_overwrite(self):
         tmpdir = mkdtemp(self)
@@ -213,7 +233,8 @@ class DistCommandTestCase(unittest.TestCase):
         })
         self.assertEqual(self.call_args, ((['npm', 'install'],), {}))
 
-    def test_install_no_init_has_package_json(self):
+    def test_install_no_init_has_package_json_default_input(self):
+        stub_stdin(self, u'')
         stub_mod_call(self, cli)
         tmpdir = mkdtemp(self)
 
