@@ -130,6 +130,9 @@ def make_dummy_dist(testcase_inst, metadata_map=(),
         tmpdir, project_name=pkgname, metadata=metadata, version=version)
 
 
+# I guess a bunch of the following stub functions can be replace by
+# mocks, but so far it's managable and limits extra dependencies on <3.5
+
 def stub_dist_flatten_package_json(testcase_inst, modules, working_set):
     """
     Replace the flatten_package_json import from dist for the specified
@@ -166,7 +169,8 @@ def stub_mod_call(testcase_inst, mod, f=None):
     def cleanup():
         # Restore original module level functions
         mod.call = call
-        delattr(testcase_inst, 'call_args')
+        if hasattr(testcase_inst, 'call_args'):
+            delattr(testcase_inst, 'call_args')
 
     testcase_inst.addCleanup(cleanup)
 
@@ -184,9 +188,20 @@ def stub_mod_check_output(testcase_inst, mod, f=None):
 
     def cleanup():
         mod.check_output = check_output
-        delattr(testcase_inst, 'check_output_answer')
+        if hasattr(testcase_inst, 'check_output_answer'):
+            delattr(testcase_inst, 'check_output_answer')
 
     testcase_inst.addCleanup(cleanup)
+
+
+def stub_stdin(testcase_inst, inputs):
+    stdin = testcase_inst._stdin = sys.stdin
+
+    def cleanup():
+        sys.stdin = stdin
+
+    testcase_inst.addCleanup(cleanup)
+    sys.stdin = StringIO(inputs)
 
 
 def stub_stdouts(testcase_inst):

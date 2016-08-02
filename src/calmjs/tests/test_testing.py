@@ -164,6 +164,14 @@ class TestingUtilsTestCase(unittest.TestCase):
         self.doCleanups()
         self.assertIs(dist.flatten_package_json, original)
 
+    def test_stub_stdin(self):
+        o_stdin = sys.stdin
+        utils.stub_stdin(self, u'N')
+        self.assertIsNot(o_stdin, sys.stdin)
+        self.assertEqual(sys.stdin.getvalue(), u'N')
+        self.doCleanups()
+        self.assertIs(o_stdin, sys.stdin)
+
     def test_stub_stdouts(self):
         o_stdout = sys.stdout
         o_stderr = sys.stderr
