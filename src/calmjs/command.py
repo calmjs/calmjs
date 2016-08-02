@@ -59,6 +59,9 @@ class npm(Command):
     description = "npm compatibility helper"
     indent = 4
 
+    # We are really only interested logs from these modules.
+    handle_logger_ids = ('calmjs.cli', 'calmjs.dist',)
+
     user_options = [
         ('init', None,
          "generate package.json and write to current dir"),
@@ -98,10 +101,11 @@ class npm(Command):
                 'must specify an action flag; see %s --help' % name)
 
     def run(self):
-        # We are really only interested in this module.
-        logger = logging.getLogger('calmjs.cli')
-        logger.addHandler(distutils_log_handler)
-        logger.setLevel(logging.DEBUG)
+        for logger_id in self.handle_logger_ids:
+            logger = logging.getLogger(logger_id)
+            logger.addHandler(distutils_log_handler)
+            logger.setLevel(logging.DEBUG)
+
         self.run_command('egg_info')
         if self.dry_run:
             # Everything else will do a lot of naughty things so...

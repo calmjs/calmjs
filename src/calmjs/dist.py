@@ -6,8 +6,9 @@ Provides functions and classes that enable the management of npm
 dependencies for JavaScript sources that lives in Python packages.
 """
 
+from logging import getLogger
+
 from distutils.errors import DistutilsSetupError
-from distutils import log
 
 from pkg_resources import Requirement
 from pkg_resources import working_set as default_working_set
@@ -16,6 +17,8 @@ import json
 
 from calmjs.npm import verify_package_json
 from calmjs.npm import PACKAGE_JSON
+
+logger = getLogger(__name__)
 
 
 def validate_package_json(dist, attr, value):
@@ -63,23 +66,23 @@ def get_dist_package_json(dist, filename=PACKAGE_JSON):
 
     # Then use the package's distribution to acquire the file.
     if not dist.has_metadata(filename):
-        log.debug("No '%s' for '%s'.", filename, dist)
+        logger.debug("no '%s' for '%s'", filename, dist)
         return
 
     try:
         result = dist.get_metadata(filename)
     except IOError:
-        log.error("Failed to read '%s' for '%s'.", filename, dist)
+        logger.error("I/O error on reading of '%s' for '%s'.", filename, dist)
         return
 
     try:
         obj = json.loads(result)
     except (TypeError, ValueError):
-        log.error(
-            "The '%s' found in '%s' is not a valid json.", filename, dist)
+        logger.error(
+            "the '%s' found in '%s' is not a valid json.", filename, dist)
         return
 
-    log.debug("Found '%s' for '%s'.", filename, dist)
+    logger.debug("found '%s' for '%s'.", filename, dist)
     return obj
 
 
@@ -133,12 +136,15 @@ def flatten_dist_package_json(
         if not obj:
             continue
 
+        logger.debug("merging '%s' for required '%s'", filename, dist)
         dependencies.update(obj.get('dependencies', {}))
         devDependencies.update(obj.get('devDependencies', {}))
 
-    # Layer on top
-    dependencies.update(root.get('dependencies', {}))
-    devDependencies.update(root.get('devDependencies', {}))
+    if source_dist:
+        # Layer on top
+        logger.debug("merging '%s' for target '%s'", filename, source_dist)
+        dependencies.update(root.get('dependencies', {}))
+        devDependencies.update(root.get('devDependencies', {}))
 
     root['dependencies'] = {
         k: v for k, v in dependencies.items() if v is not None}
