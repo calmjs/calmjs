@@ -5,6 +5,7 @@ import logging
 import json
 import re
 import sys
+from locale import getpreferredencoding
 from os import fstat
 from os.path import exists
 from stat import S_ISCHR
@@ -20,6 +21,7 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
+locale = getpreferredencoding()
 
 version_expr = re.compile('((?:\d+)(?:\.\d+)*)')
 
@@ -195,7 +197,8 @@ def prompt(question, validator=None,
                 _stdout.write('] ')
         _stdout.flush()
         try:
-            answer = validator(_stdin.readline().strip())
+            answer = validator(
+                _stdin.readline().strip().encode(locale).decode(locale))
         except ValueError as e:
             _stdout.write('%s\n' % e)
             _stdout.write(question.splitlines()[-1])
