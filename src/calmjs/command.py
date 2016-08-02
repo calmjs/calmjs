@@ -4,15 +4,53 @@ Module providing npm distutil command that ultimately integrates with
 setuptools
 """
 
+import logging
+
 from distutils.core import Command
 from distutils.errors import DistutilsOptionError
+from distutils import log
 
 from calmjs.npm import PACKAGE_JSON
 from calmjs import cli
 
 
-# class names in lower case simply due to setuptools using this verbatim
-# as the command name when showing user help.
+class DistutilsLogHandler(logging.Handler):
+    """
+    A handler that streams the logs to the distutils logger
+    """
+
+    def __init__(self, distutils_log=log):
+        logging.Handler.__init__(self)
+        self.log = distutils_log
+        # Basic numeric table
+        self.level_table = {
+            logging.CRITICAL: distutils_log.FATAL,
+            logging.ERROR: distutils_log.ERROR,
+            logging.WARNING: distutils_log.WARN,
+            logging.INFO: distutils_log.INFO,
+            logging.DEBUG: distutils_log.DEBUG,
+        }
+        self.setFormatter(logging.Formatter('%(message)s'))
+
+    def _to_distutils_level(self, level):
+        return self.level_table.get(level, level // 10)
+
+    def emit(self, record):
+        level = self._to_distutils_level(record.levelno)
+        try:
+            msg = self.format(record)
+            self.log.log(level, msg)
+        except Exception:
+            # LogRecord.__str__ shouldn't fail... probably.
+            self.log.warn('Failed to convert %s' % record)
+
+
+distutils_log_handler = DistutilsLogHandler()
+
+
+# Class names for subclasses of Command is in lower case simply due to
+# setuptools using this verbatim as the command name when showing user
+# help.
 
 class npm(Command):
     """
