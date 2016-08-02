@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import unittest
+import sys
 import tempfile
 
 from pkg_resources import WorkingSet
@@ -162,3 +163,13 @@ class TestingUtilsTestCase(unittest.TestCase):
         self.assertIsNot(dist.flatten_package_json, original)
         self.doCleanups()
         self.assertIs(dist.flatten_package_json, original)
+
+    def test_stub_stdouts(self):
+        o_stdout = sys.stdout
+        o_stderr = sys.stderr
+        utils.stub_stdouts(self)
+        self.assertIsNot(o_stdout, sys.stdout)
+        self.assertIsNot(o_stderr, sys.stderr)
+        self.doCleanups()
+        self.assertIs(o_stdout, sys.stdout)
+        self.assertIs(o_stderr, sys.stderr)

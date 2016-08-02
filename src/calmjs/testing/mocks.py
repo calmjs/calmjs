@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import io
+
 from pkg_resources import Distribution
 from pkg_resources import EntryPoint
 from pkg_resources import EmptyProvider
@@ -52,3 +54,13 @@ class MockProvider(EmptyProvider):
         if results is None:
             raise IOError('emulating an IOError')
         return results
+
+
+class StringIO(io.StringIO):
+    """
+    A "safely" wrapped version
+    """
+
+    def write(self, msg):
+        io.StringIO.write(self, msg.encode(
+            'utf8', 'backslashreplace').decode('utf8'))

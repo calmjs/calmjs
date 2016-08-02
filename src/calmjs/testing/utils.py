@@ -1,4 +1,5 @@
 import tempfile
+import sys
 from os import makedirs
 from os.path import join
 from shutil import rmtree
@@ -11,6 +12,7 @@ from pkg_resources import Distribution
 # Do not invoke/import the calmjs namespace here.  If they are needed
 # please import from a scope.
 from . import module3
+from .mocks import StringIO
 
 
 TMPDIR_ID = '_calmjs_testing_tmpdir'
@@ -185,6 +187,19 @@ def stub_mod_check_output(testcase_inst, mod, f=None):
         delattr(testcase_inst, 'check_output_answer')
 
     testcase_inst.addCleanup(cleanup)
+
+
+def stub_stdouts(testcase_inst):
+    stderr = testcase_inst._stderr = sys.stderr
+    stdout = testcase_inst._stdout = sys.stdout
+
+    def cleanup():
+        sys.stderr = stderr
+        sys.stdout = stdout
+
+    testcase_inst.addCleanup(cleanup)
+    sys.stderr = StringIO()
+    sys.stdout = StringIO()
 
 
 def setup_testing_module_registry(testcase_inst):

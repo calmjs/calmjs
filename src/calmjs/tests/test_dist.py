@@ -11,6 +11,7 @@ from calmjs import dist as calmjs_dist
 from calmjs.testing.mocks import Mock_egg_info
 from calmjs.testing.mocks import MockProvider
 from calmjs.testing.utils import make_dummy_dist
+from calmjs.testing.utils import stub_stdouts
 
 
 class DistTestCase(unittest.TestCase):
@@ -92,6 +93,9 @@ class DistTestCase(unittest.TestCase):
         self.assertEqual(results, package_json)
 
     def test_get_dist_package_decoding_error(self):
+        # Quiet stdout from distutils logs
+        stub_stdouts(self)
+
         # trailing comma
         package_json = '{"dependencies": {"left-pad": "~1.1.1"},}'
         # bad data could be created by a competiting package.
@@ -107,6 +111,9 @@ class DistTestCase(unittest.TestCase):
         self.assertIsNone(results)
 
     def test_get_dist_package_read_error(self):
+        # Quiet stdout from distutils logs
+        stub_stdouts(self)
+
         mock_provider = MockProvider({
             'package.json': None,  # None will emulate IO error.
         })
@@ -162,6 +169,8 @@ class DistTestCase(unittest.TestCase):
             'dummydist', filename='bower.json', working_set=working_set))
 
     def tests_flatten_package_json_deps(self):
+        # Quiet stdout from distutils logs
+        stub_stdouts(self)
         make_dummy_dist(self, (
             ('requires.txt', '\n'.join([
             ])),

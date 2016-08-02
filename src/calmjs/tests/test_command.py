@@ -14,6 +14,7 @@ from calmjs.testing.utils import make_dummy_dist
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import stub_mod_call
 from calmjs.testing.utils import stub_dist_flatten_package_json
+from calmjs.testing.utils import stub_stdouts
 
 
 class DistCommandTestCase(unittest.TestCase):
@@ -37,6 +38,8 @@ class DistCommandTestCase(unittest.TestCase):
         # Stub out the flatten_package_json calls with one that uses our
         # custom working_set here.
         stub_dist_flatten_package_json(self, [cli], working_set)
+        # Quiet stdout from distutils logs
+        stub_stdouts(self)
 
     def tearDown(self):
         os.chdir(self.cwd)
