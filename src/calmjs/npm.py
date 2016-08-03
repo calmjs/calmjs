@@ -5,9 +5,13 @@ Module for dealing with npm framework.
 Provides some helper functions that deal with package.json
 """
 
+from functools import partial
+
 from calmjs.cli import Driver
+from calmjs.dist import write_json_file
 from calmjs.command import GenericPackageManagerCommand
 
+PACKAGE_FIELD = 'package_json'
 PACKAGE_JSON = 'package.json'
 NPM = 'npm'
 
@@ -18,6 +22,8 @@ get_npm_version = _inst.get_pkg_manager_version
 npm_init = _inst.pkg_manager_init
 npm_install = _inst.pkg_manager_install
 package_json = _inst.pkgdef_filename
+
+write_package_json = partial(write_json_file, PACKAGE_FIELD)
 
 
 class npm(GenericPackageManagerCommand):

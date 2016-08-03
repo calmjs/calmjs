@@ -42,10 +42,10 @@ setup(name='calmjs',
       npm = calmjs.npm:npm
 
       [distutils.setup_keywords]
-      package_json = calmjs.dist:validate_package_json
+      package_json = calmjs.dist:validate_json_field
 
       [egg_info.writers]
-      package.json = calmjs.dist:write_package_json
+      package.json = calmjs.npm:write_package_json
       """,
       test_suite="calmjs.tests.test_suite",
       )

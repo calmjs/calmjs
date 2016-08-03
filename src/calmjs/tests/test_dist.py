@@ -21,11 +21,12 @@ class DistTestCase(unittest.TestCase):
 
     def setUp(self):
         self.dist = Distribution()
-        self.optname = 'package_json'
+        self.optname = 'default_json'
+        self.pkgname = calmjs_dist.DEFAULT_JSON
 
-    def test_check_package_json_bad_type(self):
+    def test_is_json_compat_bad_type(self):
         with self.assertRaises(ValueError) as e:
-            calmjs_dist.verify_package_json(NotImplemented)
+            calmjs_dist.is_json_compat(NotImplemented)
 
         self.assertEqual(
             str(e.exception),
@@ -33,9 +34,9 @@ class DistTestCase(unittest.TestCase):
             'NotImplemented is not JSON serializable'
         )
 
-    def test_check_package_json_bad_type_in_dict(self):
+    def test_is_json_compat_bad_type_in_dict(self):
         with self.assertRaises(ValueError) as e:
-            calmjs_dist.verify_package_json({
+            calmjs_dist.is_json_compat({
                 'devDependencies': {
                     'left-pad': NotImplemented,
                 }
@@ -47,9 +48,9 @@ class DistTestCase(unittest.TestCase):
             'NotImplemented is not JSON serializable'
         )
 
-    def test_check_package_json_bad_type_not_dict(self):
+    def test_is_json_compat_bad_type_not_dict(self):
         with self.assertRaises(ValueError) as e:
-            calmjs_dist.verify_package_json(1)
+            calmjs_dist.is_json_compat(1)
 
         self.assertEqual(
             str(e.exception),
@@ -58,7 +59,7 @@ class DistTestCase(unittest.TestCase):
         )
 
         with self.assertRaises(ValueError) as e:
-            calmjs_dist.verify_package_json('"hello world"')
+            calmjs_dist.is_json_compat('"hello world"')
 
         self.assertEqual(
             str(e.exception),
@@ -66,9 +67,9 @@ class DistTestCase(unittest.TestCase):
             'or a JSON deserializable string'
         )
 
-    def test_check_package_json_bad_encode(self):
+    def test_is_json_compat_bad_encode(self):
         with self.assertRaises(ValueError) as e:
-            calmjs_dist.verify_package_json(
+            calmjs_dist.is_json_compat(
                 '{'
                 '    "devDependencies": {'
                 '        "left-pad": "~1.1.1",'  # trailing comma
@@ -78,8 +79,8 @@ class DistTestCase(unittest.TestCase):
 
         self.assertTrue(str(e.exception).startswith('JSON decoding error:'))
 
-    def test_check_package_json_good_str(self):
-        result = calmjs_dist.verify_package_json(
+    def test_is_json_compat_good_str(self):
+        result = calmjs_dist.is_json_compat(
             '{'
             '    "devDependencies": {'
             '        "left-pad": "~1.1.1"'
@@ -88,8 +89,8 @@ class DistTestCase(unittest.TestCase):
         )
         self.assertTrue(result)
 
-    def test_check_package_json_good_dict(self):
-        result = calmjs_dist.verify_package_json(
+    def test_is_json_compat_good_dict(self):
+        result = calmjs_dist.is_json_compat(
             # trailing commas are fine in python dicts.
             {
                 "devDependencies": {
@@ -99,9 +100,9 @@ class DistTestCase(unittest.TestCase):
         )
         self.assertTrue(result)
 
-    def test_check_package_json_good_dict_with_none(self):
+    def test_is_json_compat_good_dict_with_none(self):
         # Possible to specify a null requirement to remove things.
-        result = calmjs_dist.verify_package_json(
+        result = calmjs_dist.is_json_compat(
             {
                 "devDependencies": {
                     "left-pad": None
@@ -110,45 +111,48 @@ class DistTestCase(unittest.TestCase):
         )
         self.assertTrue(result)
 
-    def test_validate_package_json_good(self):
+    def test_validate_json_field_good(self):
         # don't need to validate against None as "the validation
         # function will only be called if the setup() call sets it to a"
         # non-None value", as per setuptools documentation.
 
-        self.assertTrue(calmjs_dist.validate_package_json(
+        self.assertTrue(calmjs_dist.validate_json_field(
             self.dist, self.optname, {}))
 
-    def test_validate_package_json_bad(self):
+    def test_validate_json_field_bad(self):
         with self.assertRaises(DistutilsSetupError) as e:
-            calmjs_dist.validate_package_json(
+            calmjs_dist.validate_json_field(
                 self.dist, self.optname, "{},")
 
         self.assertTrue(str(e.exception).startswith(
-            "'package_json' JSON decoding error:"
+            "'default_json' JSON decoding error:"
         ))
 
-    def test_write_package_json(self):
-        self.dist.package_json = '{}'
+    def test_write_json_file(self):
+        self.dist.default_json = '{}'
         ei = Mock_egg_info(self.dist)
         ei.initialize_options()
-        calmjs_dist.write_package_json(ei, 'package.json', 'package.json')
-        self.assertEqual(ei.called['package.json'], '{}')
+        calmjs_dist.write_json_file(
+            'default_json', ei, self.pkgname, self.pkgname)
+        self.assertEqual(ei.called[self.pkgname], '{}')
 
-    def test_write_package_json_dict(self):
-        self.dist.package_json = {}
+    def test_write_json_file_dict(self):
+        self.dist.default_json = {}
         ei = Mock_egg_info(self.dist)
         ei.initialize_options()
-        calmjs_dist.write_package_json(ei, 'package.json', 'package.json')
-        self.assertEqual(ei.called['package.json'], '{}')
+        calmjs_dist.write_json_file(
+            'default_json', ei, self.pkgname, self.pkgname)
+        self.assertEqual(ei.called[self.pkgname], '{}')
 
-    def test_write_package_json_delete(self):
-        self.dist.package_json = None  # this triggers the delete
+    def test_write_json_file_delete(self):
+        self.dist.default_json = None  # this triggers the delete
         ei = Mock_egg_info(self.dist)
         ei.initialize_options()
-        calmjs_dist.write_package_json(ei, 'package.json', 'package.json')
+        calmjs_dist.write_json_file(
+            'default_json', ei, self.pkgname, self.pkgname)
         # However since the top level method was stubbed out, just check
         # that it's been called...
-        self.assertEqual(ei.called['package.json'], None)
+        self.assertEqual(ei.called[self.pkgname], None)
 
     def test_get_pkg_dist(self):
         # Only really testing that this returns an actual distribution
@@ -169,7 +173,7 @@ class DistTestCase(unittest.TestCase):
 
         # We will mock up a Distribution object with some fake metadata.
         mock_provider = MockProvider({
-            'package.json': json.dumps(package_json),
+            self.pkgname: json.dumps(package_json),
         })
 
         mock_dist = pkg_resources.Distribution(
@@ -187,7 +191,7 @@ class DistTestCase(unittest.TestCase):
         package_json = '{"dependencies": {"left-pad": "~1.1.1"},}'
         # bad data could be created by a competiting package.
         mock_provider = MockProvider({
-            'package.json': package_json,
+            self.pkgname: package_json,
         })
         mock_dist = pkg_resources.Distribution(
             metadata=mock_provider, project_name='dummydist', version='0.0.0')
@@ -202,7 +206,7 @@ class DistTestCase(unittest.TestCase):
         stub_stdouts(self)
 
         mock_provider = MockProvider({
-            'package.json': None,  # None will emulate IO error.
+            self.pkgname: None,  # None will emulate IO error.
         })
         mock_dist = pkg_resources.Distribution(
             metadata=mock_provider, project_name='dummydist', version='0.0.0')
@@ -219,7 +223,7 @@ class DistTestCase(unittest.TestCase):
         package_json = {"dependencies": {"left-pad": "~1.1.1"}}
         mock_dist = make_dummy_dist(
             self, (
-                ('package.json', json.dumps(package_json)),
+                (self.pkgname, json.dumps(package_json)),
             ), pkgname='dummydist'
         )
         results = calmjs_dist.get_dist_package_json(mock_dist)
@@ -261,14 +265,14 @@ class DistTestCase(unittest.TestCase):
         make_dummy_dist(self, (
             ('requires.txt', '\n'.join([
             ])),
-            ('package.json', 'This is very NOT a package.json.'),
+            (self.pkgname, 'This is very NOT a package.json.'),
         ), 'security', '9999')
 
         make_dummy_dist(self, (
             ('requires.txt', '\n'.join([
                 'security',
             ])),
-            ('package.json', json.dumps({
+            (self.pkgname, json.dumps({
                 'name': 'framework',
                 'description': 'some framework',
                 'dependencies': {
@@ -284,7 +288,7 @@ class DistTestCase(unittest.TestCase):
             ('requires.txt', '\n'.join([
                 'framework>=2.1',
             ])),
-            ('package.json', json.dumps({
+            (self.pkgname, json.dumps({
                 'dependencies': {
                     'jquery': '~2.0.0',
                     'underscore': '~1.7.0',
@@ -297,7 +301,7 @@ class DistTestCase(unittest.TestCase):
                 'framework>=2.2',
                 'widget>=1.0',
             ])),
-            ('package.json', json.dumps({
+            (self.pkgname, json.dumps({
                 'dependencies': {
                     'backbone': '~1.3.0',
                     'jquery-ui': '~1.12.0',
@@ -309,7 +313,7 @@ class DistTestCase(unittest.TestCase):
             ('requires.txt', '\n'.join([
                 'framework>=2.1',
             ])),
-            ('package.json', json.dumps({
+            (self.pkgname, json.dumps({
                 'dependencies': {
                     'underscore': '~1.8.0',
                 },
@@ -326,7 +330,7 @@ class DistTestCase(unittest.TestCase):
                 'forms>=1.6',
                 'service>=1.1',
             ])),
-            ('package.json', json.dumps({
+            (self.pkgname, json.dumps({
                 'name': 'site',
                 'dependencies': {
                     'underscore': '~1.8.0',
@@ -373,21 +377,21 @@ class DistTestCase(unittest.TestCase):
 
         uilib_1_1 = make_dummy_dist(self, (
             ('requires.txt', '\n'.join([])),
-            ('package.json', json.dumps({
+            (self.pkgname, json.dumps({
                 'dependencies': {'jquery': '~1.0.0'},
             })),
         ), 'uilib', '1.1.0')
 
         uilib_1_4 = make_dummy_dist(self, (
             ('requires.txt', '\n'.join([])),
-            ('package.json', json.dumps({
+            (self.pkgname, json.dumps({
                 'dependencies': {'jquery': '~1.4.0'},
             })),
         ), 'uilib', '1.4.0')
 
         uilib_1_9 = make_dummy_dist(self, (
             ('requires.txt', '\n'.join([])),
-            ('package.json', json.dumps({
+            (self.pkgname, json.dumps({
                 'dependencies': {'jquery': '~1.9.0'},
             })),
         ), 'uilib', '1.9.0')
@@ -479,7 +483,7 @@ class DistTestCase(unittest.TestCase):
 
         lib = make_dummy_dist(self, (  # noqa: F841
             ('requires.txt', '\n'.join([])),
-            ('package.json', json.dumps({
+            (self.pkgname, json.dumps({
                 'dependencies': {
                     'jquery': '~3.0.0',
                     'left-pad': '1.1.1',
@@ -491,7 +495,7 @@ class DistTestCase(unittest.TestCase):
             ('requires.txt', '\n'.join([
                 'lib>=1.0.0',
             ])),
-            ('package.json', json.dumps({
+            (self.pkgname, json.dumps({
                 'dependencies': {
                     'jquery': '~3.0.0',
                     'left-pad': None,

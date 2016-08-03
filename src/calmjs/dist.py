@@ -18,10 +18,10 @@ import json
 logger = getLogger(__name__)
 
 # default package definition filename.
-DEFAULT_JSON = 'package.json'
+DEFAULT_JSON = 'default.json'
 
 
-def verify_package_json(value):
+def is_json_compat(value):
     """
     Check that the value is either a JSON decodable string or a dict
     that can be encoded into a JSON.
@@ -50,26 +50,24 @@ def verify_package_json(value):
     return True
 
 
-def validate_package_json(dist, attr, value):
+def validate_json_field(dist, attr, value):
     """
-    Check for package_json validity.
+    Check for json validity.
     """
 
     try:
-        verify_package_json(value)
+        is_json_compat(value)
     except ValueError as e:
         raise DistutilsSetupError("%r %s" % (attr, e))
 
     return True
 
 
-def write_package_json(cmd, basename, filename):
+def write_json_file(argname, cmd, basename, filename):
     """
-    Write the defined package_json into the package's egg-info directory
-    as ``package.json``.
+    Write JSON captured from the defined argname into the package's
+    egg-info directory using the specified filename.
     """
-
-    argname = 'package_json'
 
     value = getattr(cmd.distribution, argname, None)
 
