@@ -155,6 +155,14 @@ class DistCommandTestCase(unittest.TestCase):
             "directory.\n", stdout
         )
 
+        # That the diff additional block is inside
+        self.assertIn(
+            '+     "dependencies": {\n'
+            '+         "jquery": "~1.11.0"\n'
+            '+     },',
+            stdout,
+        )
+
         self.assertTrue(sys.stderr.getvalue().endswith(
             "not overwriting existing 'package.json' in current directory\n"
         ))
@@ -231,6 +239,9 @@ class DistCommandTestCase(unittest.TestCase):
         ))
         dist.parse_command_line()
         dist.run_commands()
+
+        stdout = sys.stdout.getvalue()
+        self.assertIn('+         "jquery": "~1.11.0",', stdout)
 
         with open(os.path.join(tmpdir, 'package.json')) as fd:
             result = json.load(fd)

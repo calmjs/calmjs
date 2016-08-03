@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import difflib
 import logging
 import json
 import re
@@ -308,6 +309,11 @@ class Driver(object):
 
         existed = exists(self.pkgdef_filename)
 
+        # I really don't like all these if statements that follow,
+        # however this is still relatively easy to reason over.  Should
+        # consider this more of a shell and have the heavy lifting be
+        # arranged in a more functional approach.
+
         if existed:
             try:
                 with open(self.pkgdef_filename, 'r') as fd:
@@ -348,13 +354,30 @@ class Driver(object):
                     overwrite = True
             elif interactive:
                 if not overwrite:
+                    # generate compacted ndiff output.
+                    diff = '\n'.join(l for l in (
+                        line.rstrip() for line in difflib.ndiff(
+                            json.dumps(
+                                original_json, indent=self.indent,
+                                sort_keys=True,
+                            ).splitlines(),
+                            json.dumps(
+                                package_json, indent=self.indent,
+                                sort_keys=True,
+                            ).splitlines(),
+                        ))
+                        if l[:1] in '?+-' or l[-1:] in '{}' or l[-2:] == '},')
                     # set new overwrite value from user input.
                     overwrite = prompt(
                         "Generated '%(pkgdef_filename)s' differs from one in "
                         "current working directory.\n\n"
+                        "The following is a compacted list of changes to be "
+                        "made:\n"
+                        "%(diff)s\n\n"
                         "Overwrite '%(pkgdef_filename)s' in "
                         "current directory?" % {
                             'pkgdef_filename': self.pkgdef_filename,
+                            'diff': diff,
                         },
                         choices=(
                             ('Yes', True),
