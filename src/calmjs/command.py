@@ -64,13 +64,13 @@ class npm(Command):
 
     user_options = [
         ('init', None,
-         "generate and write 'package.json' to current directory for this "
-         "package"),
+         "action: generate and write 'package.json' to current directory for "
+         "this package"),
         # this required implicit step is done, otherwise there are no
         # difference to running ``npm init`` directly from the shell.
         ('install', None,
-         "run npm install with generated 'package.json'; implies init; will "
-         "abort if init fails to write the generated file"),
+         "action: run npm install with generated 'package.json'; "
+         "implies init; will abort if init fails to write the generated file"),
         # as far as I know typically setuptools setup.py are not
         # interactive, so we keep it that way unless user explicitly
         # want this.
@@ -88,6 +88,9 @@ class npm(Command):
     ]
     # TODO implement support for other install args like specifying the
     # location of stuff.
+
+    # the actions that result in effects that we support
+    actions = ('init', 'install')
 
     def _opt_keys(self):
         for opt in self.user_options:
@@ -115,7 +118,7 @@ class npm(Command):
         )
 
     def finalize_options(self):
-        opts = [i for i in (getattr(self, k) for k in self._opt_keys()) if i]
+        opts = [i for i in (getattr(self, k) for k in self.actions) if i]
         if not opts:
             name = self.get_command_name()
             raise DistutilsOptionError(

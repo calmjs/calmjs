@@ -120,6 +120,18 @@ class DistCommandTestCase(unittest.TestCase):
         with self.assertRaises(DistutilsOptionError):
             dist.run_commands()
 
+    def test_interactive_only(self):
+        tmpdir = mkdtemp(self)
+        os.chdir(tmpdir)
+        dist = Distribution(dict(
+            script_name='setup.py',
+            script_args=['npm', '-i'],
+            name='foo',
+        ))
+        dist.parse_command_line()
+        with self.assertRaises(DistutilsOptionError):
+            dist.run_commands()
+
     def test_init_no_overwrite_default_input_interactive(self):
         tmpdir = mkdtemp(self)
         stub_stdin(self, u'')  # default should be no
