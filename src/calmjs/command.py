@@ -97,7 +97,7 @@ class npm(Command):
             yield opt[0]
 
     def initialize_options(self):
-        self.cli = cli.Driver(interactive=False)
+        self.cli = cli.Driver(interactive=False, pkg_manager_bin='npm')
         for key in self._opt_keys():
             setattr(self, key, False)
 
@@ -125,10 +125,13 @@ class npm(Command):
                 'must specify an action flag; see %s --help' % name)
 
     def run(self):
+        root_logger = logging.getLogger()
+        old_level = root_logger.level
+        root_logger.setLevel(logging.DEBUG)
+
         for logger_id in self.handle_logger_ids:
             logger = logging.getLogger(logger_id)
             logger.addHandler(distutils_log_handler)
-            logger.setLevel(logging.DEBUG)
 
         self.run_command('egg_info')
         if self.dry_run:
@@ -139,3 +142,10 @@ class npm(Command):
             self.do_init()
         elif self.install:
             self.do_install()
+
+        # should really restore the level but whatever for now.
+        for logger_id in self.handle_logger_ids:
+            logger = logging.getLogger(logger_id)
+            logger.removeHandler(distutils_log_handler)
+
+        root_logger.setLevel(old_level)

@@ -23,6 +23,93 @@ class DistTestCase(unittest.TestCase):
         self.dist = Distribution()
         self.optname = 'package_json'
 
+    def test_check_package_json_bad_type(self):
+        with self.assertRaises(ValueError) as e:
+            calmjs_dist.verify_package_json(NotImplemented)
+
+        self.assertEqual(
+            str(e.exception),
+            'must be a JSON serializable object: '
+            'NotImplemented is not JSON serializable'
+        )
+
+    def test_check_package_json_bad_type_in_dict(self):
+        with self.assertRaises(ValueError) as e:
+            calmjs_dist.verify_package_json({
+                'devDependencies': {
+                    'left-pad': NotImplemented,
+                }
+            })
+
+        self.assertEqual(
+            str(e.exception),
+            'must be a JSON serializable object: '
+            'NotImplemented is not JSON serializable'
+        )
+
+    def test_check_package_json_bad_type_not_dict(self):
+        with self.assertRaises(ValueError) as e:
+            calmjs_dist.verify_package_json(1)
+
+        self.assertEqual(
+            str(e.exception),
+            'must be specified as a JSON serializable dict '
+            'or a JSON deserializable string'
+        )
+
+        with self.assertRaises(ValueError) as e:
+            calmjs_dist.verify_package_json('"hello world"')
+
+        self.assertEqual(
+            str(e.exception),
+            'must be specified as a JSON serializable dict '
+            'or a JSON deserializable string'
+        )
+
+    def test_check_package_json_bad_encode(self):
+        with self.assertRaises(ValueError) as e:
+            calmjs_dist.verify_package_json(
+                '{'
+                '    "devDependencies": {'
+                '        "left-pad": "~1.1.1",'  # trailing comma
+                '    },'
+                '}'
+            )
+
+        self.assertTrue(str(e.exception).startswith('JSON decoding error:'))
+
+    def test_check_package_json_good_str(self):
+        result = calmjs_dist.verify_package_json(
+            '{'
+            '    "devDependencies": {'
+            '        "left-pad": "~1.1.1"'
+            '    }'
+            '}'
+        )
+        self.assertTrue(result)
+
+    def test_check_package_json_good_dict(self):
+        result = calmjs_dist.verify_package_json(
+            # trailing commas are fine in python dicts.
+            {
+                "devDependencies": {
+                    "left-pad": "~1.1.1",
+                },
+            },
+        )
+        self.assertTrue(result)
+
+    def test_check_package_json_good_dict_with_none(self):
+        # Possible to specify a null requirement to remove things.
+        result = calmjs_dist.verify_package_json(
+            {
+                "devDependencies": {
+                    "left-pad": None
+                },
+            },
+        )
+        self.assertTrue(result)
+
     def test_validate_package_json_good(self):
         # don't need to validate against None as "the validation
         # function will only be called if the setup() call sets it to a"

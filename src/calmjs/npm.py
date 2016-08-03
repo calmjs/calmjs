@@ -5,35 +5,14 @@ Module for dealing with npm framework.
 Provides some helper functions that deal with package.json
 """
 
-import json
+from calmjs.cli import Driver
 
 PACKAGE_JSON = 'package.json'
+NPM = 'npm'
 
-
-def verify_package_json(value):
-    """
-    Check that the value is either a JSON decodable string or a dict
-    that can be encoded into a JSON.
-
-    Raises ValueError when validation fails.
-    """
-
-    try:
-        value = json.loads(value)
-    except ValueError as e:
-        raise ValueError('JSON decoding error: ' + str(e))
-    except TypeError:
-        # Check that the value can be serialized back into json.
-        try:
-            json.dumps(value)
-        except TypeError as e:
-            raise ValueError(
-                'must be a JSON serializable object: ' + str(e))
-
-    if not isinstance(value, dict):
-        raise ValueError(
-            'must be specified as a JSON serializable dict or a '
-            'JSON deserializable string'
-        )
-
-    return True
+_inst = Driver(pkg_manager_bin=NPM, pkgdef_filename=PACKAGE_JSON)
+get_node_version = _inst.get_node_version
+get_npm_version = _inst.get_pkg_manager_version
+npm_init = _inst.pkg_manager_init
+npm_install = _inst.pkg_manager_install
+package_json = _inst.pkgdef_filename

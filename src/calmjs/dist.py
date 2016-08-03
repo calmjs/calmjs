@@ -15,10 +15,39 @@ from pkg_resources import working_set as default_working_set
 
 import json
 
-from calmjs.npm import verify_package_json
-from calmjs.npm import PACKAGE_JSON
-
 logger = getLogger(__name__)
+
+# default package definition filename.
+DEFAULT_JSON = 'package.json'
+
+
+def verify_package_json(value):
+    """
+    Check that the value is either a JSON decodable string or a dict
+    that can be encoded into a JSON.
+
+    Raises ValueError when validation fails.
+    """
+
+    try:
+        value = json.loads(value)
+    except ValueError as e:
+        raise ValueError('JSON decoding error: ' + str(e))
+    except TypeError:
+        # Check that the value can be serialized back into json.
+        try:
+            json.dumps(value)
+        except TypeError as e:
+            raise ValueError(
+                'must be a JSON serializable object: ' + str(e))
+
+    if not isinstance(value, dict):
+        raise ValueError(
+            'must be specified as a JSON serializable dict or a '
+            'JSON deserializable string'
+        )
+
+    return True
 
 
 def validate_package_json(dist, attr, value):
@@ -59,7 +88,7 @@ def get_pkg_dist(pkg_name, working_set=default_working_set):
     return working_set.find(req)
 
 
-def get_dist_package_json(dist, filename=PACKAGE_JSON):
+def get_dist_package_json(dist, filename=DEFAULT_JSON):
     """
     Safely get a package_json from a distribution.
     """
@@ -87,7 +116,7 @@ def get_dist_package_json(dist, filename=PACKAGE_JSON):
 
 
 def read_package_json(
-        pkg_name, filename=PACKAGE_JSON, working_set=default_working_set):
+        pkg_name, filename=DEFAULT_JSON, working_set=default_working_set):
     """
     Read the package.json of a package identified by `pkg_name` that's
     already installed within the current Python environment.
@@ -98,7 +127,7 @@ def read_package_json(
 
 
 def flatten_dist_package_json(
-        source_dist, filename=PACKAGE_JSON, working_set=default_working_set):
+        source_dist, filename=DEFAULT_JSON, working_set=default_working_set):
     """
     Resolve a distribution's (dev)dependencies through the working set
     and generate a flattened version package.json, returned as a dict,
@@ -155,7 +184,7 @@ def flatten_dist_package_json(
 
 
 def flatten_package_json(
-        pkg_name, filename=PACKAGE_JSON, working_set=default_working_set):
+        pkg_name, filename=DEFAULT_JSON, working_set=default_working_set):
     """
     Generate a flattened package.json of a package `pkg_name` that's
     already installed within the current Python environment (defaults

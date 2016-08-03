@@ -15,11 +15,11 @@ from stat import S_ISCHR
 from subprocess import check_output
 from subprocess import call
 
-from calmjs.npm import PACKAGE_JSON
 from calmjs.dist import flatten_package_json
+from calmjs.dist import DEFAULT_JSON
 
 __all__ = [
-    'Driver', 'get_node_version', 'get_npm_version', 'npm_init', 'npm_install',
+    'Driver',
 ]
 
 logger = logging.getLogger(__name__)
@@ -29,7 +29,6 @@ version_expr = re.compile('((?:\d+)(?:\.\d+)*)')
 
 NODE_PATH = 'NODE_PATH'
 NODE = 'node'
-NPM = 'npm'
 DEP_KEYS = ('dependencies', 'devDependencies')
 
 
@@ -39,10 +38,10 @@ if sys.version_info < (3,):  # pragma: no cover
 lower = str.lower
 
 
-def _get_bin_version(bin_path, version_flag='-v', _from=None, _to=None):
+def _get_bin_version(bin_path, version_flag='-v', _from=None, _to=None, kw={}):
     try:
         version_str = version_expr.search(
-            check_output([bin_path, version_flag]).decode('ascii')
+            check_output([bin_path, version_flag], **kw).decode('ascii')
         ).groups()[0]
         version = tuple(int(i) for i in version_str.split('.'))
     except OSError:
@@ -212,23 +211,49 @@ def prompt(question, validator=None,
     return answer
 
 
-class Driver(object):
+class NodeDriver(object):
 
     indent = 4
 
-    def __init__(self, node_bin=NODE, pkg_manager_bin=NPM,
-                 node_path=None, pkgdef_filename=PACKAGE_JSON,
-                 prompt=prompt, interactive=None,
-                 ):
+    def __init__(self, node_bin=NODE, node_path=None):
         """
         Optional Arguments:
 
         node_bin
             Path to node binary.  Defaults to ``node``.
-        pkg_manager_bin
-            Path to package manager binary.  Defaults to ``npm``.
         node_path
             Overrides NODE_PATH environment variable.
+        """
+
+        self.node_path = node_path
+        self.node_bin = node_bin
+
+    def _gen_call_kws(self):
+        kw = {}
+        env = {}
+        if self.node_path:
+            env[NODE_PATH] = self.node_path
+        if env:
+            kw['env'] = env
+        return kw
+
+    def get_node_version(self):
+        kw = self._gen_call_kws()
+        return _get_bin_version(self.node_bin, _from=1, kw=kw)
+
+
+class Driver(NodeDriver):
+    """
+    Generic package manager interaction driver class.
+    """
+
+    def __init__(self, pkg_manager_bin, pkgdef_filename=DEFAULT_JSON,
+                 prompt=prompt, interactive=None, *a, **kw):
+        """
+        Optional Arguments:
+
+        pkg_manager_bin
+            Path to package manager binary.
         pkgdef_filename
             The file name of the package manager's definition file -
             defaults to ``package.json``.
@@ -240,8 +265,7 @@ class Driver(object):
             running application has an interactive console.
         """
 
-        self.node_path = node_path
-        self.node_bin = node_bin
+        super(Driver, self).__init__(*a, **kw)
         self.pkg_manager_bin = pkg_manager_bin
         self.pkgdef_filename = pkgdef_filename
         self.prompt = prompt
@@ -249,10 +273,6 @@ class Driver(object):
         self.interactive = interactive
         if self.interactive is None:
             self.interactive = check_interactive()
-
-    def get_node_version(self):
-        # XXX factor this out.  Maybe base driver.
-        return _get_bin_version(self.node_bin, _from=1)
 
     def get_pkg_manager_version(self):
         return _get_bin_version(self.pkg_manager_bin)
@@ -425,6 +445,8 @@ class Driver(object):
         process anyway, to still enable the shorthand calling.
         """
 
+        # TODO not hardcode 'install'
+
         if package_name:
             result = self.pkg_manager_init(package_name, *a, **kw)
             if not result:
@@ -439,23 +461,9 @@ class Driver(object):
                 self.pkg_manager_bin
             )
 
-        kw = {}
-        env = {}
-
-        if self.node_path:
-            env[NODE_PATH] = self.node_path
-
-        if env:
-            kw['env'] = env
-
+        kw = self._gen_call_kws()
         call([self.pkg_manager_bin, 'install'], **kw)
 
 
-_inst = Driver()
+_inst = NodeDriver()
 get_node_version = _inst.get_node_version
-# Defaults rely on npm.  The same Driver class should be usable with
-# bower when constructed with the relevant reference to its binary.
-get_npm_version = _inst.get_pkg_manager_version
-npm_init = _inst.pkg_manager_init
-npm_install = _inst.pkg_manager_install
-package_json = _inst.pkgdef_filename
