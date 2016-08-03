@@ -10,8 +10,6 @@ from distutils.core import Command
 from distutils.errors import DistutilsOptionError
 from distutils import log
 
-from calmjs import cli
-
 
 class DistutilsLogHandler(logging.Handler):
     """
@@ -47,16 +45,15 @@ class DistutilsLogHandler(logging.Handler):
 distutils_log_handler = DistutilsLogHandler()
 
 
-# Class names for subclasses of Command is in lower case simply due to
-# setuptools using this verbatim as the command name when showing user
-# help.
-
-class npm(Command):
+class GenericPackageManagerCommand(Command):
     """
-    Simple compatibility hook for npm.
+    Simple compatibility hook for a package manager
     """
 
-    description = "npm compatibility helper"
+    # subclasses need to define these
+    cli_driver = None
+    # description = "base command for package manager compatibility helper"
+
     indent = 4
 
     # We are really only interested logs from these modules.
@@ -64,30 +61,40 @@ class npm(Command):
 
     user_options = [
         ('init', None,
-         "action: generate and write 'package.json' to current directory for "
-         "this package"),
+         "action: generate and write '%(pkgdef_filename)s' to the "
+         "current directory for this Python package"),
         # this required implicit step is done, otherwise there are no
         # difference to running ``npm init`` directly from the shell.
         ('install', None,
-         "action: run npm install with generated 'package.json'; "
-         "implies init; will abort if init fails to write the generated file"),
+         "action: run '%(pkg_manager_bin)s' install with generated "
+         "'%(pkgdef_filename)s'; implies init; will abort if init fails "
+         "to write the generated file"),
         # as far as I know typically setuptools setup.py are not
         # interactive, so we keep it that way unless user explicitly
         # want this.
         ('interactive', 'i',
          "enable interactive prompt; if an action requires an explicit "
-         "response but none were specified through flags (i.e. overwrite), "
-         "prompt for response; disabled by default"),
+         "response but none were specified through flags "
+         "(i.e. overwrite), prompt for response; disabled by default"),
         ('merge', None,
-         "merge generated 'package.json' with the one in current directory; "
-         "if interactive mode is not enabled, implies overwrite, else the "
-         "difference will be displayed"),
+         "merge generated 'package.json' with the one in current "
+         "directory; if interactive mode is not enabled, implies "
+         "overwrite, else the difference will be displayed"),
         ('overwrite', None,
          "automatically overwrite any file changes to current directory "
          "without prompting"),
     ]
     # TODO implement support for other install args like specifying the
     # location of stuff.
+
+    @classmethod
+    def _initialize_user_options(cls):
+        cls.user_options = [
+            (full, s, desc % {
+                'pkgdef_filename': cls.cli_driver.pkgdef_filename,
+                'pkg_manager_bin': cls.cli_driver.pkg_manager_bin,
+            }) for full, s, desc in cls.user_options
+        ]
 
     # the actions that result in effects that we support
     actions = ('init', 'install')
@@ -97,13 +104,12 @@ class npm(Command):
             yield opt[0]
 
     def initialize_options(self):
-        self.cli = cli.Driver(interactive=False, pkg_manager_bin='npm')
         for key in self._opt_keys():
             setattr(self, key, False)
 
     def do_init(self):
         pkg_name = self.distribution.get_name()
-        self.cli.pkg_manager_init(
+        self.cli_driver.pkg_manager_init(
             pkg_name,
             overwrite=self.overwrite, merge=self.merge,
             interactive=self.interactive,
@@ -111,7 +117,7 @@ class npm(Command):
 
     def do_install(self):
         pkg_name = self.distribution.get_name()
-        self.cli.pkg_manager_install(
+        self.cli_driver.pkg_manager_install(
             pkg_name,
             overwrite=self.overwrite, merge=self.merge,
             interactive=self.interactive,
