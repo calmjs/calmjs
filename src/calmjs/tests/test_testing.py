@@ -164,6 +164,17 @@ class TestingUtilsTestCase(unittest.TestCase):
         self.doCleanups()
         self.assertIs(dist.flatten_package_json, original)
 
+    def test_stub_mod_check_interactive(self):
+        from calmjs import cli
+        original = cli.check_interactive
+        self.assertIs(cli.check_interactive, original)
+        utils.stub_mod_check_interactive(self, [cli], None)
+        self.assertIsNot(cli.check_interactive, original)
+        # it now returns this typically invalid result for testing
+        self.assertIsNone(cli.check_interactive())
+        self.doCleanups()
+        self.assertIs(cli.check_interactive, original)
+
     def test_stub_stdin(self):
         o_stdin = sys.stdin
         utils.stub_stdin(self, u'N')

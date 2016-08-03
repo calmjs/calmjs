@@ -64,15 +64,27 @@ class npm(Command):
 
     user_options = [
         ('init', None,
-         "generate package.json and write to current dir"),
-        ('overwrite', None,
-         "overwrite configuration files (such as package.json)"),
-        ('merge', None,
-         "merge configuration files if possible (such as package.json)"),
-        # this is implicit because otherwise no difference from running
-        # ``npm init`` directly from the shell.
+         "generate and write 'package.json' to current directory for this "
+         "package"),
+        # this required implicit step is done, otherwise there are no
+        # difference to running ``npm init`` directly from the shell.
         ('install', None,
-         "runs npm install with generated package.json; implies --init"),
+         "run npm install with generated 'package.json'; implies init; will "
+         "abort if init fails to write the generated file"),
+        # as far as I know typically setuptools setup.py are not
+        # interactive, so we keep it that way unless user explicitly
+        # want this.
+        ('interactive', 'i',
+         "enable interactive prompt; if an action requires an explicit "
+         "response but none were specified through flags (i.e. overwrite), "
+         "prompt for response; disabled by default"),
+        ('merge', None,
+         "merge generated 'package.json' with the one in current directory; "
+         "if interactive mode is not enabled, implies overwrite, else the "
+         "difference will be displayed"),
+        ('overwrite', None,
+         "automatically overwrite any file changes to current directory "
+         "without prompting"),
     ]
     # TODO implement support for other install args like specifying the
     # location of stuff.
@@ -82,16 +94,25 @@ class npm(Command):
             yield opt[0]
 
     def initialize_options(self):
+        self.cli = cli.Driver(interactive=False)
         for key in self._opt_keys():
             setattr(self, key, False)
 
     def do_init(self):
         pkg_name = self.distribution.get_name()
-        cli.npm_init(pkg_name, overwrite=self.overwrite, merge=self.merge)
+        self.cli.pkg_manager_init(
+            pkg_name,
+            overwrite=self.overwrite, merge=self.merge,
+            interactive=self.interactive,
+        )
 
     def do_install(self):
         pkg_name = self.distribution.get_name()
-        cli.npm_install(pkg_name, overwrite=self.overwrite, merge=self.merge)
+        self.cli.pkg_manager_install(
+            pkg_name,
+            overwrite=self.overwrite, merge=self.merge,
+            interactive=self.interactive,
+        )
 
     def finalize_options(self):
         opts = [i for i in (getattr(self, k) for k in self._opt_keys()) if i]

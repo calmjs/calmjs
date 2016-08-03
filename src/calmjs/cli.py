@@ -216,7 +216,7 @@ class Driver(object):
 
     def __init__(self, node_bin=NODE, pkg_manager_bin=NPM,
                  node_path=None, pkgdef_filename=PACKAGE_JSON,
-                 prompt=prompt,
+                 prompt=prompt, interactive=None,
                  ):
         """
         Optional Arguments:
@@ -232,6 +232,10 @@ class Driver(object):
             ``package.json``.
         prompt
             The interactive prompt function.  See above.
+        interactive
+            Boolean value to determine interactive mode.  Unset by
+            default, which triggers auto-detection and set if the
+            running application has an interactive console.
         """
 
         self.node_path = node_path
@@ -240,9 +244,12 @@ class Driver(object):
         self.pkgdef_filename = pkgdef_filename
         self.prompt = prompt
 
-        self.interactive = check_interactive()
+        self.interactive = interactive
+        if self.interactive is None:
+            self.interactive = check_interactive()
 
     def get_node_version(self):
+        # XXX factor this out.  Maybe base driver.
         return _get_bin_version(self.node_bin, _from=1)
 
     def get_pkg_manager_version(self):
@@ -266,17 +273,18 @@ class Driver(object):
 
         interactive
             Boolean flag; if set, prompts user on what to do when choice
-            needs to be made.  Defaults to None, which is auto-detect.
+            needs to be made.  Defaults to None, which falls back to the
+            default setting for this command line instance.
 
         overwrite
             Boolean flag; if set, overwrite package.json with the newly
-            generated ``package.json``.
+            generated ``package.json``; ignores interactive setting
 
         merge
-            Boolean flag; if set, implies overwrite.  However this will
-            keep details defined in existing ``package.json`` and only
-            merge dependencies/devDependencies defined by the specified
-            Python package.
+            Boolean flag; if set, implies overwrite, but does not ignore
+            interactive setting.  However this will keep details defined
+            in existing ``package.json`` and only merge dependencies /
+            devDependencies defined by the specified Python package.
 
         Returns True if successful; can be achieved by writing a new
         file or that the existing one matches with the expected version.
@@ -290,7 +298,7 @@ class Driver(object):
         if interactive is None:
             interactive = self.interactive
         # both autodetection AND manual specification must be true.
-        interactive = interactive & self.interactive
+        interactive = interactive & check_interactive()
 
         # this will be modified in place
         original_json = {}
@@ -318,7 +326,6 @@ class Driver(object):
 
             if merge:
                 # Merge the generated on top of the original.
-                overwrite = True  # implied, as documented.
                 updates = generate_merge_dict(
                     DEP_KEYS, original_json, package_json,
                 )
@@ -331,21 +338,30 @@ class Driver(object):
             if original_json == package_json:
                 # Well, if original existing one is identical with the
                 # generated version, we got it, and we are done here.
+                # This also prevents the interactive prompt from firing.
                 return True
 
-            if interactive and not overwrite:
-                # Only complain if the generated file differs
-                overwrite = prompt(
-                    "Generated '%s' differs from one in current working "
-                    "directory.\nOverwrite?" % (
-                        self.pkgdef_filename,
-                    ),
-                    choices=(
-                        ('Yes', True),
-                        ('No', False),
-                    ),
-                    default_key=1,
-                )
+            if not interactive:
+                # here the implied settings due to non-interactive mode
+                # are finally set
+                if merge:
+                    overwrite = True
+            elif interactive:
+                if not overwrite:
+                    # set new overwrite value from user input.
+                    overwrite = prompt(
+                        "Generated '%(pkgdef_filename)s' differs from one in "
+                        "current working directory.\n\n"
+                        "Overwrite '%(pkgdef_filename)s' in "
+                        "current directory?" % {
+                            'pkgdef_filename': self.pkgdef_filename,
+                        },
+                        choices=(
+                            ('Yes', True),
+                            ('No', False),
+                        ),
+                        default_key=1,
+                    )
 
             if not overwrite:
                 logger.warning(
@@ -357,7 +373,7 @@ class Driver(object):
         if package_json:
             # Only write one if we actually got data.
             with open(self.pkgdef_filename, 'w') as fd:
-                json.dump(package_json, fd, indent=self.indent)
+                json.dump(package_json, fd, indent=self.indent, sort_keys=True)
 
         return True
 

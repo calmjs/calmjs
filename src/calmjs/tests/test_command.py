@@ -17,6 +17,7 @@ from calmjs import cli
 from calmjs.testing.utils import make_dummy_dist
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import stub_mod_call
+from calmjs.testing.utils import stub_mod_check_interactive
 from calmjs.testing.utils import stub_dist_flatten_package_json
 from calmjs.testing.utils import stub_stdouts
 from calmjs.testing.utils import stub_stdin
@@ -100,13 +101,12 @@ class DistCommandTestCase(unittest.TestCase):
         stub_dist_flatten_package_json(self, [cli], working_set)
         # Quiet stdout from distutils logs
         stub_stdouts(self)
-        # Forcibly enable interactive mode.
-        self.inst_interactive, cli._inst.interactive = (
-            cli._inst.interactive, True)
+        # Force auto-detected interactive mode to True, because this is
+        # typically executed within an interactive context.
+        stub_mod_check_interactive(self, [cli], True)
 
     def tearDown(self):
         os.chdir(self.cwd)
-        cli._inst.interactive = self.inst_interactive
 
     def test_no_args(self):
         tmpdir = mkdtemp(self)
@@ -120,7 +120,7 @@ class DistCommandTestCase(unittest.TestCase):
         with self.assertRaises(DistutilsOptionError):
             dist.run_commands()
 
-    def test_init_no_overwrite_default_input(self):
+    def test_init_no_overwrite_default_input_interactive(self):
         tmpdir = mkdtemp(self)
         stub_stdin(self, u'')  # default should be no
 
@@ -131,7 +131,7 @@ class DistCommandTestCase(unittest.TestCase):
         os.chdir(tmpdir)
         dist = Distribution(dict(
             script_name='setup.py',
-            script_args=['npm', '--init'],
+            script_args=['npm', '--init', '--interactive'],
             name='foo',
         ))
         dist.parse_command_line()
@@ -184,6 +184,7 @@ class DistCommandTestCase(unittest.TestCase):
         })
 
     def test_init_merge(self):
+        # --merge without --interactive implies overwrite
         tmpdir = mkdtemp(self)
 
         with open(os.path.join(tmpdir, 'package.json'), 'w') as fd:
@@ -205,9 +206,38 @@ class DistCommandTestCase(unittest.TestCase):
         with open(os.path.join(tmpdir, 'package.json')) as fd:
             result = json.load(fd)
 
-        # gets overwritten anyway.
+        # gets overwritten as we explicitly asked
         self.assertEqual(result, {
             'dependencies': {'jquery': '~1.11.0', 'underscore': '~1.8.0'},
+            'devDependencies': {'sinon': '~1.17.0'},
+        })
+
+    def test_init_merge_interactive_default(self):
+        tmpdir = mkdtemp(self)
+        stub_stdin(self, u'')
+
+        with open(os.path.join(tmpdir, 'package.json'), 'w') as fd:
+            json.dump({'dependencies': {
+                'underscore': '~1.8.0',
+            }, 'devDependencies': {
+                'sinon': '~1.17.0',
+            }}, fd)
+
+        os.chdir(tmpdir)
+        dist = Distribution(dict(
+            script_name='setup.py',
+            script_args=['npm', '--init', '--merge', '--interactive'],
+            name='foo',
+        ))
+        dist.parse_command_line()
+        dist.run_commands()
+
+        with open(os.path.join(tmpdir, 'package.json')) as fd:
+            result = json.load(fd)
+
+        # Nothing happened.
+        self.assertEqual(result, {
+            'dependencies': {'underscore': '~1.8.0'},
             'devDependencies': {'sinon': '~1.17.0'},
         })
 
@@ -226,14 +256,15 @@ class DistCommandTestCase(unittest.TestCase):
         with open(os.path.join(tmpdir, 'package.json')) as fd:
             result = json.load(fd)
 
-        # The cli will still automatically write to that.
+        # The cli will still automatically write to that, as install
+        # implies init.
         self.assertEqual(result, {
             'dependencies': {'jquery': '~1.11.0'},
             'devDependencies': {},
         })
         self.assertEqual(self.call_args, ((['npm', 'install'],), {}))
 
-    def test_install_no_init_has_package_json_default_input(self):
+    def test_install_no_init_has_package_json_interactive_default_input(self):
         stub_stdin(self, u'')
         stub_mod_call(self, cli)
         tmpdir = mkdtemp(self)
@@ -247,7 +278,7 @@ class DistCommandTestCase(unittest.TestCase):
         os.chdir(tmpdir)
         dist = Distribution(dict(
             script_name='setup.py',
-            script_args=['npm', '--install'],
+            script_args=['npm', '--install', '--interactive'],
             name='foo',
         ))
         dist.parse_command_line()
@@ -261,6 +292,8 @@ class DistCommandTestCase(unittest.TestCase):
             'dependencies': {'jquery': '~3.0.0'},
             'devDependencies': {},
         })
+        # Ensure that install is NOT called.
+        self.assertIsNone(self.call_args)
 
     def test_install_false(self):
         stub_mod_call(self, cli)
@@ -275,4 +308,5 @@ class DistCommandTestCase(unittest.TestCase):
         dist.run_commands()
 
         self.assertFalse(exists(join(tmpdir, 'package.json')))
+        # Ensure that install is NOT called.
         self.assertIsNone(self.call_args)

@@ -20,6 +20,7 @@ from calmjs.testing.utils import stub_mod_check_output
 from calmjs.testing.utils import stub_dist_flatten_package_json
 from calmjs.testing.utils import stub_stdin
 from calmjs.testing.utils import stub_stdouts
+from calmjs.testing.utils import stub_mod_check_interactive
 
 
 class CliGenerateMergeDictTestCase(unittest.TestCase):
@@ -324,10 +325,16 @@ class CliDriverTestCase(unittest.TestCase):
         self.assertFalse(exists(join(tmpdir, 'package.json')))
 
     def test_npm_install_package_json_no_overwrite_interactive(self):
+        """
+        Most of these package_json testing will be done in the next test
+        class specific for ``npm init``.
+        """
+
         # Testing the implied init call
         stub_mod_call(self, cli)
         stub_stdouts(self)
         stub_stdin(self, 'n\n')
+        stub_mod_check_interactive(self, [cli], True)
         tmpdir = mkdtemp(self)
         os.chdir(tmpdir)
 
@@ -349,9 +356,11 @@ class CliDriverTestCase(unittest.TestCase):
         # This is faked.
         cli.npm_install('foo')
 
-        self.assertTrue(sys.stdout.getvalue().endswith(
-            'Overwrite? (Yes/No) [No] '))
-        # No log level set.
+        self.assertIn(
+            "Overwrite 'package.json' in current directory? (Yes/No) [No] ",
+            sys.stdout.getvalue())
+        # No log level set, otherwise it will complain that npm install
+        # cannot be continued
         self.assertEqual(sys.stderr.getvalue(), '')
 
         with open(join(tmpdir, 'package.json')) as fd:
@@ -407,7 +416,6 @@ class CliDriverInitTestCase(unittest.TestCase):
     def setUp(self):
         # save working directory
         self.cwd = os.getcwd()
-        self.inst_interactive = cli._inst.interactive
 
         # All the pre-made setup.
         stub_mod_call(self, cli)
@@ -420,10 +428,9 @@ class CliDriverInitTestCase(unittest.TestCase):
         working_set = WorkingSet()
         working_set.add(app, self._calmjs_testing_tmpdir)
         stub_dist_flatten_package_json(self, [cli], working_set)
+        stub_mod_check_interactive(self, [cli], True)
 
     def tearDown(self):
-        # restore original os.environ from copy
-        cli._inst.interactive = self.inst_interactive
         os.chdir(self.cwd)
 
     def test_npm_init_new_non_interactive(self):
@@ -467,7 +474,7 @@ class CliDriverInitTestCase(unittest.TestCase):
             json.dump({'dependencies': {}, 'devDependencies': {}}, fd)
         os.chdir(tmpdir)
 
-        # force interactivity to be True
+        # force autodetected interactivity to be True
         cli._inst.interactive = True
         self.assertFalse(cli.npm_init('foo', interactive=True))
 
@@ -491,7 +498,6 @@ class CliDriverInitTestCase(unittest.TestCase):
             }, 'devDependencies': {}}, fd)
 
         os.chdir(tmpdir)
-        # Should be a concrete option overriding interactive
         self.assertTrue(cli.npm_init('foo', overwrite=True))
 
         with open(join(tmpdir, 'package.json')) as fd:
@@ -502,7 +508,9 @@ class CliDriverInitTestCase(unittest.TestCase):
             'devDependencies': {},
         })
 
-    def test_npm_init_existing_merge(self):
+    def test_npm_init_existing_merge_interactive_yes(self):
+        stub_stdouts(self)
+        stub_stdin(self, 'Y')
         tmpdir = mkdtemp(self)
 
         # Write an initial thing
@@ -515,7 +523,6 @@ class CliDriverInitTestCase(unittest.TestCase):
             }, 'name': 'dummy'}, fd, indent=0)
 
         os.chdir(tmpdir)
-        # Should be a concrete option overriding interactive
         self.assertTrue(cli.npm_init('foo', merge=True))
 
         with open(join(tmpdir, 'package.json')) as fd:
@@ -524,7 +531,7 @@ class CliDriverInitTestCase(unittest.TestCase):
             fd.seek(0)
             result = json.load(fd)
 
-        # Merge results shouldn't have written
+        # Merge results should be written when user agrees.
         self.assertEqual(result, {
             'dependencies': {
                 'jquery': '~1.11.0',
@@ -536,7 +543,78 @@ class CliDriverInitTestCase(unittest.TestCase):
             'name': 'dummy',
         })
 
-    def test_npm_init_no_overwrite_if_semantically_identical(self):
+    def test_npm_init_existing_merge_overwrite(self):
+        stub_stdouts(self)
+        tmpdir = mkdtemp(self)
+
+        # Write an initial thing
+        with open(join(tmpdir, 'package.json'), 'w') as fd:
+            json.dump({'dependencies': {
+                'jquery': '~3.0.0',
+                'underscore': '~1.8.0',
+            }, 'devDependencies': {
+                'sinon': '~1.17.0'
+            }, 'name': 'dummy'}, fd, indent=0)
+
+        os.chdir(tmpdir)
+        # Overwrite will supercede interactive.
+        self.assertTrue(cli.npm_init(
+            'foo', merge=True, overwrite=True, interactive=True))
+
+        with open(join(tmpdir, 'package.json')) as fd:
+            with self.assertRaises(ValueError):
+                json.loads(fd.readline())
+            fd.seek(0)
+            result = json.load(fd)
+
+        # Merge results should be written when user agrees.
+        self.assertEqual(result, {
+            'dependencies': {
+                'jquery': '~1.11.0',
+                'underscore': '~1.8.0',
+            },
+            'devDependencies': {
+                'sinon': '~1.17.0'
+            },
+            'name': 'dummy',
+        })
+
+    def test_npm_init_existing_interactive_merge_no(self):
+        stub_stdouts(self)
+        stub_stdin(self, 'N')
+        tmpdir = mkdtemp(self)
+
+        # Write an initial thing
+        with open(join(tmpdir, 'package.json'), 'w') as fd:
+            json.dump({'dependencies': {
+                'jquery': '~3.0.0',
+                'underscore': '~1.8.0',
+            }, 'devDependencies': {
+                'sinon': '~1.17.0'
+            }, 'name': 'dummy'}, fd, indent=0)
+
+        os.chdir(tmpdir)
+        self.assertFalse(cli.npm_init('foo', merge=True, interactive=True))
+
+        with open(join(tmpdir, 'package.json')) as fd:
+            with self.assertRaises(ValueError):
+                json.loads(fd.readline())
+            fd.seek(0)
+            result = json.load(fd)
+
+        # Should not have written anything if user said no.
+        self.assertEqual(result, {
+            'dependencies': {
+                'jquery': '~3.0.0',
+                'underscore': '~1.8.0',
+            },
+            'devDependencies': {
+                'sinon': '~1.17.0'
+            },
+            'name': 'dummy',
+        })
+
+    def test_npm_init_merge_no_overwrite_if_semantically_identical(self):
         tmpdir = mkdtemp(self)
 
         # Write an initial thing

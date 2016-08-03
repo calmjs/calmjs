@@ -194,6 +194,27 @@ def stub_mod_check_output(testcase_inst, mod, f=None):
     testcase_inst.addCleanup(cleanup)
 
 
+def stub_mod_check_interactive(testcase_inst, modules, result):
+    """
+    Replace the check_interactive function for the target module so that
+    it will return result.
+    """
+
+    from calmjs import cli
+
+    original_check_interactive = cli.check_interactive
+
+    def check_interactive():
+        return result
+
+    def restore(module):
+        module.check_interactive = original_check_interactive
+
+    for module in modules:
+        module.check_interactive = check_interactive
+        testcase_inst.addCleanup(restore, module)
+
+
 def stub_stdin(testcase_inst, inputs):
     stdin = testcase_inst._stdin = sys.stdin
 
