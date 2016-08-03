@@ -130,7 +130,7 @@ Running ``setup.py install`` will write that ``package_json`` fragment
 into the package's egg-info metadata section.
 
 All packages that ultimately depending on this ``example.package`` will
-have the option to pick up this ``package.json`` egg-info metadata.
+have the option to inherit this ``package.json`` egg-info metadata.
 One way to do this is through that package's ``setup.py``.  By invoking
 ``setup.py npm --init`` from there, a new ``package.json`` will be
 written to the current directory as if running ``npm init`` with all the
@@ -196,10 +196,19 @@ Dealing with ``npm`` dependencies with Python package dependencies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Remember, flat is better than nested.  So all ``dependencies`` (and
-``devDependencies``) declared can be overridden by subsequent packages,
-and doing so flattens the dependencies for the final package to consume,
-with the desired toolchain to make use of the declared information to
-generate their JavaScript bundle.
+``devDependencies``) declared by any upstream Python package will be
+automatically inherited by all its downstream packages, but they have
+the option to override it with whatever they want through the mechanism
+as described above.  They can set a JavaScript package to whatever
+versions desired, or even simply remove that dependency completely by
+setting the version to ``None``.
+
+Through this inheritance mechanism whenever an actual ``package.json``
+is needed to be generated for final consumption for a given Python
+package, the dependencies are flattened for consumption by the
+respective JavaScript package managers, or by the desired toolchain to
+make use of the declared information to generate the desired JavaScript
+bundle.
 
 Of course, if the nested style of packages and dependency in the same
 style as npm is desired, no one is forced to use this, they are free to
