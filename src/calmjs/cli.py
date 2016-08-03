@@ -230,8 +230,8 @@ class Driver(object):
         node_path
             Overrides NODE_PATH environment variable.
         pkgdef_filename
-            The file name of the package.json file - defaults to
-            ``package.json``.
+            The file name of the package manager's definition file -
+            defaults to ``package.json``.
         prompt
             The interactive prompt function.  See above.
         interactive
@@ -262,6 +262,10 @@ class Driver(object):
             interactive=None,
             overwrite=False, merge=False):
         """
+        Note: default implementation calls for npm and package.json,
+        please note that it may not be the case for this instance of
+        Driver.
+
         If this class is initiated using standard procedures, this will
         emulate the functionality of ``npm init`` for the generation of
         a working ``package.json``, but without asking users for input
@@ -322,12 +326,13 @@ class Driver(object):
                     original_json = json.load(fd)
             except ValueError:
                 logger.warning(
-                    "Ignoring existing malformed 'package.json'.")
+                    "Ignoring existing malformed '%s'.", self.pkgdef_filename)
             except (IOError, OSError):
                 logger.error(
-                    "Reading of existing 'package.json' failed; "
+                    "Reading of existing '%s' failed; "
                     "please confirm that it is a file and/or permissions to "
-                    "read and write is permitted before retrying."
+                    "read and write is permitted before retrying.",
+                    self.pkgdef_filename,
                 )
                 # Cowardly giving up.
                 raise
