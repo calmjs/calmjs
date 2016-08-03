@@ -8,6 +8,7 @@ import re
 import sys
 from locale import getpreferredencoding
 from os import fstat
+from os import getcwd
 from os.path import exists
 from stat import S_ISCHR
 
@@ -293,8 +294,9 @@ class Driver(object):
         """
 
         logger.info(
-            "generating a flattened '%s' for '%s'",
-            self.pkgdef_filename, package_name)
+            "generating a flattened '%s' for '%s' into current working "
+            "directory (%s)",
+            self.pkgdef_filename, package_name, getcwd())
 
         if interactive is None:
             interactive = self.interactive
@@ -371,11 +373,11 @@ class Driver(object):
                     overwrite = prompt(
                         "Generated '%(pkgdef_filename)s' differs from one in "
                         "current working directory.\n\n"
-                        "The following is a compacted list of changes to be "
-                        "made:\n"
+                        "The following is a compacted list of changes "
+                        "required:\n"
                         "%(diff)s\n\n"
                         "Overwrite '%(pkgdef_filename)s' in "
-                        "current directory?" % {
+                        "current working directory?" % {
                             'pkgdef_filename': self.pkgdef_filename,
                             'diff': diff,
                         },
@@ -388,8 +390,8 @@ class Driver(object):
 
             if not overwrite:
                 logger.warning(
-                    "not overwriting existing 'package.json' "
-                    "in current directory"
+                    "'%s' exists in current working directory; "
+                    "not overwriting", self.pkgdef_filename
                 )
                 return False
 
@@ -397,6 +399,10 @@ class Driver(object):
             # Only write one if we actually got data.
             with open(self.pkgdef_filename, 'w') as fd:
                 json.dump(package_json, fd, indent=self.indent, sort_keys=True)
+            logger.info(
+                "wrote '%s' to current working directory",
+                self.pkgdef_filename
+            )
 
         return True
 

@@ -357,7 +357,8 @@ class CliDriverTestCase(unittest.TestCase):
         cli.npm_install('foo')
 
         self.assertIn(
-            "Overwrite 'package.json' in current directory? (Yes/No) [No] ",
+            "Overwrite 'package.json' in current working directory? "
+            "(Yes/No) [No] ",
             sys.stdout.getvalue())
         # No log level set, otherwise it will complain that npm install
         # cannot be continued

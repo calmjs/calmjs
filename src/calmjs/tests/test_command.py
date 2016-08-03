@@ -150,9 +150,11 @@ class DistCommandTestCase(unittest.TestCase):
         self.assertTrue(stdout.startswith("running npm\n"))
 
         self.assertIn(
-            "generating a flattened 'package.json' for 'foo'\n"
+            "generating a flattened 'package.json' for 'foo' "
+            "into current working directory (%s)\n"
             "Generated 'package.json' differs from one in current working "
-            "directory.\n", stdout
+            "directory" % (tmpdir),
+            stdout
         )
 
         # That the diff additional block is inside
@@ -163,9 +165,11 @@ class DistCommandTestCase(unittest.TestCase):
             stdout,
         )
 
-        self.assertTrue(sys.stderr.getvalue().endswith(
-            "not overwriting existing 'package.json' in current directory\n"
-        ))
+        self.assertIn(
+            "'package.json' exists in current working directory; "
+            "not overwriting\n",
+            sys.stderr.getvalue(),
+        )
 
     def test_init_overwrite(self):
         tmpdir = mkdtemp(self)
