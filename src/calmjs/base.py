@@ -7,54 +7,21 @@ calmjs infrastructure that leverages on the underlying setuptools entry
 point system.
 """
 
+from collections import OrderedDict
 from logging import getLogger
-
-try:
-    from pkg_resources import working_set
-except ImportError:  # pragma: no cover
-    working_set = None
+from pkg_resources import working_set
 
 logger = getLogger(__name__)
 _marker = object()
 
 
-class _ModuleRegistry(object):
-    """
-    This is the "meta" registry - provides a class method to access the
-    really private "registry" of registeries stored in the main base
-    class.
-    """
-
-    __registry_instances = {}
-
-    @classmethod
-    def register(cls, name, registry):
-        if not isinstance(registry, BaseModuleRegistry):
-            raise TypeError('registration on module registries only.')
-
-        if name in cls.__registry_instances:
-            raise KeyError('%s already exists in registry.' % name)
-
-        cls.__registry_instances[name] = registry
-
-    @classmethod
-    def get(cls, name, default=_marker):
-        result = cls.__registry_instances.get(name, default)
-        if result is _marker:
-            raise LookupError('module registry %s not found' % name)
-        return result
-
-
-class BaseModuleRegistry(object):
+class BaseRegistry(object):
     """
     A base registry implementation that make use of ``pkg_resources``
-    entry points for definition of what interesting modules in the
-    current python environment are.
+    entry points for its definitions.
     """
 
-    entry_point_name = NotImplemented
-
-    def __init__(self, registry_name):
+    def __init__(self, registry_name, *a, **kw):
         """
         Arguments:
 
@@ -62,12 +29,34 @@ class BaseModuleRegistry(object):
             The name of this registry.
         """
 
+        # The container for the resolved item.
+        self.records = OrderedDict()
         self.registry_name = registry_name
+        _working_set = kw.pop('_working_set', working_set)
+        self.raw_entry_points = [] if _working_set is None else list(
+            _working_set.iter_entry_points(self.registry_name))
+        self._init(*a, **kw)
 
     def _init(self, *a, **kw):
         """
-        Subclasses can override this instead to set instance attributes.
+        Subclasses can override this for setting up its single instance.
         """
+
+    def get_record(self, name):
+        raise NotImplementedError
+
+    def iter_records(self):
+        raise NotImplementedError
+
+
+class BaseModuleRegistry(BaseRegistry):
+    """
+    Extending off the BaseRegistry, ensure that there is a registration
+    step that takes place that will verify the existence of the target.
+    """
+
+    def _init(self, *a, **kw):
+        self.register_entry_points(self.raw_entry_points)
 
     def register_entry_points(self, entry_points):
         """
@@ -77,8 +66,8 @@ class BaseModuleRegistry(object):
         Arguments:
 
         entry_points
-            a list of entry_points to be registered into this registry
-            instance.
+            a list of entry_points to be registered and activated into
+            this registry instance.
         """
 
         for entry_point in entry_points:
@@ -93,6 +82,9 @@ class BaseModuleRegistry(object):
     def register_entry_point(self, entry_point):
         """
         Register a lone entry_point
+
+        Will raise ImportError if the entry_point leads to an invalid
+        import.
         """
 
         module = __import__(
@@ -107,78 +99,17 @@ class BaseModuleRegistry(object):
 
         raise NotImplementedError
 
-    @classmethod
-    def _initialize(cls, registry_name, *a, **kw):
+    def get_record(self, name):
         """
-        Private class initialize method that ignores the shared registry.
-        """
-
-        if cls.entry_point_name is NotImplemented:
-            raise NotImplementedError(
-                '%s must provide a valid ``entry_point_name`` attribute',
-                cls.__name__
-            )
-
-        # used for testing and/or very implementation specific stuff.
-        _working_set = kw.pop('_working_set', None)
-
-        if _working_set is None:
-            if working_set is None:
-                logger.error(
-                    'Autoloading of the `%s` registry is disabled as the '
-                    'available setuptools package is missing the '
-                    '`pkg_resources` module.  Registry will empty.',
-                    registry_name,
-                )
-            else:
-                _working_set = working_set
-
-        entry_points = [] if _working_set is None else list(
-            _working_set.iter_entry_points(cls.entry_point_name))
-
-        # Then create the default registry based on that.
-        inst = cls(registry_name)
-        inst._init(*a, **kw)
-        inst.register_entry_points(entry_points)
-        return inst
-
-    @classmethod
-    def initialize(cls, registry_name, *a, **kw):
-        """
-        Default registry constructor that will load all the entry points
-        identified by the class attribute ``entry_point_name``.  The
-        constructor will also check to see if another registry of the
-        same type has been created, and if so that will be returned, if
-        not, a ValueError will be raised.
-
-        Arguments:
-
-        registry_name
-            The name for this registry
-
-        Other arguments are passed to the default init method.
+        Get a record by name
         """
 
-        old_inst = _ModuleRegistry.get(registry_name, None)
+        return self.records.get(name)
 
-        if old_inst:
-            if type(old_inst) == cls:
-                logger.debug(
-                    "returning registry '%s' for class '%s'",
-                    registry_name, cls.__name__
-                )
-                if a or kw:
-                    logger.warning(
-                        "Registry initialize method found an existing "
-                        "registry '%s' for class '%s'; new arguments passed "
-                        "will not be invoked with the registry class's init "
-                        "method", registry_name, cls.__name__
-                    )
-                return old_inst
+    def iter_records(self):
+        """
+        Iterates through the records.
+        """
 
-            raise ValueError(
-                '%s already exists for a different registry' % registry_name)
-
-        inst = cls._initialize(registry_name, *a, **kw)
-        _ModuleRegistry.register(registry_name, inst)
-        return inst
+        for item in self.records.items():
+            yield item

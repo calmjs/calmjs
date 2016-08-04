@@ -140,8 +140,8 @@ given Python package.
 Expose JavaScript code from a Python module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Furthering the previous example, say within ``example.package`` its
-files and directories are laid out like so::
+Furthering the previous example, if the files and directories inside
+``example.package`` are laid out like so::
 
     .
     ├── example
@@ -176,14 +176,63 @@ names::
     - 'example/package/ui'
     - 'example/package/widget'
 
-It is possible to use the ``.`` for separating out modules if a more
-Pythonic namespace module style is desired, however this may have
-consequences with how other packages interact with this code through
-specific import and/or transpiler systems within the JavaScript
-ecosystem; ``calmjs`` will also provide tools that work with this
-module registry.  Also this is awfully not documented and very
-unsupported at the moment.  Need to finalize the toolchains for working
-with this before more can happen.
+For some projects, it may be undesirable to permit this automated method
+to extract all the available JavaScript source files from within the
+given Python module.
+
+To get around this, it is possible to declare new module registries
+through the ``calmjs`` framework.  Provided that the ``ModuleRegistry``
+subclass was set up correctly to generate the desired modules from a
+given package, simply declare this as a ``calmjs.registry`` entry point
+like so:
+
+.. code:: python
+
+    setup(
+        ...
+        entry_points="""
+        [calmjs.registry]
+        example.module = example.package.registry:ExampleModuleRegistry
+        """
+        ...
+    )
+
+Then to use simply replace ``calmjs.module`` with the name of the
+registry that was just declared.
+
+.. code:: python
+
+    setup(
+        ...
+        entry_points="""
+        [example.module]
+        example.package = example.package
+        """
+        ...
+    )
+
+Within the ``calmjs`` framework, tools can be explicitly specified to
+capture modules from any or all module registeries registered to the
+framework.  One other registry was also defined.  If the entry point
+was declared like so:
+
+.. code:: python
+
+    setup(
+        ...
+        entry_points="""
+        [calmjs.module.pythonic]
+        example.package = example.package
+        """
+        ...
+    )
+
+The separator for the namespace and the module will use the ``.``
+character instead of ``/``.  However given that the ``.`` character is
+a valid name for a JavaScript module, the usage of this is ill-advised,
+but it does make JavaScript code look a bit more Pythonic at the cost of
+lessened standards compliance with the target language.
+
 
 Toolchain
 ~~~~~~~~~

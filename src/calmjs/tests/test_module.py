@@ -1,59 +1,54 @@
 # -*- coding: utf-8 -*-
 import unittest
 from pkg_resources import EntryPoint
+from pkg_resources import iter_entry_points
 
 from calmjs.module import ModuleRegistry
+from calmjs.module import PythonicModuleRegistry
 
 
-class ModuleTestCase(unittest.TestCase):
+@unittest.skipIf(
+    list(iter_entry_points(__name__)),
+    'basic module tests cannot run if %s is used as entry_point' % __name__)
+class ModuleRegistryTestCase(unittest.TestCase):
     """
     Test the JavaScript module registry.
     """
 
     def setUp(self):
         self.registry = ModuleRegistry(__name__)
-        self.registry._init()
-
-    def tearDown(self):
-        pass
 
     def test_module_registry_empty(self):
-        self.assertEqual(self.registry.module_map, {})
+        with self.assertRaises(StopIteration):
+            next(self.registry.iter_records())
 
     def test_module_registry_standard(self):
         self.registry.register_entry_points([
             EntryPoint.parse(
                 'calmjs.testing.module1 = calmjs.testing.module1'),
         ])
-        self.assertEqual(sorted(self.registry.module_map.keys()), [
+        self.assertEqual(sorted(
+            key for key, value in self.registry.iter_records()
+        ), [
             'calmjs.testing.module1',
         ])
 
-        module1 = self.registry.module_map['calmjs.testing.module1']
+        module1 = self.registry.get_record('calmjs.testing.module1')
         key = 'calmjs/testing/module1/hello'
         self.assertEqual(sorted(module1.keys()), [key])
-        self.assertTrue(module1[key].endswith(key + '.js'))
 
-    def test_module_registry_extras(self):
-        # This may be an awful abuse of entry_point extras, will need to
-        # figure out how to do this properly.
-        self.registry.register_entry_points([
+    def test_module_registry_pythonic(self):
+        registry = PythonicModuleRegistry(__name__)
+        registry.register_entry_points([
             EntryPoint.parse(
-                'calmjs.testing.module1 = calmjs.testing.module1 '
-                '[calmjs.indexer.mapper_python]'
-            ),
-            # this should do nothing.
-            EntryPoint.parse(
-                'calmjs.testing.module2 = calmjs.testing.module2 '
-                '[calmjs.bad.entry_point]'
-            ),
+                'calmjs.testing.module1 = calmjs.testing.module1'),
         ])
-        self.assertEqual(sorted(self.registry.module_map.keys()), [
+        self.assertEqual(sorted(
+            key for key, value in registry.iter_records()
+        ), [
             'calmjs.testing.module1',
         ])
 
-        module1 = self.registry.module_map['calmjs.testing.module1']
+        module1 = registry.get_record('calmjs.testing.module1')
         key = 'calmjs.testing.module1.hello'
         self.assertEqual(sorted(module1.keys()), [key])
-        self.assertTrue(module1[key].endswith(
-            'calmjs/testing/module1/hello.js'))

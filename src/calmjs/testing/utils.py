@@ -236,26 +236,3 @@ def stub_stdouts(testcase_inst):
     testcase_inst.addCleanup(cleanup)
     sys.stderr = StringIO()
     sys.stdout = StringIO()
-
-
-def setup_testing_module_registry(testcase_inst):
-    """
-    Warning: nosetest by default will pick out **anything** that is a
-    callable that also contains `test` in its name, so this will be
-    treated as a callable that contains tests and it will fail due to
-    wrong arguments being passed.  It's dumb/simple design by default
-    so don't import this into your test_*.py files on its own, but
-    instead import this whole module and call it like::
-
-        utils.setup_testing_module_registry(self)
-    """
-
-    from calmjs.base import _ModuleRegistry
-    original = {}
-    original.update(_ModuleRegistry._ModuleRegistry__registry_instances)
-
-    def cleanup():
-        _ModuleRegistry._ModuleRegistry__registry_instances.clear()
-        _ModuleRegistry._ModuleRegistry__registry_instances.update(original)
-
-    testcase_inst.addCleanup(cleanup)

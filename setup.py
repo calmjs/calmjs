@@ -30,8 +30,7 @@ setup(name='calmjs',
       packages=find_packages('src', exclude=['ez_setup']),
       package_dir={'': 'src'},
       namespace_packages=['calmjs'],
-      include_package_data=True,
-      zip_safe=False,
+      zip_safe=True,
       install_requires=[
           'setuptools>=11.3',
       ],
@@ -46,6 +45,10 @@ setup(name='calmjs',
 
       [egg_info.writers]
       package.json = calmjs.npm:write_package_json
+
+      [calmjs.registry]
+      calmjs.module = calmjs.module:ModuleRegistry
+      calmjs.module.pythonic = calmjs.module:PythonicModuleRegistry
       """,
       test_suite="calmjs.tests.test_suite",
       )
