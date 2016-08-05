@@ -142,6 +142,7 @@ class NpmTestCase(unittest.TestCase):
         self.assertEqual(config, {
             'dependencies': {'jquery': '~1.11.0'},
             'devDependencies': {},
+            'name': 'foo',
         })
 
         # No log level set.
@@ -166,8 +167,16 @@ class NpmDriverInitTestCase(unittest.TestCase):
                 'dependencies': {'jquery': '~1.11.0'},
             })),
         ), 'foo', '1.9.0')
+        named = make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([])),
+            ('package.json', json.dumps({
+                'dependencies': {'jquery': '~3.0.0'},
+                'name': 'named-js',
+            })),
+        ), 'named', '2.0.0')
         working_set = WorkingSet()
         working_set.add(app, self._calmjs_testing_tmpdir)
+        working_set.add(named, self._calmjs_testing_tmpdir)
         stub_dist_flatten_package_json(self, [cli], working_set)
         stub_mod_check_interactive(self, [cli], True)
         # also save this
@@ -249,9 +258,12 @@ class NpmDriverInitTestCase(unittest.TestCase):
         with open(join(tmpdir, 'package.json')) as fd:
             result = json.load(fd)
 
+        # name wasn't already specified, so it will be automatically
+        # added
         self.assertEqual(result, {
             'dependencies': {'jquery': '~1.11.0'},
             'devDependencies': {},
+            'name': 'foo',
         })
 
     def test_npm_init_existing_merge_interactive_yes(self):
@@ -286,6 +298,8 @@ class NpmDriverInitTestCase(unittest.TestCase):
             'devDependencies': {
                 'sinon': '~1.17.0'
             },
+            # name already in file, but not part of the defined
+            # package.json.
             'name': 'dummy',
         })
 
@@ -360,6 +374,42 @@ class NpmDriverInitTestCase(unittest.TestCase):
             'name': 'dummy',
         })
 
+    def test_npm_init_write_name_merge(self):
+        stub_stdouts(self)
+        stub_stdin(self, 'Y')
+        tmpdir = mkdtemp(self)
+
+        # Write an initial thing
+        with open(join(tmpdir, 'package.json'), 'w') as fd:
+            json.dump({'dependencies': {
+                'jquery': '~1.8.9',
+                'underscore': '~1.8.0',
+            }, 'devDependencies': {
+                'sinon': '~1.17.0'
+            }, 'name': 'something_else'}, fd, indent=0)
+
+        os.chdir(tmpdir)
+        self.assertTrue(npm.npm_init('named', merge=True))
+
+        with open(join(tmpdir, 'package.json')) as fd:
+            with self.assertRaises(ValueError):
+                json.loads(fd.readline())
+            fd.seek(0)
+            result = json.load(fd)
+
+        # Merge results should be written when user agrees.
+        self.assertEqual(result, {
+            'dependencies': {
+                'jquery': '~3.0.0',
+                'underscore': '~1.8.0',
+            },
+            'devDependencies': {
+                'sinon': '~1.17.0'
+            },
+            # name derived from the package_json field.
+            'name': 'named-js',
+        })
+
     def test_npm_init_merge_no_overwrite_if_semantically_identical(self):
         tmpdir = mkdtemp(self)
 
@@ -370,7 +420,7 @@ class NpmDriverInitTestCase(unittest.TestCase):
                 'underscore': '~1.8.0',
             }, 'devDependencies': {
                 'sinon': '~1.17.0'
-            }, 'name': 'dummy'}, fd, indent=None)
+            }, 'name': 'foo'}, fd, indent=None)
 
         os.chdir(tmpdir)
         self.assertTrue(npm.npm_init('foo', merge=True))
@@ -390,7 +440,7 @@ class NpmDriverInitTestCase(unittest.TestCase):
             'devDependencies': {
                 'sinon': '~1.17.0'
             },
-            'name': 'dummy',
+            'name': 'foo',
         })
 
     def test_npm_init_existing_broken_no_overwrite_non_interactive(self):
@@ -419,6 +469,7 @@ class NpmDriverInitTestCase(unittest.TestCase):
         self.assertEqual(result, {
             'dependencies': {'jquery': '~1.11.0'},
             'devDependencies': {},
+            'name': 'foo',
         })
 
     def test_npm_init_existing_not_readable_as_file(self):
@@ -557,6 +608,7 @@ class DistCommandTestCase(unittest.TestCase):
         self.assertEqual(result, {
             'dependencies': {'jquery': '~1.11.0'},
             'devDependencies': {},
+            'name': 'foo',
         })
 
     def test_init_merge(self):
@@ -586,6 +638,7 @@ class DistCommandTestCase(unittest.TestCase):
         self.assertEqual(result, {
             'dependencies': {'jquery': '~1.11.0', 'underscore': '~1.8.0'},
             'devDependencies': {'sinon': '~1.17.0'},
+            'name': 'foo',
         })
 
     def test_init_merge_interactive_default(self):

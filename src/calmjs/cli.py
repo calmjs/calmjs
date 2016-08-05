@@ -368,6 +368,9 @@ class Driver(NodeDriver):
                 final.update(updates)
                 package_json = final
 
+            if package_json.get('name', NotImplemented) is NotImplemented:
+                package_json['name'] = package_name
+
             if original_json == package_json:
                 # Well, if original existing one is identical with the
                 # generated version, we got it, and we are done here.
