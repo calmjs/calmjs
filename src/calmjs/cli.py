@@ -212,6 +212,11 @@ def prompt(question, validator=None,
 
 
 class NodeDriver(object):
+    """
+    This is really a common base driver class that stores the common
+    location of the node related values for the actual driver(s) to be
+    implemented.
+    """
 
     indent = 4
 

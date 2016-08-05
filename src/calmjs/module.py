@@ -20,6 +20,13 @@ class ModuleRegistry(BaseModuleRegistry):
     """
     A registry that tracks all JavaScript modules that have been shipped
     with Python modules within the running Python environment.
+
+    Subclass can either override ``_init`` completely to specify its own
+    mapper, or subclass `_register_entry_point_module`` and use the same
+    mapper but modify its results before assigment to ``self.records``.
+
+    This is to be registered in calmjs.registry entry point as
+    ``calmjs.module``.
     """
 
     def _init(self):
@@ -34,6 +41,9 @@ class PythonicModuleRegistry(ModuleRegistry):
     A registry that tracks all JavaScript modules that have been shipped
     with Python modules within the running Python environment, with the
     modules exported using Pythonic namespace style.
+
+    This is to be registered in calmjs.registry entry point as
+    ``calmjs.module.pythonic``.
     """
 
     def _init(self):

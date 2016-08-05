@@ -10,7 +10,7 @@ install:
   - python setup.py develop
 script: 
   - flake8 setup.py src
-  - nosetests --with-coverage --cover-package=calmjs --with-doctest --doctest-options=+ELLIPSIS
+  - nosetests --with-coverage --cover-package=calmjs --with-doctest
 after_success:
   - pip install coveralls
   - coveralls

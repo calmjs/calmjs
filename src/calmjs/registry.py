@@ -1,10 +1,23 @@
 # -*- coding: utf-8 -*-
 """
-Generic registry loader
+Registry of all registries for calmjs.
 
-This module simply provides a function to get registries that have been
-registered through its standardized, inherited initialize classmethod
-constructor.
+This module provides the implementation for working with the entry point
+group ``calmjs.registry``, where it will be able to instantiate and
+cache registries for the rest of the calmjs framework.
+
+Typically, usage is done through this::
+
+    >>> from calmjs.registry import get
+    >>> calmjs_module = get('calmjs.module')
+    >>> calmjs_module  # doctest: +ELLIPSIS
+    <calmjs.module.ModuleRegistry object ...>
+    >>> calmjs_module.iter_records()  # doctest: +ELLIPSIS
+    <generator object ...>
+
+The iter_records is typically used by the other parts of the calmjs
+framework to produce configuration files and/or transpile the source
+into the usable final form.
 """
 
 from logging import getLogger

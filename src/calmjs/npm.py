@@ -2,7 +2,8 @@
 """
 Module for dealing with npm framework.
 
-Provides some helper functions that deal with package.json
+Provides some helper functions that deal with package.json, and also the
+setuptools integration of certain npm features.
 """
 
 from functools import partial

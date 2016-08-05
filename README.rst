@@ -35,10 +35,11 @@ modules.
 The name ``calmjs`` was originally derived from the steps in the first
 iteration of the toolchain which involves the steps compile, assemble,
 and linkage into a module of JavaScript using the namespace from the
-host Python package.  The logo (whenever this can be gotten around to)
-will involve a bunny rabbit, ears represented by the `m` letter.  This
-is choosen for their dietary habits, which is akin to how JavaScript is
-typically worked into a state that resembles a usable level.
+host Python package.  The `m` in the logo is the ear of a rabbit.  The
+reason this animal is chosen as the mascot for this project is because
+of their dietary habits, as it's analogous to how JavaScript code is
+typically turned into a minimally usable level by other tools and
+framework.
 
 
 Features
@@ -56,6 +57,9 @@ Manage dependencies on JavaScript modules (hosted by ``npm`` or others).
     ``package.json`` for a current project.  This means all upstream
     dependencies on JavaScript packages will also be used when
     generating the final ``package.json`` needed by any given project.
+
+    In other words, subsequent Python packages can readily generate and
+    reuse its parent(s) ``package.json`` file with ease.
 
 Expose JavaScript code in a Python module as proper namespace modules
     A given Python package that may have included JavaScript code
@@ -212,7 +216,7 @@ registry that was just declared.
     )
 
 Within the ``calmjs`` framework, tools can be explicitly specified to
-capture modules from any or all module registeries registered to the
+capture modules from any or all module registries registered to the
 framework.  One other registry was also defined.  If the entry point
 was declared like so:
 

@@ -1,9 +1,11 @@
 Changelog
 =========
 
+1.0.0 (unreleased)
+------------------
 
-0.1 (unreleased)
-----------------
-
-- Initial release.
-  [metatoaster]
+- Initial release of the ``calmjs`` framework.
+- Provide core integration with ``npm`` and generation of
+  ``package.json`` through the ``setuptools`` framework.
+- Provide core registries for registering packages for use by ``calmjs``
+  through the predefined ``setuptools`` entry point groups.
