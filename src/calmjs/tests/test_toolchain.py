@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 import unittest
 import tempfile
+from os import makedirs
 from os.path import basename
 from os.path import exists
 from os.path import join
@@ -292,3 +293,47 @@ class NullToolchainTestCase(unittest.TestCase):
         })
         self.assertTrue(exists(join(build_dir, 'bundle1.js')))
         self.assertTrue(exists(join(build_dir, 'bundle2', 'bundled.js')))
+
+    def test_null_toolchain_transpile_js_ns_directory_sources(self):
+        """
+        Ensure that directory structures are copied, if needed, because
+        JavaScript uses directories for namespaces, too, however the
+        names are verbatim from directories and `.`s are valid module
+        names which can result in some really hilarious side effects
+        when combined with its completely transparent model on top of
+        the filesystem (think ``..``), but that's for another time.
+        """
+
+        source_dir = mkdtemp(self)
+        build_dir = mkdtemp(self)
+
+        namespace_root = join(source_dir, 'namespace', 'dummy')
+        makedirs(namespace_root)
+        with open(join(namespace_root, 'source.js'), 'w') as fd:
+            fd.write('var dummy = function () {};\n')
+
+        spec = Spec(
+            build_dir=build_dir,
+            transpile_source_map={
+                # note that the convention in nodejs tools, the .js
+                # suffix is completely omitted.
+                'namespace/dummy/source': join(namespace_root, 'source'),
+            },
+        )
+        self.toolchain(spec)
+
+        # name, and relative filename to the build_path
+        self.assertEqual(spec, {
+            'build_dir': build_dir,
+            'transpile_source_map': {
+                'namespace/dummy/source': join(namespace_root, 'source')
+            },
+
+            'bundled_paths': {},
+            'compiled_paths': {
+                'namespace/dummy/source': 'namespace/dummy/source',
+            },
+            'module_names': ['namespace/dummy/source'],
+        })
+        self.assertTrue(exists(join(
+            build_dir, 'namespace', 'dummy', 'source.js')))

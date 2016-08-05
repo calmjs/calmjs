@@ -35,8 +35,10 @@ import logging
 import shutil
 import errno
 from os import mkdir
+from os import makedirs
 from os import strerror
 from os.path import join
+from os.path import dirname
 from os.path import exists
 from os.path import isfile
 from os.path import isdir
@@ -113,6 +115,8 @@ class Toolchain(object):
 
     def compile(self, source, target):
         logger.info('Compiling %s to %s', source, target)
+        if not exists(dirname(target)):
+            makedirs(dirname(target))
         opener = self.opener
         with opener(source, 'r') as reader, opener(target, 'w') as writer:
             self.transpiler(reader, writer)
