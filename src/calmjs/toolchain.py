@@ -40,6 +40,7 @@ from os.path import join
 from os.path import exists
 from os.path import isfile
 from os.path import isdir
+from os.path import realpath
 from tempfile import mkdtemp
 
 logger = logging.getLogger(__name__)
@@ -106,6 +107,10 @@ class Toolchain(object):
         self.transpiler = NotImplemented
         self.opener = _opener
 
+    def _validate_build_target(self, spec, target):
+        if not realpath(target).startswith(spec['build_dir']):
+            raise ValueError('build_target %s is outside build_dir' % target)
+
     def compile(self, source, target):
         logger.info('Compiling %s to %s', source, target)
         opener = self.opener
@@ -126,8 +131,16 @@ class Toolchain(object):
             yield reqold, name, reqnew, source, target
 
     def compile_all(self, spec):
+        # Contains a mapping of the module name to the compiled file's
+        # relative path starting from the base build_dir.
         compiled_paths = {}
+
+        # Contains a mapping of the bundled name to the bundled file's
+        # relative path starting from the base build_dir.
         bundled_paths = {}
+
+        # List of exported module names, should be equal to all keys of
+        # the compiled_paths.
         module_names = []
 
         transpile_source_map = spec.get('transpile_source_map', {})
@@ -137,16 +150,20 @@ class Toolchain(object):
                 transpile_source_map):
             compiled_paths[name] = reqnew
             module_names.append(name)
-            self.compile(source, join(spec['build_dir'], target))
+            compile_target = join(spec['build_dir'], target)
+            self._validate_build_target(spec, compile_target)
+            self.compile(source, compile_target)
 
         for reqold, name, reqnew, source, target in self._gen_req_src_targets(
                 bundled_source_map):
             bundled_paths[name] = reqnew
             if isfile(source):
                 module_names.append(name)
-                shutil.copy(source, join(spec['build_dir'], target))
+                copy_target = join(spec['build_dir'], target)
+                shutil.copy(source, copy_target)
             elif isdir(reqold):
-                shutil.copytree(reqold, join(spec['build_dir'], reqnew))
+                copy_target = join(spec['build_dir'], reqnew)
+                shutil.copytree(reqold, copy_target)
 
         spec.update_selected(locals(), [
             'compiled_paths', 'bundled_paths', 'module_names'])
@@ -203,6 +220,13 @@ class Toolchain(object):
         else:
             if not exists(spec['build_dir']):
                 raise_os_error(errno.ENOTDIR)
+            check = realpath(spec['build_dir'])
+            if check != spec['build_dir']:
+                spec['build_dir'] = check
+                logger.warn(
+                    "realpath of build_dir resolved to '%s', spec is updated",
+                    check
+                )
 
         try:
             self._calf(spec)

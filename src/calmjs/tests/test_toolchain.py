@@ -3,8 +3,10 @@ from __future__ import unicode_literals
 
 import unittest
 import tempfile
+from os.path import basename
 from os.path import exists
 from os.path import join
+from os.path import pardir
 
 from calmjs.toolchain import Spec
 from calmjs.toolchain import Toolchain
@@ -135,12 +137,59 @@ class ToolchainTestCase(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             self.toolchain(spec)
 
-        # Manually specified build_dirs do not get deleted.
+        # Manually specified build_dirs do not get deleted from the
+        # filesystem
         self.assertTrue(exists(spec['build_dir']))
 
-        spec['build_dir'] = join(spec['build_dir'], 'not_exist')
+        not_exist = join(spec['build_dir'], 'not_exist')
 
+        spec['build_dir'] = not_exist
         with self.assertRaises(OSError):
+            # well, dir does not exist
+            self.toolchain(spec)
+
+        # Manually specified build_dirs do not get modified if they just
+        # simply don't exist.
+        self.assertEqual(spec['build_dir'], not_exist)
+
+    def test_toolchain_standard_build_dir_remapped(self):
+        """
+        This can either be caused by relative paths or symlinks.  Will
+        result in the manually specified build_dir being remapped to its
+        real location
+        """
+
+        fake = mkdtemp(self)
+        real = mkdtemp(self)
+        real_base = basename(real)
+        spec = Spec()
+        spec['build_dir'] = join(fake, pardir, real_base)
+
+        with self.assertRaises(NotImplementedError):
+            self.toolchain(spec)
+
+        self.assertEqual(spec['build_dir'], real)
+
+    def test_toolchain_target_build_dir_inside(self):
+        """
+        Mostly a sanity check; who knows if anyone will write some
+        config that will break this somehow.
+        """
+
+        source = mkdtemp(self)
+        build_dir = mkdtemp(self)
+
+        with open(join(source, 'source.js'), 'w') as fd:
+            fd.write('Hello world.')
+
+        spec = Spec(
+            build_dir=build_dir,
+            transpile_source_map={
+                # lol ``.`` being valid namespace in node
+                '../source': join(source, 'source'),
+            },
+        )
+        with self.assertRaises(ValueError):
             self.toolchain(spec)
 
 
