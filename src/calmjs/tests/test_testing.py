@@ -160,6 +160,15 @@ class TestingUtilsTestCase(unittest.TestCase):
         self.doCleanups()
         self.assertIs(cli.check_interactive, original)
 
+    def test_stub_mod_working_set(self):
+        from calmjs import base
+        original_working_set = base.working_set
+        self.assertIsNot(base.working_set, None)
+        utils.stub_mod_working_set(self, [base], None)
+        self.assertIs(base.working_set, None)
+        self.doCleanups()
+        self.assertIs(base.working_set, original_working_set)
+
     def test_stub_stdin(self):
         o_stdin = sys.stdin
         utils.stub_stdin(self, u'N')

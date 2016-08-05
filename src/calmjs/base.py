@@ -55,7 +55,8 @@ class BaseModuleRegistry(BaseRegistry):
     step that takes place that will verify the existence of the target.
     """
 
-    def _init(self, *a, **kw):
+    def __init__(self, registry_name, *a, **kw):
+        super(BaseModuleRegistry, self).__init__(registry_name, *a, **kw)
         self.register_entry_points(self.raw_entry_points)
 
     def register_entry_points(self, entry_points):

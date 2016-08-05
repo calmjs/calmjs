@@ -215,6 +215,19 @@ def stub_mod_check_interactive(testcase_inst, modules, result):
         testcase_inst.addCleanup(restore, module)
 
 
+def stub_mod_working_set(testcase_inst, modules, working_set):
+    """
+    Replace the working_set for the target modules
+    """
+
+    def restore(module, working_set):
+        module.working_set = working_set
+
+    for module in modules:
+        testcase_inst.addCleanup(restore, module, module.working_set)
+        module.working_set = working_set
+
+
 def stub_stdin(testcase_inst, inputs):
     stdin = testcase_inst._stdin = sys.stdin
 
