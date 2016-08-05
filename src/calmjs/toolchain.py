@@ -104,10 +104,12 @@ class Toolchain(object):
 
     def __init__(self):
         self.transpiler = NotImplemented
+        self.opener = _opener
 
     def compile(self, source, target):
         logger.info('Compiling %s to %s', source, target)
-        with _opener(source, 'r') as reader, _opener(target, 'w') as writer:
+        opener = self.opener
+        with opener(source, 'r') as reader, opener(target, 'w') as writer:
             self.transpiler(reader, writer)
 
     def _gen_req_src_targets(self, d):
@@ -222,6 +224,7 @@ class NullToolchain(Toolchain):
     """
 
     def __init__(self):
+        super(NullToolchain, self).__init__()
         self.transpiler = null_transpiler
 
     def assemble(self, spec):
