@@ -131,6 +131,10 @@ class GenericPackageManagerCommand(Command):
                 'must specify an action flag; see %s --help' % name)
 
     def run(self):
+        if self.dry_run:
+            # Everything else will do a lot of naughty things so...
+            return
+
         root_logger = logging.getLogger()
         old_level = root_logger.level
         root_logger.setLevel(logging.DEBUG)
@@ -139,19 +143,16 @@ class GenericPackageManagerCommand(Command):
             logger = logging.getLogger(logger_id)
             logger.addHandler(distutils_log_handler)
 
-        self.run_command('egg_info')
-        if self.dry_run:
-            # Everything else will do a lot of naughty things so...
-            return
+        try:
+            self.run_command('egg_info')
+            if self.init:
+                self.do_init()
+            elif self.install:
+                self.do_install()
+        finally:
+            # Remove the logging handlers and restore the level.
+            for logger_id in self.handle_logger_ids:
+                logger = logging.getLogger(logger_id)
+                logger.removeHandler(distutils_log_handler)
 
-        if self.init:
-            self.do_init()
-        elif self.install:
-            self.do_install()
-
-        # should really restore the level but whatever for now.
-        for logger_id in self.handle_logger_ids:
-            logger = logging.getLogger(logger_id)
-            logger.removeHandler(distutils_log_handler)
-
-        root_logger.setLevel(old_level)
+            root_logger.setLevel(old_level)

@@ -5,6 +5,7 @@ import unittest
 import json
 import os
 import sys
+from logging import getLogger
 from os.path import join
 from os.path import exists
 
@@ -742,3 +743,5 @@ class DistCommandTestCase(unittest.TestCase):
         self.assertFalse(exists(join(tmpdir, 'package.json')))
         # Ensure that install is NOT called.
         self.assertIsNone(self.call_args)
+        # also log handlers removed.
+        self.assertEqual(len(getLogger('calmjs.cli').handlers), 0)
