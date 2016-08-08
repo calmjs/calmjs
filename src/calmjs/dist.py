@@ -72,7 +72,7 @@ def write_json_file(argname, cmd, basename, filename):
     value = getattr(cmd.distribution, argname, None)
 
     if isinstance(value, dict):
-        value = json.dumps(value, indent=4)
+        value = json.dumps(value, indent=4, separators=(',', ': '))
 
     cmd.write_or_delete_file(argname, filename, value, force=True)
 

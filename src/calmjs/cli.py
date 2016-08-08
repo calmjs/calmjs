@@ -395,10 +395,12 @@ class Driver(NodeDriver):
                             json.dumps(
                                 original_json, indent=self.indent,
                                 sort_keys=True,
+                                separators=(',', ': '),
                             ).splitlines(),
                             json.dumps(
                                 package_json, indent=self.indent,
                                 sort_keys=True,
+                                separators=(',', ': '),
                             ).splitlines(),
                         ))
                         if l[:1] in '?+-' or l[-1:] in '{}' or l[-2:] == '},')
