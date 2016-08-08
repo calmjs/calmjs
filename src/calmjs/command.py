@@ -66,7 +66,7 @@ class GenericPackageManagerCommand(Command):
         # this required implicit step is done, otherwise there are no
         # difference to running ``npm init`` directly from the shell.
         ('install', None,
-         "action: run '%(pkg_manager_bin)s' install with generated "
+         "action: run '%(pkg_manager_bin)s install' with generated "
          "'%(pkgdef_filename)s'; implies init; will abort if init fails "
          "to write the generated file"),
         # as far as I know typically setuptools setup.py are not
