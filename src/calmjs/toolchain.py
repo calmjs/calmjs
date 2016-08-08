@@ -134,6 +134,17 @@ class Toolchain(object):
             target = reqnew + '.js'
             yield reqold, name, reqnew, source, target
 
+    def prepare(self, spec):
+        """
+        Optional preparation step.
+
+        Implementation can make use of this to do pre-compilation
+        checking and/or other validation steps in order to result in a
+        successful compilation run.
+
+        This step is optional.
+        """
+
     def compile_all(self, spec):
         # Contains a mapping of the module name to the compiled file's
         # relative path starting from the base build_dir.
@@ -174,7 +185,14 @@ class Toolchain(object):
 
     def assemble(self, spec):
         """
-        Accept all compiled paths; should return the manifest.
+        Assemble all the compiled files.
+
+        This was intended to be the function that provides the
+        aggregation of all compiled files in the build directory into a
+        form that can then be linked.  Typically this is for the
+        generation of an actual specification or instruction file that
+        will be passed to the linker, which is some binary that is
+        installed on the system.
         """
 
         raise NotImplementedError
@@ -202,6 +220,7 @@ class Toolchain(object):
         The main call, assuming everything is prepared.
         """
 
+        self.prepare(spec)
         self.compile_all(spec)
         self.assemble(spec)
         self.link(spec)
@@ -255,12 +274,23 @@ class NullToolchain(Toolchain):
         super(NullToolchain, self).__init__()
         self.transpiler = null_transpiler
 
+    def prepare(self, spec):
+        """
+        Does absolutely nothing
+        """
+
+        spec['prepare'] = 'prepared'
+
     def assemble(self, spec):
         """
         Does absolutely nothing
         """
 
+        spec['assemble'] = 'assembled'
+
     def link(self, spec):
         """
         Does absolutely nothing
         """
+
+        spec['link'] = 'linked'

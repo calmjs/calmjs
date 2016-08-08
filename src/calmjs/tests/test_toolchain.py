@@ -251,6 +251,9 @@ class NullToolchainTestCase(unittest.TestCase):
                 'namespace.dummy.source': 'namespace.dummy.source',
             },
             'module_names': ['namespace.dummy.source'],
+            'prepare': 'prepared',
+            'assemble': 'assembled',
+            'link': 'linked',
         })
         self.assertTrue(exists(join(build_dir, 'namespace.dummy.source.js')))
 
@@ -290,6 +293,9 @@ class NullToolchainTestCase(unittest.TestCase):
             },
             'compiled_paths': {},
             'module_names': ['bundle1'],
+            'prepare': 'prepared',
+            'assemble': 'assembled',
+            'link': 'linked',
         })
         self.assertTrue(exists(join(build_dir, 'bundle1.js')))
         self.assertTrue(exists(join(build_dir, 'bundle2', 'bundled.js')))
@@ -334,6 +340,9 @@ class NullToolchainTestCase(unittest.TestCase):
                 'namespace/dummy/source': 'namespace/dummy/source',
             },
             'module_names': ['namespace/dummy/source'],
+            'prepare': 'prepared',
+            'assemble': 'assembled',
+            'link': 'linked',
         })
         self.assertTrue(exists(join(
             build_dir, 'namespace', 'dummy', 'source.js')))
