@@ -42,7 +42,7 @@ npm._initialize_user_options()
 
 def npm_bin():
     """
-    Returns output of 'npm bin'.
+    Returns output of 'npm bin' from the current working directory.
     """
 
     try:

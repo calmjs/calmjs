@@ -272,15 +272,53 @@ class CliDriverTestCase(unittest.TestCase):
             'env': {'NODE_PATH': './node_mods'},
         }))
 
-    def test_set_environ_path(self):
+    def test_set_paths(self):
         stub_mod_call(self, cli)
         driver = cli.Driver(pkg_manager_bin='mgr')
-        driver.env_path = 'some_path'
+        driver.set_paths('some_path')
+        # ensure env and cwdis passed into the call.
+        driver.pkg_manager_install()
+        args, kwargs = self.call_args
+        self.assertEqual(kwargs['env']['PATH'].split(pathsep)[0], 'some_path')
+        self.assertEqual(kwargs['cwd'], driver.working_dir)
 
+    def test_set_paths_no_working_dir(self):
+        stub_mod_call(self, cli)
+        driver = cli.Driver(pkg_manager_bin='mgr')
+        # explicitly disable setting of cwd.
+        driver.set_paths('some_path', None)
         # ensure env is passed into the call.
         driver.pkg_manager_install()
         args, kwargs = self.call_args
         self.assertEqual(kwargs['env']['PATH'].split(pathsep)[0], 'some_path')
+        self.assertNotIn('cwd', kwargs)
+
+    def test_set_paths_none(self):
+        stub_mod_call(self, cli)
+        driver = cli.Driver(pkg_manager_bin='mgr')
+        # explicitly disable setting of cwd.
+        driver.set_paths(None)
+        self.assertIs(driver.env_path, None)
+        self.assertIs(driver.working_dir, None)
+        # ensure nothing is passed through
+        driver.pkg_manager_install()
+        args, kwargs = self.call_args
+        self.assertNotIn('PATH', kwargs)
+        self.assertNotIn('cwd', kwargs)
+
+    def test_set_paths_just_cwd(self):
+        # no idea why, but sure.
+        stub_mod_call(self, cli)
+        driver = cli.Driver(pkg_manager_bin='mgr')
+        # explicitly disable setting of cwd.
+        driver.set_paths(None, 'some_cwd')
+        self.assertIs(driver.env_path, None)
+        self.assertEqual(driver.working_dir, 'some_cwd')
+        # ensure nothing is passed through
+        driver.pkg_manager_install()
+        args, kwargs = self.call_args
+        self.assertNotIn('PATH', kwargs)
+        self.assertEqual(kwargs['cwd'], 'some_cwd')
 
     def test_set_binary(self):
         stub_mod_call(self, cli)

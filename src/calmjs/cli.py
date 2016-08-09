@@ -235,6 +235,7 @@ class NodeDriver(object):
         self.node_path = node_path
         self.node_bin = node_bin
         self.env_path = None
+        self.working_dir = None
 
     def _gen_call_kws(self):
         kw = {}
@@ -244,9 +245,30 @@ class NodeDriver(object):
         if self.env_path:
             env['PATH'] = pathsep.join([
                 self.env_path, os.environ.get('PATH', '')])
+        if self.working_dir:
+            kw['cwd'] = self.working_dir
         if env:
             kw['env'] = env
         return kw
+
+    def set_paths(self, env_path, working_dir=NotImplemented):
+        """
+        This "freezes" the path and the working directory in one go
+
+        Reasoning is that typically within calmjs the setting of the
+        environment path is done through the 'npm bin', and that relies
+        **heavily** on the current working directory.  However we are
+        not coupling that into these classes so just provide a default
+        hook that also set current working directory if only env_path
+        was provided, so that the path actually make sense.
+        """
+
+        if env_path and working_dir is NotImplemented:
+            working_dir = getcwd()
+        elif working_dir is NotImplemented:
+            working_dir = None
+        self.working_dir = working_dir
+        self.env_path = env_path
 
     def get_node_version(self):
         kw = self._gen_call_kws()
@@ -479,6 +501,13 @@ class Driver(NodeDriver):
             )
 
         kw = self._gen_call_kws()
+        logger.debug("invoking '%s install'", self.pkg_manager_bin)
+        if self.env_path:
+            logger.debug(
+                "invoked with env_path '%s'", self.env_path)
+        if self.working_dir:
+            logger.debug(
+                "invoked from working directory '%s'", self.working_dir)
         call([self.pkg_manager_bin, 'install'], **kw)
 
 
