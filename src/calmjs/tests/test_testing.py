@@ -6,6 +6,7 @@ import tempfile
 from pkg_resources import WorkingSet
 from pkg_resources import Requirement
 
+import os
 from os.path import exists
 from os.path import join
 
@@ -168,6 +169,15 @@ class TestingUtilsTestCase(unittest.TestCase):
         self.assertIs(base.working_set, None)
         self.doCleanups()
         self.assertIs(base.working_set, original_working_set)
+
+    def test_stub_os_environ(self):
+        self.assertNotEqual(os.environ['PATH'], '')
+        original = os.environ['PATH']
+        utils.stub_os_environ(self)
+        os.environ['PATH'] = ''
+        self.assertNotEqual(os.environ['PATH'], original)
+        self.doCleanups()
+        self.assertEqual(os.environ['PATH'], original)
 
     def test_stub_stdin(self):
         o_stdin = sys.stdin

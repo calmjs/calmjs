@@ -1,4 +1,5 @@
 import tempfile
+import os
 import sys
 from os import makedirs
 from os.path import join
@@ -226,6 +227,22 @@ def stub_mod_working_set(testcase_inst, modules, working_set):
     for module in modules:
         testcase_inst.addCleanup(restore, module, module.working_set)
         module.working_set = working_set
+
+
+def stub_os_environ(testcase_inst):
+    """
+    Not really stubbing it, but more restoring it to whatever it was
+    when test concludes.
+    """
+
+    original_environ = {}
+    original_environ.update(os.environ)
+
+    def cleanup():
+        os.environ.clear()
+        os.environ.update(original_environ)
+
+    testcase_inst.addCleanup(cleanup)
 
 
 def stub_stdin(testcase_inst, inputs):

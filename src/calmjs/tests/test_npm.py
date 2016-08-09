@@ -18,19 +18,18 @@ from calmjs import cli
 
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import make_dummy_dist
-from calmjs.testing.utils import stub_mod_call
 from calmjs.testing.utils import stub_dist_flatten_package_json
+from calmjs.testing.utils import stub_mod_call
+from calmjs.testing.utils import stub_mod_check_interactive
+from calmjs.testing.utils import stub_os_environ
 from calmjs.testing.utils import stub_stdin
 from calmjs.testing.utils import stub_stdouts
-from calmjs.testing.utils import stub_mod_check_interactive
 
 
 class NpmTestCase(unittest.TestCase):
 
     def setUp(self):
-        # keep copy of original os.environ
-        self.original_env = {}
-        self.original_env.update(os.environ)
+        stub_os_environ(self)
         # working directory
         self.cwd = os.getcwd()
         # Forcibly enable interactive mode.
@@ -39,9 +38,6 @@ class NpmTestCase(unittest.TestCase):
 
     def tearDown(self):
         npm._inst.interactive = self.inst_interactive
-        # restore original os.environ from copy
-        os.environ.clear()
-        os.environ.update(self.original_env)
         os.chdir(self.cwd)
 
     def test_npm_no_path(self):

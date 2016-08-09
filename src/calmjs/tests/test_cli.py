@@ -12,6 +12,7 @@ from calmjs.testing.utils import fake_error
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import stub_mod_call
 from calmjs.testing.utils import stub_mod_check_output
+from calmjs.testing.utils import stub_os_environ
 
 
 class CliGenerateMergeDictTestCase(unittest.TestCase):
@@ -213,19 +214,6 @@ class CliDriverTestCase(unittest.TestCase):
     Base cli driver class test case.
     """
 
-    def setUp(self):
-        # keep copy of original os.environ
-        self.original_env = {}
-        self.original_env.update(os.environ)
-        # working directory
-        self.cwd = os.getcwd()
-
-    def tearDown(self):
-        # restore original os.environ from copy
-        os.environ.clear()
-        os.environ.update(self.original_env)
-        os.chdir(self.cwd)
-
     def test_get_bin_version_long(self):
         stub_mod_check_output(self, cli)
         self.check_output_answer = b'Some app v.1.2.3.4. All rights reserved'
@@ -257,6 +245,7 @@ class CliDriverTestCase(unittest.TestCase):
         self.assertIsNone(results)
 
     def test_node_no_path(self):
+        stub_os_environ(self)
         os.environ['PATH'] = ''
         self.assertIsNone(cli.get_node_version())
 
