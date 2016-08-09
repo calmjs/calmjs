@@ -307,6 +307,18 @@ class Driver(NodeDriver):
         if self.interactive is None:
             self.interactive = check_interactive()
 
+    def __getattr__(self, name):
+        lookup = {
+            'get_' + self.pkg_manager_bin + '_version':
+                self.get_pkg_manager_version,
+            self.pkg_manager_bin + '_init': self.pkg_manager_init,
+            self.pkg_manager_bin + '_install': self.pkg_manager_install,
+        }
+        if name not in lookup:
+            # this should trigger default exception with right error msg
+            return self.__getattribute__(name)
+        return lookup[name]
+
     def get_pkg_manager_version(self):
         kw = self._gen_call_kws()
         return _get_bin_version(self.pkg_manager_bin, kw=kw)

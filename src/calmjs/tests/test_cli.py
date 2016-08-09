@@ -262,6 +262,17 @@ class CliDriverTestCase(unittest.TestCase):
         version = cli.get_node_version()
         self.assertIsNotNone(version)
 
+    def test_helper_attr(self):
+        stub_mod_call(self, cli)
+        driver = cli.Driver(pkg_manager_bin='mgr')
+        with self.assertRaises(AttributeError) as e:
+            driver.no_such_attr_here
+        self.assertIn('no_such_attr_here', str(e.exception))
+        self.assertIsNot(driver.mgr_init, None)
+        self.assertIsNot(driver.get_mgr_version, None)
+        driver.mgr_install()
+        self.assertEqual(self.call_args, ((['mgr', 'install'],), {}))
+
     def test_set_node_path(self):
         stub_mod_call(self, cli)
         driver = cli.Driver(node_path='./node_mods', pkg_manager_bin='mgr')
