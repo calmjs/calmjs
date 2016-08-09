@@ -48,7 +48,8 @@ class NpmTestCase(unittest.TestCase):
     @unittest.skipIf(npm.get_npm_version() is None, 'npm not found.')
     def test_npm_version_get(self):
         version = npm.get_npm_version()
-        self.assertIsNotNone(version)
+        self.assertTrue(isinstance(version, tuple))
+        self.assertGreater(len(version), 0)
 
     def test_npm_install_package_json(self):
         stub_mod_call(self, cli)
@@ -741,3 +742,17 @@ class DistCommandTestCase(unittest.TestCase):
         self.assertIsNone(self.call_args)
         # also log handlers removed.
         self.assertEqual(len(getLogger('calmjs.cli').handlers), 0)
+
+    # Other miscellenous tests
+
+    @unittest.skipIf(npm.get_npm_version() is None, 'npm not found.')
+    def test_npm_bin_get(self):
+        bin_dir = npm.npm_bin()
+        self.assertTrue(bin_dir.endswith('bin'))
+
+    @unittest.skipIf(npm.get_npm_version() is None, 'npm not found.')
+    def test_npm_bin_fail(self):
+        stub_os_environ(self)
+        os.environ['PATH'] = ''
+        bin_dir = npm.npm_bin()
+        self.assertIsNone(bin_dir)

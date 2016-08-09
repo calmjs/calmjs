@@ -7,8 +7,10 @@ setuptools integration of certain npm features.
 """
 
 from functools import partial
+from subprocess import check_output
 
 from calmjs.cli import Driver
+from calmjs.cli import locale
 from calmjs.dist import write_json_file
 from calmjs.command import GenericPackageManagerCommand
 
@@ -36,3 +38,14 @@ class npm(GenericPackageManagerCommand):
     description = "npm compatibility helper"
 
 npm._initialize_user_options()
+
+
+def npm_bin():
+    """
+    Returns output of 'npm bin'.
+    """
+
+    try:
+        return check_output([NPM, 'bin']).decode(locale).strip()
+    except OSError:
+        return None

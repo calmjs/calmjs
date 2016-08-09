@@ -41,7 +41,7 @@ lower = str.lower
 def _get_bin_version(bin_path, version_flag='-v', _from=None, _to=None, kw={}):
     try:
         version_str = version_expr.search(
-            check_output([bin_path, version_flag], **kw).decode('ascii')
+            check_output([bin_path, version_flag], **kw).decode(locale)
         ).groups()[0]
         version = tuple(int(i) for i in version_str.split('.'))
     except OSError:
