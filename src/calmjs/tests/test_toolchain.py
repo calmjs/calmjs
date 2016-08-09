@@ -92,6 +92,11 @@ class ToolchainTestCase(unittest.TestCase):
     def tearDown(self):
         pass
 
+    def test_toolchain_calf_not_spec(self):
+        # can't just use a normal dict
+        with self.assertRaises(TypeError):
+            self.toolchain({})
+
     def test_toolchain_standard_not_implemented(self):
         spec = Spec()
 

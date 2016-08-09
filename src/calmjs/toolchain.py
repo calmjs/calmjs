@@ -234,6 +234,9 @@ class Toolchain(object):
         Requires the filename which everything will be produced to.
         """
 
+        if not isinstance(spec, Spec):
+            raise TypeError('spec must be of type Spec')
+
         if 'build_dir' not in spec:
             tempdir = mkdtemp()
             spec.add_callback('cleanup', shutil.rmtree, tempdir)
