@@ -7,9 +7,11 @@ import json
 import re
 import sys
 from locale import getpreferredencoding
+import os
 from os import fstat
 from os import getcwd
 from os.path import exists
+from os.path import pathsep
 from stat import S_ISCHR
 
 from subprocess import check_output
@@ -232,12 +234,16 @@ class NodeDriver(object):
 
         self.node_path = node_path
         self.node_bin = node_bin
+        self.env_path = None
 
     def _gen_call_kws(self):
         kw = {}
         env = {}
         if self.node_path:
             env[NODE_PATH] = self.node_path
+        if self.env_path:
+            env['PATH'] = pathsep.join([
+                self.env_path, os.environ.get('PATH', '')])
         if env:
             kw['env'] = env
         return kw
@@ -280,7 +286,8 @@ class Driver(NodeDriver):
             self.interactive = check_interactive()
 
     def get_pkg_manager_version(self):
-        return _get_bin_version(self.pkg_manager_bin)
+        kw = self._gen_call_kws()
+        return _get_bin_version(self.pkg_manager_bin, kw=kw)
 
     def pkg_manager_init(
             self, package_name=None,

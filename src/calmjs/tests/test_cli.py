@@ -6,6 +6,7 @@ from io import StringIO
 import os
 import sys
 from os.path import join
+from os.path import pathsep
 
 from calmjs import cli
 from calmjs.testing.utils import fake_error
@@ -270,6 +271,16 @@ class CliDriverTestCase(unittest.TestCase):
         self.assertEqual(self.call_args, ((['mgr', 'install'],), {
             'env': {'NODE_PATH': './node_mods'},
         }))
+
+    def test_set_environ_path(self):
+        stub_mod_call(self, cli)
+        driver = cli.Driver(pkg_manager_bin='mgr')
+        driver.env_path = 'some_path'
+
+        # ensure env is passed into the call.
+        driver.pkg_manager_install()
+        args, kwargs = self.call_args
+        self.assertEqual(kwargs['env']['PATH'].split(pathsep)[0], 'some_path')
 
     def test_set_binary(self):
         stub_mod_call(self, cli)
