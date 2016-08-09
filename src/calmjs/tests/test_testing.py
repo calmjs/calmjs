@@ -141,6 +141,14 @@ class TestingUtilsTestCase(unittest.TestCase):
         self.assertEqual(distributions[1].requires(), [
             Requirement.parse('parentpkg>=0.8')])
 
+    def test_remember_cwd(self):
+        cwd = os.getcwd()
+        utils.remember_cwd(self)
+        os.chdir(mkdtemp(self))
+        self.assertNotEqual(cwd, os.getcwd())
+        self.doCleanups()
+        self.assertEqual(cwd, os.getcwd())
+
     def test_stub_dist_flatten_package_json(self):
         from calmjs import dist
         original = dist.flatten_package_json

@@ -18,6 +18,7 @@ from calmjs import cli
 
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import make_dummy_dist
+from calmjs.testing.utils import remember_cwd
 from calmjs.testing.utils import stub_dist_flatten_package_json
 from calmjs.testing.utils import stub_mod_call
 from calmjs.testing.utils import stub_mod_check_interactive
@@ -29,16 +30,14 @@ from calmjs.testing.utils import stub_stdouts
 class NpmTestCase(unittest.TestCase):
 
     def setUp(self):
+        remember_cwd(self)
         stub_os_environ(self)
-        # working directory
-        self.cwd = os.getcwd()
         # Forcibly enable interactive mode.
         self.inst_interactive, npm._inst.interactive = (
             npm._inst.interactive, True)
 
     def tearDown(self):
         npm._inst.interactive = self.inst_interactive
-        os.chdir(self.cwd)
 
     def test_npm_no_path(self):
         # XXX should be in npm
@@ -155,7 +154,7 @@ class NpmDriverInitTestCase(unittest.TestCase):
 
     def setUp(self):
         # save working directory
-        self.cwd = os.getcwd()
+        remember_cwd(self)
 
         # All the pre-made setup.
         stub_mod_call(self, cli)
@@ -183,8 +182,6 @@ class NpmDriverInitTestCase(unittest.TestCase):
     def tearDown(self):
         # so it can be restored.
         npm._inst.interactive = self.inst_interactive
-        # restore original os.environ from copy
-        os.chdir(self.cwd)
 
     def test_npm_init_new_non_interactive(self):
         tmpdir = mkdtemp(self)
@@ -485,7 +482,7 @@ class DistCommandTestCase(unittest.TestCase):
     """
 
     def setUp(self):
-        self.cwd = os.getcwd()
+        remember_cwd(self)
 
         app = make_dummy_dist(self, (
             ('requires.txt', '\n'.join([])),
@@ -505,9 +502,6 @@ class DistCommandTestCase(unittest.TestCase):
         # Force auto-detected interactive mode to True, because this is
         # typically executed within an interactive context.
         stub_mod_check_interactive(self, [cli], True)
-
-    def tearDown(self):
-        os.chdir(self.cwd)
 
     def test_no_args(self):
         tmpdir = mkdtemp(self)

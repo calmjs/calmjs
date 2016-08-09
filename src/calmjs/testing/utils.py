@@ -131,6 +131,20 @@ def make_dummy_dist(testcase_inst, metadata_map=(),
         tmpdir, project_name=pkgname, metadata=metadata, version=version)
 
 
+def remember_cwd(testcase_inst):
+    """
+    Remember the current working directory and restore when test is
+    done.
+    """
+
+    cwd = os.getcwd()
+
+    def cleanup():
+        os.chdir(cwd)
+
+    testcase_inst.addCleanup(cleanup)
+
+
 # I guess a bunch of the following stub functions can be replace by
 # mocks, but so far it's managable and limits extra dependencies on <3.5
 
