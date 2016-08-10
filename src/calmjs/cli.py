@@ -512,7 +512,7 @@ class Driver(NodeDriver):
                 self.pkg_manager_bin
             )
 
-        kw = self._gen_call_kws()
+        call_kw = self._gen_call_kws()
         logger.debug("invoking '%s install'", self.pkg_manager_bin)
         if self.env_path:
             logger.debug(
@@ -520,7 +520,7 @@ class Driver(NodeDriver):
         if self.working_dir:
             logger.debug(
                 "invoked from working directory '%s'", self.working_dir)
-        call([self.pkg_manager_bin, 'install'], **kw)
+        call([self.pkg_manager_bin, 'install'], **call_kw)
 
 
 _inst = NodeDriver()
