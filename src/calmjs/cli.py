@@ -281,7 +281,8 @@ class Driver(NodeDriver):
     """
 
     def __init__(self, pkg_manager_bin, pkgdef_filename=DEFAULT_JSON,
-                 prompt=prompt, interactive=None, *a, **kw):
+                 prompt=prompt, interactive=None, install_cmd='install',
+                 *a, **kw):
         """
         Optional Arguments:
 
@@ -296,12 +297,16 @@ class Driver(NodeDriver):
             Boolean value to determine interactive mode.  Unset by
             default, which triggers auto-detection and set if the
             running application has an interactive console.
+        install_cmd
+            The package manager's command line install command
+            Defaults to ``install``.
         """
 
         super(Driver, self).__init__(*a, **kw)
         self.pkg_manager_bin = pkg_manager_bin
         self.pkgdef_filename = pkgdef_filename
         self.prompt = prompt
+        self.install_cmd = install_cmd
 
         self.interactive = interactive
         if self.interactive is None:
@@ -312,7 +317,8 @@ class Driver(NodeDriver):
             'get_' + self.pkg_manager_bin + '_version':
                 self.get_pkg_manager_version,
             self.pkg_manager_bin + '_init': self.pkg_manager_init,
-            self.pkg_manager_bin + '_install': self.pkg_manager_install,
+            self.pkg_manager_bin + '_' + self.install_cmd:
+                self.pkg_manager_install,
         }
         if name not in lookup:
             # this should trigger default exception with right error msg
@@ -482,45 +488,63 @@ class Driver(NodeDriver):
 
         return True
 
-    def pkg_manager_install(self, package_name=None, *a, **kw):
+    def pkg_manager_install(self, package_name=None, args=(), *a, **kw):
         """
         This will install all dependencies into the current working
         directory for the specific Python package from the selected
         JavaScript package manager; this requires that this package
         manager's package definition file to be properly generated
-        first, otherwise the process will be aborted.  All other
-        arguments to this method will be passed forward to the
-        pkg_manager_init method.
+        first, otherwise the process will be aborted.
+
+        If the argument 'args' is supplied as a tuple, those will be
+        passed through to the package manager install command as its
+        arguments.  This will be very specific to the underlying
+        program; use with care as misuse can result in an environment
+        that is not expected by the other parts of the framework.
+
+        All other arguments to this method will be passed forward to the
+        pkg_manager_init method, if the package_name is supplied for the
+        Python package.
 
         If no package_name was supplied then just continue with the
         process anyway, to still enable the shorthand calling.
-        """
 
-        # TODO not hardcode 'install'
+        Arguments:
+
+        package_name
+            Then name of the Python package to generate the manifest
+            for.
+        args
+            The arguments to pass into the command line install.
+        """
 
         if package_name:
             result = self.pkg_manager_init(package_name, *a, **kw)
             if not result:
                 logger.warn(
-                    "not continuing with '%s install' as the generation of "
-                    "'%s' failed", self.pkg_manager_bin, self.pkgdef_filename
+                    "not continuing with '%s %s' as the generation of "
+                    "'%s' failed", self.pkg_manager_bin, self.install_cmd,
+                    self.pkgdef_filename
                 )
                 return
         else:
             logger.warn(
-                "no package name supplied, but continuing with '%s install'",
-                self.pkg_manager_bin
+                "no package name supplied, but continuing with '%s %s'",
+                self.pkg_manager_bin, self.install_cmd,
             )
 
         call_kw = self._gen_call_kws()
-        logger.debug("invoking '%s install'", self.pkg_manager_bin)
+        logger.debug(
+            "invoking '%s %s'", self.pkg_manager_bin, self.install_cmd)
         if self.env_path:
             logger.debug(
                 "invoked with env_path '%s'", self.env_path)
         if self.working_dir:
             logger.debug(
                 "invoked from working directory '%s'", self.working_dir)
-        call([self.pkg_manager_bin, 'install'], **call_kw)
+        cmd = [self.pkg_manager_bin, self.install_cmd]
+        cmd.extend(args)
+        call(cmd, **call_kw)
 
 
 _inst = NodeDriver()

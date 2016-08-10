@@ -273,6 +273,23 @@ class CliDriverTestCase(unittest.TestCase):
         driver.mgr_install()
         self.assertEqual(self.call_args, ((['mgr', 'install'],), {}))
 
+    def test_install_arguments(self):
+        stub_mod_call(self, cli)
+        driver = cli.Driver(pkg_manager_bin='mgr')
+        driver.pkg_manager_install(args=('--pedantic',))
+        self.assertEqual(
+            self.call_args, ((['mgr', 'install', '--pedantic'],), {}))
+
+    def test_alternative_install_cmd(self):
+        stub_mod_call(self, cli)
+        driver = cli.Driver(pkg_manager_bin='mgr', install_cmd='sync')
+        driver.pkg_manager_install()
+        self.assertEqual(self.call_args, ((['mgr', 'sync'],), {}))
+
+        # Naturally, the short hand call will be changed.
+        driver.mgr_sync(args=('all',))
+        self.assertEqual(self.call_args, ((['mgr', 'sync', 'all'],), {}))
+
     def test_set_node_path(self):
         stub_mod_call(self, cli)
         driver = cli.Driver(node_path='./node_mods', pkg_manager_bin='mgr')
