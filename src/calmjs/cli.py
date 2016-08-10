@@ -14,6 +14,8 @@ from os.path import exists
 from os.path import pathsep
 from stat import S_ISCHR
 
+from subprocess import Popen
+from subprocess import PIPE
 from subprocess import check_output
 from subprocess import call
 
@@ -272,6 +274,20 @@ class NodeDriver(object):
     def get_node_version(self):
         kw = self._gen_call_kws()
         return _get_bin_version(self.node_bin, _from=1, kw=kw)
+
+    def node(self, source, env={}):
+        """
+        Calls node with an inline source.
+
+        Returns decoded output of stdout and stderr; decoding determine
+        by locale.
+        """
+
+        call_kw = self._gen_call_kws(**env)
+        node_bin = Popen(
+            ['node'], stdin=PIPE, stdout=PIPE, stderr=PIPE, **call_kw)
+        stdout, stderr = node_bin.communicate(source.encode(locale))
+        return (stdout.decode(locale), stderr.decode(locale))
 
 
 class Driver(NodeDriver):
@@ -556,3 +572,4 @@ class Driver(NodeDriver):
 
 _inst = NodeDriver()
 get_node_version = _inst.get_node_version
+node = _inst.node

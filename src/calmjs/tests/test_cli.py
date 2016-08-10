@@ -262,6 +262,20 @@ class CliDriverTestCase(unittest.TestCase):
         version = cli.get_node_version()
         self.assertIsNotNone(version)
 
+    def test_node_run_no_path(self):
+        stub_os_environ(self)
+        os.environ['PATH'] = ''
+        with self.assertRaises(OSError):
+            cli.node('process.stdout.write("Hello World!");')
+
+    # live test, no stubbing
+    @unittest.skipIf(cli.get_node_version() is None, 'nodejs not found.')
+    def test_node_run(self):
+        stdout, stderr = cli.node('process.stdout.write("Hello World!");')
+        self.assertEqual(stdout, 'Hello World!')
+        stdout, stderr = cli.node('window')
+        self.assertIn('window is not defined', stderr)
+
     def test_helper_attr(self):
         stub_mod_call(self, cli)
         driver = cli.Driver(pkg_manager_bin='mgr')
