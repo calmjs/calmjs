@@ -237,9 +237,8 @@ class NodeDriver(object):
         self.env_path = None
         self.working_dir = None
 
-    def _gen_call_kws(self):
+    def _gen_call_kws(self, **env):
         kw = {}
-        env = {}
         if self.node_path:
             env[NODE_PATH] = self.node_path
         if self.env_path:
@@ -488,7 +487,8 @@ class Driver(NodeDriver):
 
         return True
 
-    def pkg_manager_install(self, package_name=None, args=(), *a, **kw):
+    def pkg_manager_install(self, package_name=None, args=(), env={},
+                            *a, **kw):
         """
         This will install all dependencies into the current working
         directory for the specific Python package from the selected
@@ -501,6 +501,13 @@ class Driver(NodeDriver):
         arguments.  This will be very specific to the underlying
         program; use with care as misuse can result in an environment
         that is not expected by the other parts of the framework.
+
+        If the argument 'env' is supplied, they will be additional
+        environment variables that are not already defined by the
+        framework.  By default these are 'NODE_PATH' and 'PATH', which
+        should be set by the node_path and env_path attribute of
+        instances of this class through the constructor or set_paths
+        method - those values will take precedence.
 
         All other arguments to this method will be passed forward to the
         pkg_manager_init method, if the package_name is supplied for the
@@ -533,7 +540,7 @@ class Driver(NodeDriver):
                 self.pkg_manager_bin, self.install_cmd,
             )
 
-        call_kw = self._gen_call_kws()
+        call_kw = self._gen_call_kws(**env)
         logger.debug(
             "invoking '%s %s'", self.pkg_manager_bin, self.install_cmd)
         if self.env_path:

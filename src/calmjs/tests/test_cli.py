@@ -290,6 +290,14 @@ class CliDriverTestCase(unittest.TestCase):
         driver.mgr_sync(args=('all',))
         self.assertEqual(self.call_args, ((['mgr', 'sync', 'all'],), {}))
 
+    def test_install_other_environ(self):
+        stub_mod_call(self, cli)
+        driver = cli.Driver(pkg_manager_bin='mgr')
+        driver.pkg_manager_install(env={'MGR_ENV': 'production'})
+        self.assertEqual(self.call_args, ((['mgr', 'install'],), {
+            'env': {'MGR_ENV': 'production'},
+        }))
+
     def test_set_node_path(self):
         stub_mod_call(self, cli)
         driver = cli.Driver(node_path='./node_mods', pkg_manager_bin='mgr')
@@ -298,6 +306,16 @@ class CliDriverTestCase(unittest.TestCase):
         driver.pkg_manager_install()
         self.assertEqual(self.call_args, ((['mgr', 'install'],), {
             'env': {'NODE_PATH': './node_mods'},
+        }))
+
+        # will be overridden by instance settings.
+        driver.pkg_manager_install(env={
+            'PATH': '.',
+            'MGR_ENV': 'dev',
+            'NODE_PATH': '/tmp/somewhere/else/node_mods',
+        })
+        self.assertEqual(self.call_args, ((['mgr', 'install'],), {
+            'env': {'NODE_PATH': './node_mods', 'MGR_ENV': 'dev', 'PATH': '.'},
         }))
 
     def test_set_paths(self):
