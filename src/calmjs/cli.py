@@ -569,6 +569,21 @@ class Driver(NodeDriver):
         cmd.extend(args)
         call(cmd, **call_kw)
 
+    def run(self, args=(), env={}):
+        """
+        Calls the package manager with the arguments.
+
+        Returns decoded output of stdout and stderr; decoding determine
+        by locale.
+        """
+
+        call_kw = self._gen_call_kws(**env)
+        call_args = [self.pkg_manager_bin]
+        call_args.extend(args)
+        p = Popen(call_args, stdin=PIPE, stdout=PIPE, stderr=PIPE, **call_kw)
+        stdout, stderr = p.communicate()
+        return (stdout.decode(locale), stderr.decode(locale))
+
 
 _inst = NodeDriver()
 get_node_version = _inst.get_node_version

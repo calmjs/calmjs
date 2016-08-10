@@ -7,10 +7,8 @@ setuptools integration of certain npm features.
 """
 
 from functools import partial
-from subprocess import check_output
 
-from calmjs.cli import Driver
-from calmjs.cli import locale
+from calmjs import cli
 from calmjs.dist import write_json_file
 from calmjs.command import GenericPackageManagerCommand
 
@@ -18,8 +16,14 @@ PACKAGE_FIELD = 'package_json'
 PACKAGE_JSON = 'package.json'
 NPM = 'npm'
 
-_inst = Driver(
-    interactive=False, pkg_manager_bin=NPM, pkgdef_filename=PACKAGE_JSON)
+
+def Driver(interactive=False):
+    return cli.Driver(
+        interactive=False,
+        pkg_manager_bin=NPM, pkgdef_filename=PACKAGE_JSON)
+
+
+_inst = Driver()
 get_node_version = _inst.get_node_version
 get_npm_version = _inst.get_npm_version
 npm_init = _inst.npm_init
@@ -40,12 +44,13 @@ class npm(GenericPackageManagerCommand):
 npm._initialize_user_options()
 
 
-def npm_bin():
+def npm_bin(inst=_inst):
     """
     Returns output of 'npm bin' from the current working directory.
     """
 
     try:
-        return check_output([NPM, 'bin']).decode(locale).strip()
+        stdout, stderr = inst.run(['bin'])
+        return stdout.strip()
     except OSError:
         return None
