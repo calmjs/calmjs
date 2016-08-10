@@ -230,16 +230,15 @@ class NullToolchainTestCase(unittest.TestCase):
     def test_null_toolchain_transpile_sources(self):
         source_dir = mkdtemp(self)
         build_dir = mkdtemp(self)
+        source_file = join(source_dir, 'source.js')
 
-        with open(join(source_dir, 'source.js'), 'w') as fd:
+        with open(source_file, 'w') as fd:
             fd.write('var dummy = function () {};\n')
 
         spec = Spec(
             build_dir=build_dir,
             transpile_source_map={
-                # note that the convention in nodejs tools, the .js
-                # suffix is completely omitted.
-                'namespace.dummy.source': join(source_dir, 'source'),
+                'namespace.dummy.source': source_file,
             },
         )
         self.toolchain(spec)
@@ -248,7 +247,7 @@ class NullToolchainTestCase(unittest.TestCase):
         self.assertEqual(spec, {
             'build_dir': build_dir,
             'transpile_source_map': {
-                'namespace.dummy.source': join(source_dir, 'source')
+                'namespace.dummy.source': source_file,
             },
 
             'bundled_paths': {},
@@ -267,7 +266,9 @@ class NullToolchainTestCase(unittest.TestCase):
         bundled_dir = mkdtemp(self)
         build_dir = mkdtemp(self)
 
-        with open(join(source_dir, 'source.js'), 'w') as fd:
+        source_file = join(source_dir, 'source.js')
+
+        with open(source_file, 'w') as fd:
             fd.write('var dummy = function () {};\n')
 
         with open(join(bundled_dir, 'bundled.js'), 'w') as fd:
@@ -276,10 +277,8 @@ class NullToolchainTestCase(unittest.TestCase):
         spec = Spec(
             build_dir=build_dir,
             bundled_source_map={
-                # note that the convention in nodejs tools, the .js
-                # suffix is completely omitted.
-                'bundle1': join(source_dir, 'source'),
-                'bundle2': join(source_dir, bundled_dir),
+                'bundle1': source_file,
+                'bundle2': bundled_dir,
             },
         )
         self.toolchain(spec)
@@ -288,7 +287,7 @@ class NullToolchainTestCase(unittest.TestCase):
         self.assertEqual(spec, {
             'build_dir': build_dir,
             'bundled_source_map': {
-                'bundle1': join(source_dir, 'source'),
+                'bundle1': source_file,
                 'bundle2': bundled_dir,
             },
 
@@ -320,15 +319,14 @@ class NullToolchainTestCase(unittest.TestCase):
 
         namespace_root = join(source_dir, 'namespace', 'dummy')
         makedirs(namespace_root)
-        with open(join(namespace_root, 'source.js'), 'w') as fd:
+        source_file = join(namespace_root, 'source.js')
+        with open(source_file, 'w') as fd:
             fd.write('var dummy = function () {};\n')
 
         spec = Spec(
             build_dir=build_dir,
             transpile_source_map={
-                # note that the convention in nodejs tools, the .js
-                # suffix is completely omitted.
-                'namespace/dummy/source': join(namespace_root, 'source'),
+                'namespace/dummy/source': source_file,
             },
         )
         self.toolchain(spec)
@@ -337,7 +335,7 @@ class NullToolchainTestCase(unittest.TestCase):
         self.assertEqual(spec, {
             'build_dir': build_dir,
             'transpile_source_map': {
-                'namespace/dummy/source': join(namespace_root, 'source')
+                'namespace/dummy/source': source_file,
             },
 
             'bundled_paths': {},

@@ -122,17 +122,13 @@ class Toolchain(object):
             self.transpiler(reader, writer)
 
     def _gen_req_src_targets(self, d):
-        # name = pythonic module name
-        # reqold = the commonjs require format to the source
-        # source = the source path
-        # reqnew = the commonjs require format to the target
+        # modname = CommonJS require/import module name.
+        # source = path to JavaScript source file from a Python package.
         # target = the target write path
 
-        for name, reqold in d.items():
-            source = reqold + '.js'
-            reqnew = name
-            target = reqnew + '.js'
-            yield reqold, name, reqnew, source, target
+        for modname, source in d.items():
+            target = modname + '.js'
+            yield modname, source, target
 
     def prepare(self, spec):
         """
@@ -161,24 +157,24 @@ class Toolchain(object):
         transpile_source_map = spec.get('transpile_source_map', {})
         bundled_source_map = spec.get('bundled_source_map', {})
 
-        for reqold, name, reqnew, source, target in self._gen_req_src_targets(
+        for modname, source, target in self._gen_req_src_targets(
                 transpile_source_map):
-            compiled_paths[name] = reqnew
-            module_names.append(name)
+            compiled_paths[modname] = modname
+            module_names.append(modname)
             compile_target = join(spec['build_dir'], target)
             self._validate_build_target(spec, compile_target)
             self.compile(source, compile_target)
 
-        for reqold, name, reqnew, source, target in self._gen_req_src_targets(
+        for modname, source, target in self._gen_req_src_targets(
                 bundled_source_map):
-            bundled_paths[name] = reqnew
+            bundled_paths[modname] = modname
             if isfile(source):
-                module_names.append(name)
+                module_names.append(modname)
                 copy_target = join(spec['build_dir'], target)
                 shutil.copy(source, copy_target)
-            elif isdir(reqold):
-                copy_target = join(spec['build_dir'], reqnew)
-                shutil.copytree(reqold, copy_target)
+            elif isdir(source):
+                copy_target = join(spec['build_dir'], modname)
+                shutil.copytree(source, copy_target)
 
         spec.update_selected(locals(), [
             'compiled_paths', 'bundled_paths', 'module_names'])
