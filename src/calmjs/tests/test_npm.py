@@ -94,8 +94,7 @@ class NpmTestCase(unittest.TestCase):
         npm.npm_install('foo')
 
         self.assertIn(
-            "Overwrite 'package.json' in current working directory? "
-            "(Yes/No) [No] ",
+            "Overwrite '%s'? (Yes/No) [No] " % join(tmpdir, 'package.json'),
             sys.stdout.getvalue())
         # No log level set, otherwise it will complain that npm install
         # cannot be continued
@@ -556,12 +555,12 @@ class DistCommandTestCase(unittest.TestCase):
         stdout = sys.stdout.getvalue()
         self.assertTrue(stdout.startswith("running npm\n"))
 
+        target = join(tmpdir, 'package.json')
+
         self.assertIn(
-            "generating a flattened 'package.json' for 'foo' "
-            "into current working directory (%s)\n"
-            "Generated 'package.json' differs from one in current working "
-            "directory" % (tmpdir),
-            stdout
+            "generating a flattened 'package.json' for 'foo' into '%s'\n"
+            "Generated 'package.json' differs with '%s'" % (tmpdir, target),
+            stdout,
         )
 
         # That the diff additional block is inside
@@ -573,8 +572,7 @@ class DistCommandTestCase(unittest.TestCase):
         )
 
         self.assertIn(
-            "'package.json' exists in current working directory; "
-            "not overwriting\n",
+            "Not overwriting existing '%s'\n" % target,
             sys.stderr.getvalue(),
         )
 
@@ -602,6 +600,9 @@ class DistCommandTestCase(unittest.TestCase):
             'devDependencies': {},
             'name': 'foo',
         })
+
+        stdout = sys.stdout.getvalue()
+        self.assertIn("wrote '%s'\n" % join(tmpdir, 'package.json'), stdout)
 
     def test_init_merge(self):
         # --merge without --interactive implies overwrite

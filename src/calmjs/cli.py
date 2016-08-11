@@ -12,6 +12,7 @@ from os import fstat
 from os import getcwd
 from os.path import isdir
 from os.path import exists
+from os.path import join
 from os.path import pathsep
 from stat import S_ISCHR
 
@@ -326,6 +327,10 @@ class BaseDriver(object):
             return stdout, stderr
         return (stdout.decode(locale), stderr.decode(locale))
 
+    @property
+    def cwd(self):
+        return self.working_dir or getcwd()
+
     def dump(self, blob, stream):
         """
         Call json.dump with the attributes of this instance as
@@ -347,6 +352,24 @@ class BaseDriver(object):
             blob, indent=self.indent, sort_keys=True,
             separators=self.separators,
         )
+
+    def join_cwd(self, path=None):
+        """
+        Join the path with the current working directory.  If it is
+        specified for this instance of the object it will be used,
+        otherwise rely on the global value.
+        """
+
+        if self.working_dir:
+            logger.debug(
+                "instance 'working_dir' set to '%s'", self.working_dir)
+            cwd = self.working_dir
+        else:
+            cwd = getcwd()
+            logger.debug(
+                "instance 'working_dir' unset; default to process '%s'", cwd)
+
+        return join(cwd, path)
 
 
 class NodeDriver(BaseDriver):
@@ -479,10 +502,12 @@ class Driver(NodeDriver):
         Returns False otherwise.
         """
 
+        cwd = self.cwd
+
         logger.info(
-            "generating a flattened '%s' for '%s' into current working "
-            "directory (%s)",
-            self.pkgdef_filename, package_name, getcwd())
+            "generating a flattened '%s' for '%s' into '%s'",
+            self.pkgdef_filename, package_name, cwd
+        )
 
         if interactive is None:
             interactive = self.interactive
@@ -492,10 +517,15 @@ class Driver(NodeDriver):
         # this will be modified in place
         original_json = {}
         # package_json is the one that will get written out, if needed.
+        # remember the filename is in the context of the distribution,
+        # not the filesystem.
         package_json = flatten_package_json(
             package_name, filename=self.pkgdef_filename)
 
-        existed = exists(self.pkgdef_filename)
+        # Now we figure out the actual fiel we want to work with.
+
+        pkgdef_path = self.join_cwd(self.pkgdef_filename)
+        existed = exists(pkgdef_path)
 
         # I really don't like all these if statements that follow,
         # however this is still relatively easy to reason over.  Should
@@ -504,17 +534,17 @@ class Driver(NodeDriver):
 
         if existed:
             try:
-                with open(self.pkgdef_filename, 'r') as fd:
+                with open(pkgdef_path, 'r') as fd:
                     original_json = json.load(fd)
             except ValueError:
                 logger.warning(
-                    "Ignoring existing malformed '%s'.", self.pkgdef_filename)
+                    "Ignoring existing malformed '%s'.", pkgdef_path)
             except (IOError, OSError):
                 logger.error(
                     "Reading of existing '%s' failed; "
                     "please confirm that it is a file and/or permissions to "
                     "read and write is permitted before retrying.",
-                    self.pkgdef_filename,
+                    pkgdef_path
                 )
                 # Cowardly giving up.
                 raise
@@ -555,14 +585,14 @@ class Driver(NodeDriver):
                         if l[:1] in '?+-' or l[-1:] in '{}' or l[-2:] == '},')
                     # set new overwrite value from user input.
                     overwrite = prompt(
-                        "Generated '%(pkgdef_filename)s' differs from one in "
-                        "current working directory.\n\n"
+                        "Generated '%(pkgdef_filename)s' differs with "
+                        "'%(pkgdef_path)s'.\n\n"
                         "The following is a compacted list of changes "
                         "required:\n"
                         "%(diff)s\n\n"
-                        "Overwrite '%(pkgdef_filename)s' in "
-                        "current working directory?" % {
+                        "Overwrite '%(pkgdef_path)s'?" % {
                             'pkgdef_filename': self.pkgdef_filename,
+                            'pkgdef_path': pkgdef_path,
                             'diff': diff,
                         },
                         choices=(
@@ -573,20 +603,14 @@ class Driver(NodeDriver):
                     )
 
             if not overwrite:
-                logger.warning(
-                    "'%s' exists in current working directory; "
-                    "not overwriting", self.pkgdef_filename
-                )
+                logger.warning("Not overwriting existing '%s'", pkgdef_path)
                 return False
 
         if package_json:
             # Only write one if we actually got data.
-            with open(self.pkgdef_filename, 'w') as fd:
+            with open(pkgdef_path, 'w') as fd:
                 self.dump(package_json, fd)
-            logger.info(
-                "wrote '%s' to current working directory",
-                self.pkgdef_filename
-            )
+            logger.info("wrote '%s'", pkgdef_path)
 
         return True
 

@@ -210,6 +210,30 @@ class CliPromptTestCase(unittest.TestCase):
             'How are you? Aborted.\n')
 
 
+class CliBaseDriverClassTestCase(unittest.TestCase):
+    """
+    BaseDriver class test case.
+    """
+
+    def test_construction(self):
+        driver = cli.BaseDriver(
+            node_path='node_path', env_path='env_path', working_dir='cwd',
+            indent=2, separators=(', ', ':'))
+        self.assertEqual(driver.node_path, 'node_path')
+        self.assertEqual(driver.env_path, 'env_path')
+        self.assertEqual(driver.working_dir, 'cwd')
+        self.assertEqual(driver.indent, 2)
+        self.assertEqual(driver.separators, (', ', ':'))
+
+    def test_join_cwd(self):
+        driver = cli.BaseDriver()
+        self.assertTrue(driver.join_cwd('bar').startswith(os.getcwd()))
+        driver.working_dir = mkdtemp(self)
+        result = driver.join_cwd('bar')
+        self.assertTrue(result.startswith(driver.working_dir))
+        self.assertTrue(result.endswith('bar'))
+
+
 class CliDriverTestCase(unittest.TestCase):
     """
     Base cli driver class test case.
