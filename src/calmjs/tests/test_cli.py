@@ -3,14 +3,20 @@ from __future__ import unicode_literals
 
 import unittest
 from io import StringIO
+import json
 import os
 import sys
+from os.path import exists
 from os.path import join
 from os.path import pathsep
+import pkg_resources
 
 from calmjs import cli
+from calmjs.testing.mocks import MockProvider
 from calmjs.testing.utils import fake_error
 from calmjs.testing.utils import mkdtemp
+from calmjs.testing.utils import remember_cwd
+from calmjs.testing.utils import stub_dist_flatten_package_json
 from calmjs.testing.utils import stub_mod_call
 from calmjs.testing.utils import stub_mod_check_output
 from calmjs.testing.utils import stub_os_environ
@@ -403,3 +409,57 @@ class CliDriverTestCase(unittest.TestCase):
         # this will call ``bower install`` instead.
         driver.pkg_manager_install()
         self.assertEqual(self.call_args, ((['bower', 'install'],), {}))
+
+    # Should really put more tests of these kind in here, but the more
+    # concrete implementations have done so.  This weird version here
+    # is mostly just for laughs.
+
+    def setup_requirements_json(self):
+        # what kind of bizzaro world do the following users live in?
+        requirements = {"require": {"setuptools": "25.1.6"}}
+        mock_provider = MockProvider({
+            'requirements.json': json.dumps(requirements),
+        })
+        # seriously lolwat?
+        mock_dist = pkg_resources.Distribution(
+            metadata=mock_provider, project_name='calmpy.pip', version='0.0.0')
+        working_set = pkg_resources.WorkingSet()
+        working_set.add(mock_dist)
+        stub_dist_flatten_package_json(self, [cli], working_set)
+
+    def test_pkg_manager_init(self):
+        # we still need a temporary directory, but the difference is
+        # that whether the instance contains it or not.
+        self.setup_requirements_json()
+        remember_cwd(self)
+        cwd = mkdtemp(self)
+        os.chdir(cwd)
+
+        driver = cli.Driver(
+            pkg_manager_bin='mgr', pkgdef_filename='requirements.json',
+            dep_keys=('require',),
+        )
+        driver.pkg_manager_init('calmpy.pip', interactive=False)
+
+        target = join(cwd, 'requirements.json')
+        self.assertTrue(exists(target))
+        with open(target) as fd:
+            result = json.load(fd)
+        self.assertEqual(result, {"require": {"setuptools": "25.1.6"}})
+
+    def test_pkg_manager_init_working_dir(self):
+        self.setup_requirements_json()
+        remember_cwd(self)
+        original = mkdtemp(self)
+        os.chdir(original)
+        cwd = mkdtemp(self)
+
+        driver = cli.Driver(
+            pkg_manager_bin='mgr', pkgdef_filename='requirements.json',
+            dep_keys=('require',),
+            working_dir=cwd,
+        )
+        driver.pkg_manager_init('calmpy.pip', interactive=False)
+
+        self.assertFalse(exists(join(original, 'requirements.json')))
+        self.assertTrue(exists(join(cwd, 'requirements.json')))

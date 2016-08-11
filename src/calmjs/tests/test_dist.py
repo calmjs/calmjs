@@ -461,7 +461,7 @@ class DistTestCase(unittest.TestCase):
 
     def tests_flatten_package_json_missing_deps(self):
         """
-        Missing depedencies should not cause a hard failure.
+        Missing dependencies should not cause a hard failure.
         """
 
         make_dummy_dist(self, (

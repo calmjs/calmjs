@@ -159,9 +159,12 @@ def stub_dist_flatten_package_json(testcase_inst, modules, working_set):
 
     original_flatten_package_json = dist.flatten_package_json
 
-    def flatten_package_json(pkg_name, filename=npm.PACKAGE_JSON):
+    def flatten_package_json(
+            pkg_name, filename=npm.PACKAGE_JSON, dep_keys=dist.DEP_KEYS):
         return original_flatten_package_json(
-            pkg_name, filename=filename, working_set=working_set)
+            pkg_name, filename=filename, dep_keys=dep_keys,
+            working_set=working_set
+        )
 
     def restore(module):
         module.flatten_package_json = original_flatten_package_json

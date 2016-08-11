@@ -19,6 +19,7 @@ logger = getLogger(__name__)
 
 # default package definition filename.
 DEFAULT_JSON = 'default.json'
+DEP_KEYS = ('dependencies', 'devDependencies')
 
 
 def is_json_compat(value):
@@ -126,7 +127,8 @@ def read_package_json(
 
 
 def flatten_dist_package_json(
-        source_dist, filename=DEFAULT_JSON, working_set=default_working_set):
+        source_dist, filename=DEFAULT_JSON, dep_keys=DEP_KEYS,
+        working_set=default_working_set):
     """
     Resolve a distribution's (dev)dependencies through the working set
     and generate a flattened version package.json, returned as a dict,
@@ -146,8 +148,7 @@ def flatten_dist_package_json(
     Flat is better than nested.
     """
 
-    dependencies = {}
-    devDependencies = {}
+    depends = {dep: {} for dep in dep_keys}
 
     # ensure that we have at least a dummy value
     if source_dist:
@@ -165,25 +166,24 @@ def flatten_dist_package_json(
             continue
 
         logger.debug("merging '%s' for required '%s'", filename, dist)
-        dependencies.update(obj.get('dependencies', {}))
-        devDependencies.update(obj.get('devDependencies', {}))
+        for dep in dep_keys:
+            depends[dep].update(obj.get(dep, {}))
 
     if source_dist:
         # Layer on top
         logger.debug("merging '%s' for target '%s'", filename, source_dist)
-        dependencies.update(root.get('dependencies', {}))
-        devDependencies.update(root.get('devDependencies', {}))
+        for dep in dep_keys:
+            depends[dep].update(root.get(dep, {}))
 
-    root['dependencies'] = {
-        k: v for k, v in dependencies.items() if v is not None}
-    root['devDependencies'] = {
-        k: v for k, v in devDependencies.items() if v is not None}
+    for dep in dep_keys:
+        root[dep] = {k: v for k, v in depends[dep].items() if v is not None}
 
     return root
 
 
 def flatten_package_json(
-        pkg_name, filename=DEFAULT_JSON, working_set=default_working_set):
+        pkg_name, filename=DEFAULT_JSON, dep_keys=DEP_KEYS,
+        working_set=default_working_set):
     """
     Generate a flattened package.json of a package `pkg_name` that's
     already installed within the current Python environment (defaults
@@ -192,4 +192,5 @@ def flatten_package_json(
     """
 
     dist = get_pkg_dist(pkg_name, working_set=working_set)
-    return flatten_dist_package_json(dist, filename, working_set)
+    return flatten_dist_package_json(
+        dist, filename=filename, dep_keys=dep_keys, working_set=working_set)

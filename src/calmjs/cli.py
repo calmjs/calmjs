@@ -23,6 +23,7 @@ from subprocess import call
 
 from calmjs.dist import flatten_package_json
 from calmjs.dist import DEFAULT_JSON
+from calmjs.dist import DEP_KEYS
 
 __all__ = [
     'BaseDriver',
@@ -37,7 +38,6 @@ version_expr = re.compile('((?:\d+)(?:\.\d+)*)')
 
 NODE_PATH = 'NODE_PATH'
 NODE = 'node'
-DEP_KEYS = ('dependencies', 'devDependencies')
 
 
 if sys.version_info < (3,):  # pragma: no cover
@@ -391,6 +391,7 @@ class Driver(NodeDriver):
 
     def __init__(self, pkg_manager_bin, pkgdef_filename=DEFAULT_JSON,
                  prompt=prompt, interactive=None, install_cmd='install',
+                 dep_keys=DEP_KEYS,
                  *a, **kw):
         """
         Optional Arguments:
@@ -409,6 +410,9 @@ class Driver(NodeDriver):
         install_cmd
             The package manager's command line install command
             Defaults to ``install``.
+        dep_keys
+            The dependency keys, for which the dependency merging
+            applies for.
         """
 
         super(Driver, self).__init__(*a, **kw)
@@ -416,6 +420,7 @@ class Driver(NodeDriver):
         self.pkgdef_filename = pkgdef_filename
         self.prompt = prompt
         self.install_cmd = install_cmd
+        self.dep_keys = dep_keys
 
         self.interactive = interactive
         if self.interactive is None:
@@ -496,7 +501,9 @@ class Driver(NodeDriver):
         # remember the filename is in the context of the distribution,
         # not the filesystem.
         package_json = flatten_package_json(
-            package_name, filename=self.pkgdef_filename)
+            package_name, filename=self.pkgdef_filename,
+            dep_keys=self.dep_keys,
+        )
 
         # Now we figure out the actual fiel we want to work with.
 
@@ -528,7 +535,7 @@ class Driver(NodeDriver):
             if merge:
                 # Merge the generated on top of the original.
                 updates = generate_merge_dict(
-                    DEP_KEYS, original_json, package_json,
+                    self.dep_keys, original_json, package_json,
                 )
                 final = {}
                 final.update(original_json)
