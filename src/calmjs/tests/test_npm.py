@@ -193,6 +193,7 @@ class NpmDriverInitTestCase(unittest.TestCase):
         self.assertEqual(result, {
             'dependencies': {'jquery': '~1.11.0'},
             'devDependencies': {},
+            'name': 'foo',
         })
 
     def test_npm_init_existing_standard_non_interactive(self):
@@ -292,9 +293,7 @@ class NpmDriverInitTestCase(unittest.TestCase):
             'devDependencies': {
                 'sinon': '~1.17.0'
             },
-            # name already in file, but not part of the defined
-            # package.json.
-            'name': 'dummy',
+            'name': 'foo',
         })
 
     def test_npm_init_existing_merge_overwrite(self):
@@ -330,7 +329,7 @@ class NpmDriverInitTestCase(unittest.TestCase):
             'devDependencies': {
                 'sinon': '~1.17.0'
             },
-            'name': 'dummy',
+            'name': 'foo',
         })
 
     def test_npm_init_existing_interactive_merge_no(self):
@@ -686,6 +685,7 @@ class DistCommandTestCase(unittest.TestCase):
         self.assertEqual(result, {
             'dependencies': {'jquery': '~1.11.0'},
             'devDependencies': {},
+            'name': 'foo',
         })
         self.assertEqual(self.call_args, ((['npm', 'install'],), {}))
 

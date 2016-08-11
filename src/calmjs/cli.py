@@ -391,7 +391,7 @@ class Driver(NodeDriver):
 
     def __init__(self, pkg_manager_bin, pkgdef_filename=DEFAULT_JSON,
                  prompt=prompt, interactive=None, install_cmd='install',
-                 dep_keys=DEP_KEYS,
+                 dep_keys=DEP_KEYS, pkg_name_field='name',
                  *a, **kw):
         """
         Optional Arguments:
@@ -421,6 +421,7 @@ class Driver(NodeDriver):
         self.prompt = prompt
         self.install_cmd = install_cmd
         self.dep_keys = dep_keys
+        self.pkg_name_field = pkg_name_field
 
         self.interactive = interactive
         if self.interactive is None:
@@ -505,6 +506,10 @@ class Driver(NodeDriver):
             dep_keys=self.dep_keys,
         )
 
+        if package_json.get(
+                self.pkg_name_field, NotImplemented) is NotImplemented:
+            package_json[self.pkg_name_field] = package_name
+
         # Now we figure out the actual fiel we want to work with.
 
         pkgdef_path = self.join_cwd(self.pkgdef_filename)
@@ -542,9 +547,6 @@ class Driver(NodeDriver):
                 final.update(package_json)
                 final.update(updates)
                 package_json = final
-
-            if package_json.get('name', NotImplemented) is NotImplemented:
-                package_json['name'] = package_name
 
             if original_json == package_json:
                 # Well, if original existing one is identical with the

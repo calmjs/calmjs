@@ -445,7 +445,10 @@ class CliDriverTestCase(unittest.TestCase):
         self.assertTrue(exists(target))
         with open(target) as fd:
             result = json.load(fd)
-        self.assertEqual(result, {"require": {"setuptools": "25.1.6"}})
+        self.assertEqual(result, {
+            "require": {"setuptools": "25.1.6"},
+            "name": "calmpy.pip",
+        })
 
     def test_pkg_manager_init_working_dir(self):
         self.setup_requirements_json()
@@ -453,6 +456,7 @@ class CliDriverTestCase(unittest.TestCase):
         original = mkdtemp(self)
         os.chdir(original)
         cwd = mkdtemp(self)
+        target = join(cwd, 'requirements.json')
 
         driver = cli.Driver(
             pkg_manager_bin='mgr', pkgdef_filename='requirements.json',
@@ -462,4 +466,60 @@ class CliDriverTestCase(unittest.TestCase):
         driver.pkg_manager_init('calmpy.pip', interactive=False)
 
         self.assertFalse(exists(join(original, 'requirements.json')))
-        self.assertTrue(exists(join(cwd, 'requirements.json')))
+        self.assertTrue(exists(target))
+
+        with open(target) as fd:
+            result = json.load(fd)
+        self.assertEqual(result, {
+            "require": {"setuptools": "25.1.6"},
+            "name": "calmpy.pip",
+        })
+
+    def test_pkg_manager_init_exists_and_overwrite(self):
+        self.setup_requirements_json()
+        cwd = mkdtemp(self)
+        driver = cli.Driver(
+            pkg_manager_bin='mgr', pkgdef_filename='requirements.json',
+            dep_keys=('require',),
+            working_dir=cwd,
+        )
+        target = join(cwd, 'requirements.json')
+        with open(target, 'w') as fd:
+            result = json.dump({"require": {}}, fd)
+
+        driver.pkg_manager_init(
+            'calmpy.pip', interactive=False, overwrite=False)
+        with open(target) as fd:
+            result = json.load(fd)
+        self.assertNotEqual(result, {"require": {"setuptools": "25.1.6"}})
+
+        driver.pkg_manager_init(
+            'calmpy.pip', interactive=False, overwrite=True)
+        with open(target) as fd:
+            result = json.load(fd)
+        self.assertEqual(result, {
+            "require": {"setuptools": "25.1.6"},
+            "name": "calmpy.pip",
+        })
+
+    def test_pkg_manager_init_merge(self):
+        self.setup_requirements_json()
+        cwd = mkdtemp(self)
+        driver = cli.Driver(
+            pkg_manager_bin='mgr', pkgdef_filename='requirements.json',
+            dep_keys=('require',),
+            working_dir=cwd,
+        )
+        target = join(cwd, 'requirements.json')
+        with open(target, 'w') as fd:
+            result = json.dump({"require": {"calmpy": "1.0.0"}}, fd)
+
+        driver.pkg_manager_init(
+            'calmpy.pip', interactive=False, merge=True, overwrite=True)
+        self.assertNotEqual(result, {
+            "require": {
+                "calmpy": "1.0.0",
+                "setuptools": "25.1.6",
+            },
+            "name": "calmpy.pip",
+        })
