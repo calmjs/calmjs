@@ -282,30 +282,6 @@ class BaseDriver(object):
             kw['env'] = env
         return kw
 
-    def set_paths(self, env_path, working_dir=NotImplemented):
-        """
-        This "freezes" the PATH environemnt variable and the current
-        working directory (CWD) for this instance in one go.  By default
-        if CWD is not provided it will be frozen at wherever the CWD is
-        at when this was invoked, otherwise ``None`` can be passed to
-        not have this set.
-
-        Reasoning is that typically within calmjs the setting of the
-        environment path is done through the 'npm bin', and that it
-        relies on the current working directory if ``NODE_PATH`` was not
-        already defined, and that quite often PATH points to the actual
-        ``node`` or ``npm`` binary that the users of these instances
-        want to invoke, and that if they want to, they would also have
-        constructed these instances with inst.node_path already defined.
-        """
-
-        if env_path and working_dir is NotImplemented:
-            working_dir = getcwd()
-        elif working_dir is NotImplemented:
-            working_dir = None
-        self.working_dir = working_dir
-        self.env_path = env_path
-
     def _exec(self, binary, stdin='', args=(), env={}):
         """
         Executes the binary using stdin and args with environment
