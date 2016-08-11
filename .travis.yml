@@ -11,6 +11,9 @@ install:
 script: 
   - flake8 setup.py src
   - nosetests --with-coverage --cover-package=calmjs --with-doctest
+# Alternatively without nose
+#  - coverage run --include=src/* -m unittest calmjs.tests.make_suite
+#  - coverage report -m
 after_success:
   - pip install coveralls
   - coveralls

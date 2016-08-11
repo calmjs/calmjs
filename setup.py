@@ -50,5 +50,5 @@ setup(name='calmjs',
       calmjs.module = calmjs.module:ModuleRegistry
       calmjs.module.pythonic = calmjs.module:PythonicModuleRegistry
       """,
-      test_suite="calmjs.tests.test_suite",
+      test_suite="calmjs.tests.make_suite",
       )
