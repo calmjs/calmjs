@@ -24,6 +24,8 @@ from calmjs.dist import flatten_package_json
 from calmjs.dist import DEFAULT_JSON
 
 __all__ = [
+    'BaseDriver',
+    'NodeDriver',
     'Driver',
 ]
 
@@ -235,19 +237,31 @@ class BaseDriver(object):
     binaries with more consistent conventions to be managed, and more.
     """
 
-    indent = 4
-
-    def __init__(self, node_path=None):
+    def __init__(self, node_path=None, env_path=None, working_dir=None,
+                 indent=4, separators=(',', ': ')):
         """
-        Optional Arguments:
+        Optional Arguments (defaults to None when not stated):
 
         node_path
             Overrides NODE_PATH environment variable for calling out.
+        env_path
+            Extra directory that will be assigned to the environment's
+            PATH variable, so that that will be used first to look up a
+            binary for exec calls.
+        working_dir
+            The working directory where the driver will operate at.
+        indent
+            JSON indentation level.  Defaults to 4.
+        separators
+            Set as a workaround to remove trailing spaces.  Should be
+            left as is (',', ': ').
         """
 
         self.node_path = node_path
-        self.env_path = None
-        self.working_dir = None
+        self.env_path = env_path
+        self.working_dir = working_dir
+        self.indent = indent
+        self.separators = separators
 
     def _gen_call_kws(self, **env):
         kw = {}
@@ -311,6 +325,28 @@ class BaseDriver(object):
         if as_bytes:
             return stdout, stderr
         return (stdout.decode(locale), stderr.decode(locale))
+
+    def dump(self, blob, stream):
+        """
+        Call json.dump with the attributes of this instance as
+        arguments.
+        """
+
+        json.dump(
+            blob, stream, indent=self.indent, sort_keys=True,
+            separators=self.separators,
+        )
+
+    def dumps(self, blob):
+        """
+        Call json.dumps with the attributes of this instance as
+        arguments.
+        """
+
+        return json.dumps(
+            blob, indent=self.indent, sort_keys=True,
+            separators=self.separators,
+        )
 
 
 class NodeDriver(BaseDriver):
@@ -513,16 +549,8 @@ class Driver(NodeDriver):
                     # generate compacted ndiff output.
                     diff = '\n'.join(l for l in (
                         line.rstrip() for line in difflib.ndiff(
-                            json.dumps(
-                                original_json, indent=self.indent,
-                                sort_keys=True,
-                                separators=(',', ': '),
-                            ).splitlines(),
-                            json.dumps(
-                                package_json, indent=self.indent,
-                                sort_keys=True,
-                                separators=(',', ': '),
-                            ).splitlines(),
+                            self.dumps(original_json).splitlines(),
+                            self.dumps(package_json).splitlines(),
                         ))
                         if l[:1] in '?+-' or l[-1:] in '{}' or l[-2:] == '},')
                     # set new overwrite value from user input.
@@ -554,7 +582,7 @@ class Driver(NodeDriver):
         if package_json:
             # Only write one if we actually got data.
             with open(self.pkgdef_filename, 'w') as fd:
-                json.dump(package_json, fd, indent=self.indent, sort_keys=True)
+                self.dump(package_json, fd)
             logger.info(
                 "wrote '%s' to current working directory",
                 self.pkgdef_filename
