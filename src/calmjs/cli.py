@@ -43,7 +43,7 @@ if sys.version_info < (3,):  # pragma: no cover
 lower = str.lower
 
 
-def _get_bin_version(bin_path, version_flag='-v', _from=None, _to=None, kw={}):
+def _get_bin_version(bin_path, version_flag='-v', kw={}):
     try:
         version_str = version_expr.search(
             check_output([bin_path, version_flag], **kw).decode(locale)
@@ -227,27 +227,25 @@ def prompt(question, validator=None,
     return answer
 
 
-class NodeDriver(object):
+class BaseDriver(object):
     """
-    This is really a common base driver class that stores the common
-    location of the node related values for the actual driver(s) to be
-    implemented.
+    The nodejs interfacing base driver class.  Basically all tools that
+    talk to nodejs and their tools should inherit from this for some
+    helpful methods, such as ones that make shelling out to those nodejs
+    binaries with more consistent conventions to be managed, and more.
     """
 
     indent = 4
 
-    def __init__(self, node_bin=NODE, node_path=None):
+    def __init__(self, node_path=None):
         """
         Optional Arguments:
 
-        node_bin
-            Path to node binary.  Defaults to ``node``.
         node_path
-            Overrides NODE_PATH environment variable.
+            Overrides NODE_PATH environment variable for calling out.
         """
 
         self.node_path = node_path
-        self.node_bin = node_bin
         self.env_path = None
         self.working_dir = None
 
@@ -293,10 +291,6 @@ class NodeDriver(object):
         self.working_dir = working_dir
         self.env_path = env_path
 
-    def get_node_version(self):
-        kw = self._gen_call_kws()
-        return _get_bin_version(self.node_bin, _from=1, kw=kw)
-
     def _exec(self, binary, stdin='', args=(), env={}):
         """
         Executes the binary using stdin and args with environment
@@ -318,7 +312,33 @@ class NodeDriver(object):
             return stdout, stderr
         return (stdout.decode(locale), stderr.decode(locale))
 
-    def node(self, source, env={}):
+
+class NodeDriver(BaseDriver):
+    """
+    This is really a common base driver class that stores the common
+    location of the node related values for the actual driver(s) to be
+    implemented.
+    """
+
+    def __init__(self, node_bin=NODE, *a, **kw):
+        """
+        Optional Arguments:
+
+        node_bin
+            Path to node binary.  Defaults to ``node``.
+
+        Other keyword arguments pass up to parent; please refer to its
+        definitions.
+        """
+
+        super(NodeDriver, self).__init__(*a, **kw)
+        self.node_bin = node_bin
+
+    def get_node_version(self):
+        kw = self._gen_call_kws()
+        return _get_bin_version(self.node_bin, kw=kw)
+
+    def node(self, source, args=(), env={}):
         """
         Calls node with an inline source.
 
@@ -326,7 +346,7 @@ class NodeDriver(object):
         by locale.
         """
 
-        return self._exec(NODE, source)
+        return self._exec(self.node_bin, source, args=args, env=env)
 
 
 class Driver(NodeDriver):
