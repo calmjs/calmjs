@@ -745,7 +745,6 @@ class DistCommandTestCase(unittest.TestCase):
         bin_dir = npm.npm_bin()
         self.assertTrue(bin_dir.endswith('bin'))
 
-    @unittest.skipIf(npm.get_npm_version() is None, 'npm not found.')
     def test_npm_bin_fail(self):
         stub_os_environ(self)
         os.environ['PATH'] = ''
