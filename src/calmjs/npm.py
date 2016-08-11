@@ -18,7 +18,7 @@ NPM = 'npm'
 
 
 def Driver(interactive=False):
-    return cli.Driver(
+    return cli.PackageManagerDriver(
         interactive=False,
         pkg_manager_bin=NPM, pkgdef_filename=PACKAGE_JSON)
 

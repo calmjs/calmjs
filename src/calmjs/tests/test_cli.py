@@ -310,7 +310,7 @@ class CliDriverTestCase(unittest.TestCase):
 
     def test_helper_attr(self):
         stub_mod_call(self, cli)
-        driver = cli.Driver(pkg_manager_bin='mgr')
+        driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
         with self.assertRaises(AttributeError) as e:
             driver.no_such_attr_here
         self.assertIn('no_such_attr_here', str(e.exception))
@@ -321,14 +321,15 @@ class CliDriverTestCase(unittest.TestCase):
 
     def test_install_arguments(self):
         stub_mod_call(self, cli)
-        driver = cli.Driver(pkg_manager_bin='mgr')
+        driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
         driver.pkg_manager_install(args=('--pedantic',))
         self.assertEqual(
             self.call_args, ((['mgr', 'install', '--pedantic'],), {}))
 
     def test_alternative_install_cmd(self):
         stub_mod_call(self, cli)
-        driver = cli.Driver(pkg_manager_bin='mgr', install_cmd='sync')
+        driver = cli.PackageManagerDriver(
+            pkg_manager_bin='mgr', install_cmd='sync')
         driver.pkg_manager_install()
         self.assertEqual(self.call_args, ((['mgr', 'sync'],), {}))
 
@@ -338,7 +339,7 @@ class CliDriverTestCase(unittest.TestCase):
 
     def test_install_other_environ(self):
         stub_mod_call(self, cli)
-        driver = cli.Driver(pkg_manager_bin='mgr')
+        driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
         driver.pkg_manager_install(env={'MGR_ENV': 'production'})
         self.assertEqual(self.call_args, ((['mgr', 'install'],), {
             'env': {'MGR_ENV': 'production'},
@@ -347,7 +348,8 @@ class CliDriverTestCase(unittest.TestCase):
     def test_set_node_path(self):
         stub_mod_call(self, cli)
         node_path = mkdtemp(self)
-        driver = cli.Driver(node_path=node_path, pkg_manager_bin='mgr')
+        driver = cli.PackageManagerDriver(
+            node_path=node_path, pkg_manager_bin='mgr')
 
         # ensure env is passed into the call.
         driver.pkg_manager_install()
@@ -370,7 +372,7 @@ class CliDriverTestCase(unittest.TestCase):
         stub_mod_call(self, cli)
         somepath = mkdtemp(self)
         cwd = mkdtemp(self)
-        driver = cli.Driver(
+        driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', env_path=somepath, working_dir=cwd)
         driver.pkg_manager_install()
         args, kwargs = self.call_args
@@ -380,14 +382,15 @@ class CliDriverTestCase(unittest.TestCase):
     def test_env_path_not_exist(self):
         stub_mod_call(self, cli)
         bad_path = '/no/such/path/for/sure/at/here'
-        driver = cli.Driver(pkg_manager_bin='mgr', env_path=bad_path)
+        driver = cli.PackageManagerDriver(
+            pkg_manager_bin='mgr', env_path=bad_path)
         driver.pkg_manager_install()
         args, kwargs = self.call_args
         self.assertNotEqual(kwargs['env']['PATH'].split(pathsep)[0], bad_path)
 
     def test_paths_unset(self):
         stub_mod_call(self, cli)
-        driver = cli.Driver(pkg_manager_bin='mgr')
+        driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
         driver.pkg_manager_install()
         args, kwargs = self.call_args
         self.assertNotIn('PATH', kwargs)
@@ -396,7 +399,8 @@ class CliDriverTestCase(unittest.TestCase):
     def test_working_dir_set(self):
         stub_mod_call(self, cli)
         some_cwd = mkdtemp(self)
-        driver = cli.Driver(pkg_manager_bin='mgr', working_dir=some_cwd)
+        driver = cli.PackageManagerDriver(
+            pkg_manager_bin='mgr', working_dir=some_cwd)
         driver.pkg_manager_install()
         args, kwargs = self.call_args
         self.assertNotIn('PATH', kwargs)
@@ -404,7 +408,7 @@ class CliDriverTestCase(unittest.TestCase):
 
     def test_set_binary(self):
         stub_mod_call(self, cli)
-        driver = cli.Driver(pkg_manager_bin='bower')
+        driver = cli.PackageManagerDriver(pkg_manager_bin='bower')
 
         # this will call ``bower install`` instead.
         driver.pkg_manager_install()
@@ -435,7 +439,7 @@ class CliDriverTestCase(unittest.TestCase):
         cwd = mkdtemp(self)
         os.chdir(cwd)
 
-        driver = cli.Driver(
+        driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', pkgdef_filename='requirements.json',
             dep_keys=('require',),
         )
@@ -458,7 +462,7 @@ class CliDriverTestCase(unittest.TestCase):
         cwd = mkdtemp(self)
         target = join(cwd, 'requirements.json')
 
-        driver = cli.Driver(
+        driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', pkgdef_filename='requirements.json',
             dep_keys=('require',),
             working_dir=cwd,
@@ -478,7 +482,7 @@ class CliDriverTestCase(unittest.TestCase):
     def test_pkg_manager_init_exists_and_overwrite(self):
         self.setup_requirements_json()
         cwd = mkdtemp(self)
-        driver = cli.Driver(
+        driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', pkgdef_filename='requirements.json',
             dep_keys=('require',),
             working_dir=cwd,
@@ -505,7 +509,7 @@ class CliDriverTestCase(unittest.TestCase):
     def test_pkg_manager_init_merge(self):
         self.setup_requirements_json()
         cwd = mkdtemp(self)
-        driver = cli.Driver(
+        driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', pkgdef_filename='requirements.json',
             dep_keys=('require',),
             working_dir=cwd,

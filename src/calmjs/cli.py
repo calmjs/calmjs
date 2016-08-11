@@ -28,7 +28,7 @@ from calmjs.dist import DEP_KEYS
 __all__ = [
     'BaseDriver',
     'NodeDriver',
-    'Driver',
+    'PackageManagerDriver',
 ]
 
 logger = logging.getLogger(__name__)
@@ -384,9 +384,13 @@ class NodeDriver(BaseDriver):
         return self._exec(self.node_bin, source, args=args, env=env)
 
 
-class Driver(NodeDriver):
+class PackageManagerDriver(NodeDriver):
     """
     Generic package manager interaction driver class.
+
+    This depends directly on the NodeDriver instead of the BaseDriver
+    simply because quite often things might want to access the node
+    binary.
     """
 
     def __init__(self, pkg_manager_bin, pkgdef_filename=DEFAULT_JSON,
@@ -415,7 +419,7 @@ class Driver(NodeDriver):
             applies for.
         """
 
-        super(Driver, self).__init__(*a, **kw)
+        super(PackageManagerDriver, self).__init__(*a, **kw)
         self.pkg_manager_bin = pkg_manager_bin
         self.pkgdef_filename = pkgdef_filename
         self.prompt = prompt
