@@ -275,6 +275,27 @@ class NodeDriver(object):
         kw = self._gen_call_kws()
         return _get_bin_version(self.node_bin, _from=1, kw=kw)
 
+    def _exec(self, binary, stdin='', args=(), env={}):
+        """
+        Executes the binary using stdin and args with environment
+        variables.
+
+        Returns a tuple of stdout, stderr.  Format determined by the
+        input text (either str or bytes), and the encoding of str will
+        be determined by the locale this module was imported in.
+        """
+
+        call_kw = self._gen_call_kws(**env)
+        call_args = [binary]
+        call_args.extend(args)
+        as_bytes = isinstance(stdin, bytes)
+        source = stdin if as_bytes else stdin.encode(locale)
+        p = Popen(call_args, stdin=PIPE, stdout=PIPE, stderr=PIPE, **call_kw)
+        stdout, stderr = p.communicate(source)
+        if as_bytes:
+            return stdout, stderr
+        return (stdout.decode(locale), stderr.decode(locale))
+
     def node(self, source, env={}):
         """
         Calls node with an inline source.
@@ -283,11 +304,7 @@ class NodeDriver(object):
         by locale.
         """
 
-        call_kw = self._gen_call_kws(**env)
-        node_bin = Popen(
-            ['node'], stdin=PIPE, stdout=PIPE, stderr=PIPE, **call_kw)
-        stdout, stderr = node_bin.communicate(source.encode(locale))
-        return (stdout.decode(locale), stderr.decode(locale))
+        return self._exec(NODE, source)
 
 
 class Driver(NodeDriver):
@@ -577,12 +594,7 @@ class Driver(NodeDriver):
         by locale.
         """
 
-        call_kw = self._gen_call_kws(**env)
-        call_args = [self.pkg_manager_bin]
-        call_args.extend(args)
-        p = Popen(call_args, stdin=PIPE, stdout=PIPE, stderr=PIPE, **call_kw)
-        stdout, stderr = p.communicate()
-        return (stdout.decode(locale), stderr.decode(locale))
+        return self._exec(self.pkg_manager_bin, args=args, env=env)
 
 
 _inst = NodeDriver()

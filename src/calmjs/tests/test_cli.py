@@ -273,6 +273,8 @@ class CliDriverTestCase(unittest.TestCase):
     def test_node_run(self):
         stdout, stderr = cli.node('process.stdout.write("Hello World!");')
         self.assertEqual(stdout, 'Hello World!')
+        stdout, stderr = cli.node(b'process.stdout.write("Hello World!");')
+        self.assertEqual(stdout, b'Hello World!')
         stdout, stderr = cli.node('window')
         self.assertIn('window is not defined', stderr)
 
