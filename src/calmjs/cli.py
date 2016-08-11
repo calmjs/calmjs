@@ -10,6 +10,7 @@ from locale import getpreferredencoding
 import os
 from os import fstat
 from os import getcwd
+from os.path import isdir
 from os.path import exists
 from os.path import pathsep
 from stat import S_ISCHR
@@ -59,6 +60,17 @@ def _get_bin_version(bin_path, version_flag='-v', _from=None, _to=None, kw={}):
         return None
     logger.info('Found %s version %s', bin_path, version_str)
     return version
+
+
+def _check_isdir_assign_key(d, key, value, error_msg=None):
+    if isdir(value):
+        d[key] = value
+    else:
+        extra_info = '' if not error_msg else '; ' + error_msg
+        logger.error(
+            "not manually setting '%s' to '%s' as it not a directory%s",
+            key, value, extra_info
+        )
 
 
 def generate_merge_dict(keys, *dicts):
@@ -241,27 +253,37 @@ class NodeDriver(object):
 
     def _gen_call_kws(self, **env):
         kw = {}
-        if self.node_path:
-            env[NODE_PATH] = self.node_path
-        if self.env_path:
+        if self.node_path is not None:
+            _check_isdir_assign_key(env, NODE_PATH, self.node_path)
+        if self.env_path is not None:
+            # Initial assignment with check
+            _check_isdir_assign_key(env, 'PATH', self.env_path)
+            # then append the rest of it
             env['PATH'] = pathsep.join([
-                self.env_path, os.environ.get('PATH', '')])
+                env.get('PATH', ''), os.environ.get('PATH', '')])
         if self.working_dir:
-            kw['cwd'] = self.working_dir
+            _check_isdir_assign_key(
+                kw, 'cwd', self.working_dir,
+                error_msg="current working directory left as default")
         if env:
             kw['env'] = env
         return kw
 
     def set_paths(self, env_path, working_dir=NotImplemented):
         """
-        This "freezes" the path and the working directory in one go
+        This "freezes" the PATH environemnt variable and the current
+        working directory (CWD) for this instance in one go.  By default
+        if CWD is not provided it will be frozen at wherever the CWD is
+        at when this was invoked, otherwise ``None`` can be passed to
+        not have this set.
 
         Reasoning is that typically within calmjs the setting of the
-        environment path is done through the 'npm bin', and that relies
-        **heavily** on the current working directory.  However we are
-        not coupling that into these classes so just provide a default
-        hook that also set current working directory if only env_path
-        was provided, so that the path actually make sense.
+        environment path is done through the 'npm bin', and that it
+        relies on the current working directory if ``NODE_PATH`` was not
+        already defined, and that quite often PATH points to the actual
+        ``node`` or ``npm`` binary that the users of these instances
+        want to invoke, and that if they want to, they would also have
+        constructed these instances with inst.node_path already defined.
         """
 
         if env_path and working_dir is NotImplemented:
@@ -537,10 +559,10 @@ class Driver(NodeDriver):
 
         If the argument 'env' is supplied, they will be additional
         environment variables that are not already defined by the
-        framework.  By default these are 'NODE_PATH' and 'PATH', which
-        should be set by the node_path and env_path attribute of
-        instances of this class through the constructor or set_paths
-        method - those values will take precedence.
+        framework, which are 'NODE_PATH' and 'PATH'.  Values set for
+        those will have highest precedence, then the ones passed in
+        through env, then finally whatever was already defined before
+        the execution of this program.
 
         All other arguments to this method will be passed forward to the
         pkg_manager_init method, if the package_name is supplied for the

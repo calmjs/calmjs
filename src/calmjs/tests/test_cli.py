@@ -316,12 +316,13 @@ class CliDriverTestCase(unittest.TestCase):
 
     def test_set_node_path(self):
         stub_mod_call(self, cli)
-        driver = cli.Driver(node_path='./node_mods', pkg_manager_bin='mgr')
+        node_path = mkdtemp(self)
+        driver = cli.Driver(node_path=node_path, pkg_manager_bin='mgr')
 
         # ensure env is passed into the call.
         driver.pkg_manager_install()
         self.assertEqual(self.call_args, ((['mgr', 'install'],), {
-            'env': {'NODE_PATH': './node_mods'},
+            'env': {'NODE_PATH': node_path},
         }))
 
         # will be overridden by instance settings.
@@ -331,28 +332,44 @@ class CliDriverTestCase(unittest.TestCase):
             'NODE_PATH': '/tmp/somewhere/else/node_mods',
         })
         self.assertEqual(self.call_args, ((['mgr', 'install'],), {
-            'env': {'NODE_PATH': './node_mods', 'MGR_ENV': 'dev', 'PATH': '.'},
+            'env': {'NODE_PATH': node_path, 'MGR_ENV': 'dev', 'PATH': '.'},
         }))
 
     def test_set_paths(self):
         stub_mod_call(self, cli)
+        somepath = mkdtemp(self)
         driver = cli.Driver(pkg_manager_bin='mgr')
-        driver.set_paths('some_path')
+        driver.set_paths(somepath)
         # ensure env and cwdis passed into the call.
         driver.pkg_manager_install()
         args, kwargs = self.call_args
-        self.assertEqual(kwargs['env']['PATH'].split(pathsep)[0], 'some_path')
+        self.assertEqual(kwargs['env']['PATH'].split(pathsep)[0], somepath)
+        self.assertEqual(kwargs['cwd'], driver.working_dir)
+
+    def test_set_paths_not_exists(self):
+        stub_mod_call(self, cli)
+        driver = cli.Driver(pkg_manager_bin='mgr')
+        bad_path = '/no/such/path/for/sure/at/here'
+        driver.set_paths(bad_path)
+        # ensure env and cwdis passed into the call.
+        driver.pkg_manager_install()
+        args, kwargs = self.call_args
+        self.assertNotEqual(kwargs['env']['PATH'].split(pathsep)[0], bad_path)
+        # This is still set because verification is only done at calling
+        # time of the install method - so the path could have existed at
+        # the time of assignment but got removed later.
         self.assertEqual(kwargs['cwd'], driver.working_dir)
 
     def test_set_paths_no_working_dir(self):
         stub_mod_call(self, cli)
+        some_path = mkdtemp(self)
         driver = cli.Driver(pkg_manager_bin='mgr')
         # explicitly disable setting of cwd.
-        driver.set_paths('some_path', None)
+        driver.set_paths(some_path, None)
         # ensure env is passed into the call.
         driver.pkg_manager_install()
         args, kwargs = self.call_args
-        self.assertEqual(kwargs['env']['PATH'].split(pathsep)[0], 'some_path')
+        self.assertEqual(kwargs['env']['PATH'].split(pathsep)[0], some_path)
         self.assertNotIn('cwd', kwargs)
 
     def test_set_paths_none(self):
@@ -371,16 +388,17 @@ class CliDriverTestCase(unittest.TestCase):
     def test_set_paths_just_cwd(self):
         # no idea why, but sure.
         stub_mod_call(self, cli)
+        some_cwd = mkdtemp(self)
         driver = cli.Driver(pkg_manager_bin='mgr')
         # explicitly disable setting of cwd.
-        driver.set_paths(None, 'some_cwd')
+        driver.set_paths(None, some_cwd)
         self.assertIs(driver.env_path, None)
-        self.assertEqual(driver.working_dir, 'some_cwd')
+        self.assertEqual(driver.working_dir, some_cwd)
         # ensure nothing is passed through
         driver.pkg_manager_install()
         args, kwargs = self.call_args
         self.assertNotIn('PATH', kwargs)
-        self.assertEqual(kwargs['cwd'], 'some_cwd')
+        self.assertEqual(kwargs['cwd'], some_cwd)
 
     def test_set_binary(self):
         stub_mod_call(self, cli)
