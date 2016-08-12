@@ -33,11 +33,11 @@ class NpmTestCase(unittest.TestCase):
         remember_cwd(self)
         stub_os_environ(self)
         # Forcibly enable interactive mode.
-        self.inst_interactive, npm._inst.interactive = (
-            npm._inst.interactive, True)
+        self.inst_interactive, npm.npm.cli_driver.interactive = (
+            npm.npm.cli_driver.interactive, True)
 
     def tearDown(self):
-        npm._inst.interactive = self.inst_interactive
+        npm.npm.cli_driver.interactive = self.inst_interactive
 
     def test_npm_no_path(self):
         # XXX should be in npm
@@ -176,11 +176,11 @@ class NpmDriverInitTestCase(unittest.TestCase):
         stub_dist_flatten_package_json(self, [cli], working_set)
         stub_mod_check_interactive(self, [cli], True)
         # also save this
-        self.inst_interactive = npm._inst.interactive
+        self.inst_interactive = npm.npm.cli_driver.interactive
 
     def tearDown(self):
         # so it can be restored.
-        npm._inst.interactive = self.inst_interactive
+        npm.npm.cli_driver.interactive = self.inst_interactive
 
     def test_npm_init_new_non_interactive(self):
         tmpdir = mkdtemp(self)
@@ -225,7 +225,7 @@ class NpmDriverInitTestCase(unittest.TestCase):
         os.chdir(tmpdir)
 
         # force autodetected interactivity to be True
-        npm._inst.interactive = True
+        npm.npm.cli_driver.interactive = True
         self.assertFalse(npm.npm_init('foo', interactive=True))
 
         with open(join(tmpdir, 'package.json')) as fd:
@@ -437,7 +437,7 @@ class NpmDriverInitTestCase(unittest.TestCase):
         })
 
     def test_npm_init_existing_broken_no_overwrite_non_interactive(self):
-        npm._inst.interactive = False
+        npm.npm.cli_driver.interactive = False
 
         tmpdir = mkdtemp(self)
         # Broken json
@@ -738,15 +738,8 @@ class DistCommandTestCase(unittest.TestCase):
         # also log handlers removed.
         self.assertEqual(len(getLogger('calmjs.cli').handlers), 0)
 
-    # Other miscellenous tests
-
     @unittest.skipIf(npm.get_npm_version() is None, 'npm not found.')
     def test_npm_bin_get(self):
-        bin_dir = npm.npm_bin()
-        self.assertTrue(bin_dir.endswith('bin'))
-
-    def test_npm_bin_fail(self):
-        stub_os_environ(self)
-        os.environ['PATH'] = ''
-        bin_dir = npm.npm_bin()
-        self.assertIsNone(bin_dir)
+        # also test that the cli_driver can actually run...
+        bin_dir, stderr = npm.npm.cli_driver.run(['bin'])
+        self.assertIn('bin', bin_dir)

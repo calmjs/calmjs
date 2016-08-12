@@ -42,15 +42,3 @@ class npm(GenericPackageManagerCommand):
     description = "npm compatibility helper"
 
 npm._initialize_user_options()
-
-
-def npm_bin(inst=_inst):
-    """
-    Returns output of 'npm bin' from the current working directory.
-    """
-
-    try:
-        stdout, stderr = inst.run(['bin'])
-        return stdout.strip()
-    except OSError:
-        return None
