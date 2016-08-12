@@ -232,10 +232,22 @@ def prompt(question, validator=None,
 
 class BaseDriver(object):
     """
-    The nodejs interfacing base driver class.  Basically all tools that
-    talk to nodejs and their tools should inherit from this for some
-    helpful methods, such as ones that make shelling out to those nodejs
-    binaries with more consistent conventions to be managed, and more.
+    The nodejs interfacing base driver class.
+
+    Classes under the calmjs framework that make use of nodejs or nodejs
+    binaries should make this as the base class to make accessing the
+    nodejs environment in a manner consistent with the framework, where
+    various defined attributes and helper methods that makes use of
+    those will make interfacing with the nodejs environment be under a
+    consistently managed scheme.
+
+    Helper methods such as _exec will ensure the binary is executed
+    with the right arguments (via _gen_call_kws).  The dump/dumps method
+    invokes the underlying functions of the same name from the json
+    module with the attributes defined to ensure human readability by
+    default.  Finally, join_cwd joins a target path with the working
+    directory defined for instances of this, so that target path can be
+    accessed in a more explicit way.
     """
 
     def __init__(self, node_path=None, env_path=None, working_dir=None,

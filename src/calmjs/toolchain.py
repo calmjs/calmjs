@@ -45,6 +45,8 @@ from os.path import isdir
 from os.path import realpath
 from tempfile import mkdtemp
 
+from calmjs.cli import BaseDriver
+
 logger = logging.getLogger(__name__)
 
 
@@ -100,12 +102,21 @@ class Spec(dict):
                     logger.exception('Spec callback execution: got %s', values)
 
 
-class Toolchain(object):
+class Toolchain(BaseDriver):
     """
     For shared methods between all toolchains.
+
+    This class inherits from the BaseDriver in the cli class, as this is
+    typically used for interfacing with various nodejs cli tools so that
+    the final artifacts (bundles) can be created.
     """
 
-    def __init__(self):
+    def __init__(self, *a, **kw):
+        """
+        Refer to parent for exact arguments.
+        """
+
+        super(Toolchain, self).__init__(*a, **kw)
         self.transpiler = NotImplemented
         self.opener = _opener
 
@@ -137,8 +148,6 @@ class Toolchain(object):
         Implementation can make use of this to do pre-compilation
         checking and/or other validation steps in order to result in a
         successful compilation run.
-
-        This step is optional.
         """
 
     def compile_all(self, spec):
