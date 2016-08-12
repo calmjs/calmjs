@@ -10,6 +10,7 @@ from os.path import exists
 from os.path import join
 from os.path import pathsep
 import pkg_resources
+import warnings
 
 from calmjs import cli
 from calmjs.testing.mocks import MockProvider
@@ -243,6 +244,11 @@ class CliBaseDriverClassTestCase(unittest.TestCase):
         result = driver.join_cwd()
         self.assertEqual(result, driver.working_dir)
 
+    def test_which(self):
+        driver = cli.BaseDriver()
+        # no binary, no nothing.
+        self.assertIsNone(driver.which())
+
 
 class CliDriverTestCase(unittest.TestCase):
     """
@@ -413,10 +419,114 @@ class CliDriverTestCase(unittest.TestCase):
     def test_set_binary(self):
         stub_mod_call(self, cli)
         driver = cli.PackageManagerDriver(pkg_manager_bin='bower')
-
         # this will call ``bower install`` instead.
         driver.pkg_manager_install()
         self.assertEqual(self.call_args, ((['bower', 'install'],), {}))
+
+    def test_which_is_none(self):
+        driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
+        self.assertIsNone(driver.which())
+        driver.env_path = mkdtemp(self)
+        self.assertIsNone(driver.which())
+
+    def test_which_is_set(self):
+        stub_os_environ(self)
+        tmpdir = mkdtemp(self)
+        # fake an executable
+        mgr_bin = join(tmpdir, 'mgr')
+        with open(mgr_bin, 'w'):
+            pass
+        os.chmod(mgr_bin, 0o777)
+
+        driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
+        # With env_path is set
+        driver.env_path = tmpdir
+        self.assertEqual(driver.which(), mgr_bin)
+
+        driver.env_path = None
+        self.assertIsNone(driver.which())
+
+        # with an explicitly defined environ PATH
+        os.environ['PATH'] = tmpdir
+
+    def test_set_env_path_with_node_modules_fail(self):
+        stub_os_environ(self)
+        tmpdir = mkdtemp(self)
+        driver = cli.PackageManagerDriver(
+            pkg_manager_bin='mgr', working_dir=tmpdir)
+        driver._set_env_path_with_node_modules()
+        self.assertIsNone(driver.env_path)
+
+    def test_set_env_path_with_node_modules_error(self):
+        stub_os_environ(self)
+        tmpdir = mkdtemp(self)
+        driver = cli.PackageManagerDriver(
+            pkg_manager_bin='mgr', working_dir=tmpdir)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter('error')
+            with self.assertRaises(RuntimeWarning) as e:
+                driver._set_env_path_with_node_modules(warn=True)
+            self.assertIn(
+                "Unable to locate the 'mgr' binary;", str(e.exception))
+
+    def test_set_env_path_with_node_modules_warning(self):
+        stub_os_environ(self)
+        tmpdir = mkdtemp(self)
+        driver = cli.PackageManagerDriver(
+            pkg_manager_bin='mgr', working_dir=tmpdir)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            driver._set_env_path_with_node_modules(warn=True)
+
+    def test_set_env_path_with_node_modules_success(self):
+        stub_os_environ(self)
+        tmpdir = mkdtemp(self)
+        # fake an executable in node_modules
+        bin_dir = join(tmpdir, 'node_modules', '.bin')
+        os.makedirs(bin_dir)
+        mgr_bin = join(bin_dir, 'mgr')
+        with open(mgr_bin, 'w'):
+            pass
+        os.chmod(mgr_bin, 0o777)
+
+        driver = cli.PackageManagerDriver(
+            pkg_manager_bin='mgr', working_dir=tmpdir)
+        self.assertIsNone(driver.env_path)
+        driver._set_env_path_with_node_modules()
+        self.assertEqual(driver.env_path, bin_dir)
+        # should still result in the same thing.
+        driver._set_env_path_with_node_modules()
+        self.assertEqual(driver.env_path, bin_dir)
+
+    def test_driver_run_failure(self):
+        # testing for success may actually end up being extremely
+        # annoying, so we are going to avoid that and let the integrated
+        # subclasses deal with it.
+        stub_os_environ(self)
+        driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
+        os.environ['PATH'] = ''
+        with self.assertRaises(OSError):
+            driver.run()
+
+    # Helpers for getting a module level default instance up
+
+    def test_driver_create_failure(self):
+        with self.assertRaises(TypeError):
+            # can't create the parent one as it is not subclassed like
+            # the following
+            cli.PackageManagerDriver.create()
+
+    def test_driver_create(self):
+        class Driver(cli.PackageManagerDriver):
+            def __init__(self, **kw):
+                kw['pkg_manager_bin'] = 'mgr'
+                super(Driver, self).__init__(**kw)
+
+        inst = Driver.create()
+        self.assertTrue(isinstance(inst, Driver))
+
 
     # Should really put more tests of these kind in here, but the more
     # concrete implementations have done so.  This weird version here

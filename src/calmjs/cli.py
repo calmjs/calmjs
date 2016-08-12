@@ -4,10 +4,11 @@ from __future__ import unicode_literals
 import difflib
 import logging
 import json
+import os
 import re
 import sys
+import warnings
 from locale import getpreferredencoding
-import os
 from os import fstat
 from os import getcwd
 from os.path import isdir
@@ -24,6 +25,7 @@ from subprocess import call
 from calmjs.dist import flatten_package_json
 from calmjs.dist import DEFAULT_JSON
 from calmjs.dist import DEP_KEYS
+from calmjs.utils import which
 
 __all__ = [
     'BaseDriver',
@@ -275,6 +277,57 @@ class BaseDriver(object):
         self.working_dir = working_dir
         self.indent = indent
         self.separators = separators
+        self.binary = None
+
+    def which(self):
+        """
+        Figure out which binary this will execute.
+        """
+
+        if self.binary is None:
+            return None
+
+        if self.env_path:
+            return which(self.binary, path=self.env_path)
+        else:
+            return which(self.binary)
+
+    def _set_env_path_with_node_modules(self, warn=False):
+        """
+        Attempt to locate and set the paths to the binary with the
+        working directory defined for this instance.
+        """
+
+        if self.which() is not None:
+            return
+
+        node_path = os.environ.get(NODE_PATH, self.join_cwd('node_modules'))
+        env_path = join(node_path, '.bin')
+        if which(self.binary, path=env_path):
+            # Only setting the path specific for the binary; side effect
+            # will be whoever else borrowing the _exec in here might not
+            # get the binary they want.  That's why it's private.
+            self.env_path = env_path
+        elif warn:
+            warnings.warn(
+                "Unable to locate the '%(binary)s' binary; default module "
+                "level functions will not work. Please either provide "
+                "%(PATH)s and/or update %(PATH)s environment variable "
+                "with one that provides '%(binary)s'; or specify a "
+                "working %(NODE_PATH)s environment variable with "
+                "%(binary)s installed; or have install '%(binary)s' into "
+                "the current working directory (%(cwd)s) either through "
+                "npm or calmjs framework for this package. Restart or "
+                "reload this module once that is done. Alternatively, "
+                "create a manual Driver instance for '%(binary)s' with "
+                "explicitly defined arguments." % {
+                    'binary': self.binary,
+                    'PATH': 'PATH',
+                    'NODE_PATH': NODE_PATH,
+                    'cwd': self.join_cwd(),
+                },
+                RuntimeWarning,
+            )
 
     def _gen_call_kws(self, **env):
         kw = {}
@@ -381,7 +434,7 @@ class NodeDriver(BaseDriver):
         """
 
         super(NodeDriver, self).__init__(*a, **kw)
-        self.node_bin = node_bin
+        self.binary = self.node_bin = node_bin
 
     def get_node_version(self):
         kw = self._gen_call_kws()
@@ -434,7 +487,7 @@ class PackageManagerDriver(NodeDriver):
         """
 
         super(PackageManagerDriver, self).__init__(*a, **kw)
-        self.pkg_manager_bin = pkg_manager_bin
+        self.binary = self.pkg_manager_bin = pkg_manager_bin
         self.pkgdef_filename = pkgdef_filename
         self.prompt = prompt
         self.install_cmd = install_cmd
@@ -457,6 +510,19 @@ class PackageManagerDriver(NodeDriver):
             # this should trigger default exception with right error msg
             return self.__getattribute__(name)
         return lookup[name]
+
+    @classmethod
+    def create(cls):
+        """
+        This was originally designed to be invoked at the module level
+        for packages that implement specific support, but this can be
+        used to create an instance that has the nodejs backed executable
+        be found via current directory's node_modules or NODE_PATH.
+        """
+
+        inst = cls()
+        inst._set_env_path_with_node_modules()
+        return inst
 
     def get_pkg_manager_version(self):
         kw = self._gen_call_kws()
