@@ -63,7 +63,7 @@ def _opener(*a):
     return codecs.open(*a, encoding='utf-8')
 
 
-def null_transpiler(reader, writer):
+def null_transpiler(spec, reader, writer):
     writer.write(reader.read())
 
 
@@ -117,20 +117,28 @@ class Toolchain(BaseDriver):
         """
 
         super(Toolchain, self).__init__(*a, **kw)
-        self.transpiler = NotImplemented
         self.opener = _opener
+        self.setup_transpiler()
+
+    def setup_transpiler(self):
+        """
+        Subclasses will need to implement this to setup the transpiler
+        attribute, which the compile method will invoke.
+        """
+
+        self.transpiler = NotImplemented
 
     def _validate_build_target(self, spec, target):
         if not realpath(target).startswith(spec['build_dir']):
             raise ValueError('build_target %s is outside build_dir' % target)
 
-    def compile(self, source, target):
+    def compile(self, spec, source, target):
         logger.info('Compiling %s to %s', source, target)
         if not exists(dirname(target)):
             makedirs(dirname(target))
         opener = self.opener
         with opener(source, 'r') as reader, opener(target, 'w') as writer:
-            self.transpiler(reader, writer)
+            self.transpiler(spec, reader, writer)
 
     def _gen_req_src_targets(self, d):
         # modname = CommonJS require/import module name.
@@ -172,7 +180,7 @@ class Toolchain(BaseDriver):
             module_names.append(modname)
             compile_target = join(spec['build_dir'], target)
             self._validate_build_target(spec, compile_target)
-            self.compile(source, compile_target)
+            self.compile(spec, source, compile_target)
 
         for modname, source, target in self._gen_req_src_targets(
                 bundled_source_map):
@@ -280,6 +288,8 @@ class NullToolchain(Toolchain):
 
     def __init__(self):
         super(NullToolchain, self).__init__()
+
+    def setup_transpiler(self):
         self.transpiler = null_transpiler
 
     def prepare(self, spec):

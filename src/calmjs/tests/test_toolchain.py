@@ -220,7 +220,8 @@ class NullToolchainTestCase(unittest.TestCase):
         with open(source, 'w') as fd:
             fd.write(js_code)
 
-        self.toolchain.compile(source, target)
+        spec = Spec()
+        self.toolchain.compile(spec, source, target)
 
         with open(target) as fd:
             result = fd.read()
