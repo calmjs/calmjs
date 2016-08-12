@@ -235,9 +235,13 @@ class CliBaseDriverClassTestCase(unittest.TestCase):
         driver = cli.BaseDriver()
         self.assertTrue(driver.join_cwd('bar').startswith(os.getcwd()))
         driver.working_dir = mkdtemp(self)
+
         result = driver.join_cwd('bar')
         self.assertTrue(result.startswith(driver.working_dir))
         self.assertTrue(result.endswith('bar'))
+
+        result = driver.join_cwd()
+        self.assertEqual(result, driver.working_dir)
 
 
 class CliDriverTestCase(unittest.TestCase):

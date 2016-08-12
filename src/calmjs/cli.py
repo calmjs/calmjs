@@ -357,7 +357,9 @@ class BaseDriver(object):
             logger.debug(
                 "instance 'working_dir' unset; default to process '%s'", cwd)
 
-        return join(cwd, path)
+        if path:
+            return join(cwd, path)
+        return cwd
 
 
 class NodeDriver(BaseDriver):
