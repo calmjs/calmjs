@@ -13,24 +13,17 @@ from calmjs.dist import write_json_file
 from calmjs.command import GenericPackageManagerCommand
 
 PACKAGE_FIELD = 'package_json'
-PACKAGE_JSON = 'package.json'
+PACKAGE_JSON = package_json = 'package.json'
 NPM = 'npm'
-
-
-def Driver(interactive=False):
-    return cli.PackageManagerDriver(
-        interactive=False,
-        pkg_manager_bin=NPM, pkgdef_filename=PACKAGE_JSON)
-
-
-_inst = Driver()
-get_node_version = _inst.get_node_version
-get_npm_version = _inst.get_npm_version
-npm_init = _inst.npm_init
-npm_install = _inst.npm_install
-package_json = _inst.pkgdef_filename
-
 write_package_json = partial(write_json_file, PACKAGE_FIELD)
+
+
+class Driver(cli.PackageManagerDriver):
+
+    def __init__(self, **kw):
+        kw['pkg_manager_bin'] = NPM
+        kw['pkgdef_filename'] = PACKAGE_JSON
+        super(Driver, self).__init__(**kw)
 
 
 class npm(GenericPackageManagerCommand):
@@ -38,7 +31,8 @@ class npm(GenericPackageManagerCommand):
     The npm specific setuptools command.
     """
 
-    cli_driver = _inst
+    # modules globals will be populated with friendly exported names.
+    cli_driver = Driver.create(globals())
     description = "npm compatibility helper"
 
 npm._initialize_user_options()
