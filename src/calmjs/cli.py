@@ -498,21 +498,38 @@ class PackageManagerDriver(NodeDriver):
         if self.interactive is None:
             self.interactive = check_interactive()
 
-    def __getattr__(self, name):
-        lookup = {
-            'get_' + self.pkg_manager_bin + '_version':
-                self.get_pkg_manager_version,
-            self.pkg_manager_bin + '_init': self.pkg_manager_init,
-            self.pkg_manager_bin + '_' + self.install_cmd:
-                self.pkg_manager_install,
+    @property
+    def _aliases(self):
+        # using explicit pkg_manager_bin because well, things can get
+        # overwritten by subclasses
+        names = [
+            'pkg_manager_bin', 'get_pkg_manager_version', 'pkg_manager_init',
+            'pkg_manager_install', 'install_cmd',
+        ]
+
+        g = {}
+
+        for name in names:
+            g[name] = super(PackageManagerDriver, self).__getattribute__(name)
+
+        return {
+            'get_%(pkg_manager_bin)s_version' % g:
+                g['get_pkg_manager_version'],
+            '%(pkg_manager_bin)s_init' % g:
+                g['pkg_manager_init'],
+            '%(pkg_manager_bin)s_%(install_cmd)s' % g:
+                g['pkg_manager_install'],
         }
+
+    def __getattr__(self, name):
+        lookup = super(PackageManagerDriver, self).__getattribute__('_aliases')
         if name not in lookup:
             # this should trigger default exception with right error msg
             return self.__getattribute__(name)
         return lookup[name]
 
     @classmethod
-    def create(cls):
+    def create(cls, scope_vars=None):
         """
         This was originally designed to be invoked at the module level
         for packages that implement specific support, but this can be
@@ -521,7 +538,9 @@ class PackageManagerDriver(NodeDriver):
         """
 
         inst = cls()
-        inst._set_env_path_with_node_modules()
+        inst._set_env_path_with_node_modules(warn=(scope_vars is not None))
+        if scope_vars is not None:
+            scope_vars.update(inst._aliases)
         return inst
 
     def get_pkg_manager_version(self):

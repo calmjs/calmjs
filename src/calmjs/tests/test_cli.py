@@ -527,6 +527,23 @@ class CliDriverTestCase(unittest.TestCase):
         inst = Driver.create()
         self.assertTrue(isinstance(inst, Driver))
 
+    def test_module_level_driver_create(self):
+        class Driver(cli.PackageManagerDriver):
+            def __init__(self, **kw):
+                kw['pkg_manager_bin'] = 'mgr'
+                super(Driver, self).__init__(**kw)
+
+        values = {}
+
+        with warnings.catch_warnings():
+            # Don't spat out stderr
+            warnings.simplefilter('ignore')
+            Driver.create(values)
+
+        # Normally, these will be global names.
+        self.assertIn('mgr_install', values)
+        self.assertIn('mgr_init', values)
+        self.assertIn('get_mgr_version', values)
 
     # Should really put more tests of these kind in here, but the more
     # concrete implementations have done so.  This weird version here
