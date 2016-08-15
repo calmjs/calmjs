@@ -249,6 +249,15 @@ class CliBaseDriverClassTestCase(unittest.TestCase):
         # no binary, no nothing.
         self.assertIsNone(driver.which())
 
+    def test_set_env_path_with_node_modules_undefined(self):
+        driver = cli.BaseDriver()
+        with self.assertRaises(ValueError) as e:
+            driver._set_env_path_with_node_modules()
+        self.assertEqual(
+            str(e.exception),
+            "binary undefined for 'calmjs.cli:BaseDriver' instance"
+        )
+
 
 class CliDriverTestCase(unittest.TestCase):
     """
@@ -457,30 +466,20 @@ class CliDriverTestCase(unittest.TestCase):
         driver._set_env_path_with_node_modules()
         self.assertIsNone(driver.env_path)
 
-    def test_set_env_path_with_node_modules_error(self):
-        stub_os_environ(self)
-        tmpdir = mkdtemp(self)
-        driver = cli.PackageManagerDriver(
-            pkg_manager_bin='mgr', working_dir=tmpdir)
-
-        with warnings.catch_warnings():
-            warnings.simplefilter('error')
-            with self.assertRaises(RuntimeWarning) as e:
-                driver._set_env_path_with_node_modules(warn=True)
-            self.assertIn(
-                "Unable to locate the 'mgr' binary;", str(e.exception))
-
     def test_set_env_path_with_node_modules_warning(self):
         stub_os_environ(self)
         tmpdir = mkdtemp(self)
         driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', working_dir=tmpdir)
 
-        with warnings.catch_warnings():
-            warnings.simplefilter('ignore')
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter('always')
             driver._set_env_path_with_node_modules(warn=True)
+            self.assertTrue(issubclass(w[-1].category, RuntimeWarning))
+            self.assertIn(
+                "Unable to locate the 'mgr' binary;", str(w[-1].message))
 
-    def test_set_env_path_with_node_modules_success(self):
+    def fake_mgr_bin(self):
         stub_os_environ(self)
         tmpdir = mkdtemp(self)
         # fake an executable in node_modules
@@ -490,10 +489,27 @@ class CliDriverTestCase(unittest.TestCase):
         with open(mgr_bin, 'w'):
             pass
         os.chmod(mgr_bin, 0o777)
+        return tmpdir, bin_dir
 
+    def test_set_env_path_with_node_modules_success(self):
+        tmpdir, bin_dir = self.fake_mgr_bin()
+        # constructor with an explicit working directory.
         driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', working_dir=tmpdir)
         self.assertIsNone(driver.env_path)
+        driver._set_env_path_with_node_modules()
+        self.assertEqual(driver.env_path, bin_dir)
+        # should still result in the same thing.
+        driver._set_env_path_with_node_modules()
+        self.assertEqual(driver.env_path, bin_dir)
+
+    def test_set_env_path_with_node_path_success(self):
+        tmpdir, bin_dir = self.fake_mgr_bin()
+        # default constructor
+        driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
+        self.assertIsNone(driver.env_path)
+        # using NODE_PATH set to a valid node_modules
+        os.environ['NODE_PATH'] = join(tmpdir, 'node_modules')
         driver._set_env_path_with_node_modules()
         self.assertEqual(driver.env_path, bin_dir)
         # should still result in the same thing.

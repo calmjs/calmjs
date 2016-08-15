@@ -295,22 +295,55 @@ class BaseDriver(object):
         working directory defined for this instance.
         """
 
-        if self.which() is not None:
+        modcls_name = ':'.join((
+            self.__class__.__module__, self.__class__.__name__))
+
+        if self.binary is None:
+            raise ValueError(
+                "binary undefined for '%s' instance" % modcls_name)
+
+        logger.debug(
+            "locating '%s' node binary for %s instance...",
+            self.binary, modcls_name,
+        )
+
+        default = self.which()
+        if default is not None:
+            logger.debug(
+                "found '%s'; "
+                "not modifying PATH environment variable in instance of '%s'.",
+                default, modcls_name)
             return
 
-        node_path = os.environ.get(NODE_PATH, self.join_cwd('node_modules'))
+        node_path = os.environ.get(NODE_PATH)
+        if node_path:
+            logger.debug(
+                "environment variable '%s' defined (%s); "
+                "selected as base directory for finding node binaries.",
+                NODE_PATH, node_path,
+            )
+        else:
+            node_path = self.join_cwd('node_modules')
+            logger.debug(
+                "environment variable '%s' undefined; using instance's "
+                "working directory's node_modules (%s) as base directory for "
+                "finding node binaries.",
+                NODE_PATH, node_path,
+            )
+
         env_path = join(node_path, '.bin')
         if which(self.binary, path=env_path):
             # Only setting the path specific for the binary; side effect
             # will be whoever else borrowing the _exec in here might not
             # get the binary they want.  That's why it's private.
             logger.debug(
-                "located '%s' binary at '%s'; setting environment path for "
-                "instance", self.binary,  env_path
+                "located '%s' binary at '%s'; setting PATH environment "
+                "variable for '%s' instance.",
+                self.binary, env_path, modcls_name
             )
             self.env_path = env_path
         elif warn:
-            warnings.warn(
+            msg = (
                 "Unable to locate the '%(binary)s' binary; default module "
                 "level functions will not work. Please either provide "
                 "%(PATH)s and/or update %(PATH)s environment variable "
@@ -326,8 +359,17 @@ class BaseDriver(object):
                     'PATH': 'PATH',
                     'NODE_PATH': NODE_PATH,
                     'cwd': self.join_cwd(),
-                },
-                RuntimeWarning,
+                }
+            )
+            warnings.warn(msg, RuntimeWarning)
+            # Yes there may be duplicates, but warnings are governed
+            # differently.
+            logger.debug(msg)
+        else:
+            logger.debug(
+                "Unable to locate '%s'; not modifying PATH environment "
+                "variable for instance of '%s'.",
+                self.binary, modcls_name
             )
 
     def _gen_call_kws(self, **env):
