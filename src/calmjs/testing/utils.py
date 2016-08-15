@@ -148,29 +148,29 @@ def remember_cwd(testcase_inst):
 # I guess a bunch of the following stub functions can be replace by
 # mocks, but so far it's managable and limits extra dependencies on <3.5
 
-def stub_dist_flatten_package_json(testcase_inst, modules, working_set):
+def stub_dist_flatten_egginfo_json(testcase_inst, modules, working_set):
     """
-    Replace the flatten_package_json import from dist for the specified
+    Replace the flatten_egginfo_json import from dist for the specified
     modules.
     """
 
     from calmjs import dist
     from calmjs import npm
 
-    original_flatten_package_json = dist.flatten_package_json
+    original_flatten_egginfo_json = dist.flatten_egginfo_json
 
-    def flatten_package_json(
+    def flatten_egginfo_json(
             pkg_name, filename=npm.PACKAGE_JSON, dep_keys=dist.DEP_KEYS):
-        return original_flatten_package_json(
+        return original_flatten_egginfo_json(
             pkg_name, filename=filename, dep_keys=dep_keys,
             working_set=working_set
         )
 
     def restore(module):
-        module.flatten_package_json = original_flatten_package_json
+        module.flatten_egginfo_json = original_flatten_egginfo_json
 
     for module in modules:
-        module.flatten_package_json = flatten_package_json
+        module.flatten_egginfo_json = flatten_egginfo_json
         testcase_inst.addCleanup(restore, module)
 
 

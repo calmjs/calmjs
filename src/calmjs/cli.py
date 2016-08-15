@@ -22,7 +22,7 @@ from subprocess import PIPE
 from subprocess import check_output
 from subprocess import call
 
-from calmjs.dist import flatten_package_json
+from calmjs.dist import flatten_egginfo_json
 from calmjs.dist import DEFAULT_JSON
 from calmjs.dist import DEP_KEYS
 from calmjs.utils import which
@@ -644,17 +644,18 @@ class PackageManagerDriver(NodeDriver):
 
         # this will be modified in place
         original_json = {}
-        # package_json is the one that will get written out, if needed.
+        # pkgdef_filename is the one that will get written out, if
+        # needed.
         # remember the filename is in the context of the distribution,
         # not the filesystem.
-        package_json = flatten_package_json(
+        pkgdef_json = flatten_egginfo_json(
             package_name, filename=self.pkgdef_filename,
             dep_keys=self.dep_keys,
         )
 
-        if package_json.get(
+        if pkgdef_json.get(
                 self.pkg_name_field, NotImplemented) is NotImplemented:
-            package_json[self.pkg_name_field] = package_name
+            pkgdef_json[self.pkg_name_field] = package_name
 
         # Now we figure out the actual fiel we want to work with.
 
@@ -686,15 +687,15 @@ class PackageManagerDriver(NodeDriver):
             if merge:
                 # Merge the generated on top of the original.
                 updates = generate_merge_dict(
-                    self.dep_keys, original_json, package_json,
+                    self.dep_keys, original_json, pkgdef_json,
                 )
                 final = {}
                 final.update(original_json)
-                final.update(package_json)
+                final.update(pkgdef_json)
                 final.update(updates)
-                package_json = final
+                pkgdef_json = final
 
-            if original_json == package_json:
+            if original_json == pkgdef_json:
                 # Well, if original existing one is identical with the
                 # generated version, we got it, and we are done here.
                 # This also prevents the interactive prompt from firing.
@@ -711,7 +712,7 @@ class PackageManagerDriver(NodeDriver):
                     diff = '\n'.join(l for l in (
                         line.rstrip() for line in difflib.ndiff(
                             self.dumps(original_json).splitlines(),
-                            self.dumps(package_json).splitlines(),
+                            self.dumps(pkgdef_json).splitlines(),
                         ))
                         if l[:1] in '?+-' or l[-1:] in '{}' or l[-2:] == '},')
                     # set new overwrite value from user input.
@@ -737,10 +738,10 @@ class PackageManagerDriver(NodeDriver):
                 logger.warning("Not overwriting existing '%s'", pkgdef_path)
                 return False
 
-        if package_json:
+        if pkgdef_json:
             # Only write one if we actually got data.
             with open(pkgdef_path, 'w') as fd:
-                self.dump(package_json, fd)
+                self.dump(pkgdef_json, fd)
             logger.info("wrote '%s'", pkgdef_path)
 
         return True

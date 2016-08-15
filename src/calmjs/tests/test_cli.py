@@ -17,7 +17,7 @@ from calmjs.testing.mocks import MockProvider
 from calmjs.testing.utils import fake_error
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import remember_cwd
-from calmjs.testing.utils import stub_dist_flatten_package_json
+from calmjs.testing.utils import stub_dist_flatten_egginfo_json
 from calmjs.testing.utils import stub_mod_call
 from calmjs.testing.utils import stub_mod_check_output
 from calmjs.testing.utils import stub_os_environ
@@ -576,7 +576,7 @@ class CliDriverTestCase(unittest.TestCase):
             metadata=mock_provider, project_name='calmpy.pip', version='0.0.0')
         working_set = pkg_resources.WorkingSet()
         working_set.add(mock_dist)
-        stub_dist_flatten_package_json(self, [cli], working_set)
+        stub_dist_flatten_egginfo_json(self, [cli], working_set)
 
     def test_pkg_manager_init(self):
         # we still need a temporary directory, but the difference is

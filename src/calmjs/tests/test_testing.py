@@ -149,14 +149,14 @@ class TestingUtilsTestCase(unittest.TestCase):
         self.doCleanups()
         self.assertEqual(cwd, os.getcwd())
 
-    def test_stub_dist_flatten_package_json(self):
+    def test_stub_dist_flatten_egginfo_json(self):
         from calmjs import dist
-        original = dist.flatten_package_json
-        self.assertIs(dist.flatten_package_json, original)
-        utils.stub_dist_flatten_package_json(self, [dist], None)
-        self.assertIsNot(dist.flatten_package_json, original)
+        original = dist.flatten_egginfo_json
+        self.assertIs(dist.flatten_egginfo_json, original)
+        utils.stub_dist_flatten_egginfo_json(self, [dist], None)
+        self.assertIsNot(dist.flatten_egginfo_json, original)
         self.doCleanups()
-        self.assertIs(dist.flatten_package_json, original)
+        self.assertIs(dist.flatten_egginfo_json, original)
 
     def test_stub_mod_check_interactive(self):
         from calmjs import cli

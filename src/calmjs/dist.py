@@ -88,12 +88,12 @@ def get_pkg_dist(pkg_name, working_set=default_working_set):
     return working_set.find(req)
 
 
-def get_dist_package_json(dist, filename=DEFAULT_JSON):
+def get_dist_egginfo_json(dist, filename=DEFAULT_JSON):
     """
-    Safely get a package_json from a distribution.
+    Safely get a json within an egginfo from a distribution.
     """
 
-    # Then use the package's distribution to acquire the file.
+    # use the given package's istribution to acquire the json file.
     if not dist.has_metadata(filename):
         logger.debug("no '%s' for '%s'", filename, dist)
         return
@@ -115,21 +115,26 @@ def get_dist_package_json(dist, filename=DEFAULT_JSON):
     return obj
 
 
-def read_package_json(
+def read_egginfo_json(
         pkg_name, filename=DEFAULT_JSON, working_set=default_working_set):
     """
-    Read the package.json of a package identified by `pkg_name` that's
+    Read json from egginfo of a package identified by `pkg_name` that's
     already installed within the current Python environment.
     """
 
     dist = get_pkg_dist(pkg_name, working_set=working_set)
-    return get_dist_package_json(dist, filename)
+    return get_dist_egginfo_json(dist, filename)
 
 
-def flatten_dist_package_json(
+def flatten_dist_egginfo_json(
         source_dist, filename=DEFAULT_JSON, dep_keys=DEP_KEYS,
         working_set=default_working_set):
     """
+    Flatten a distribution's egginfo json, with the depended keys to be
+    flattened.
+
+    Originally this was done for this:
+
     Resolve a distribution's (dev)dependencies through the working set
     and generate a flattened version package.json, returned as a dict,
     from the resolved distributions.
@@ -153,7 +158,7 @@ def flatten_dist_package_json(
     # ensure that we have at least a dummy value
     if source_dist:
         requires = source_dist.requires()
-        root = get_dist_package_json(source_dist, filename) or {}
+        root = get_dist_egginfo_json(source_dist, filename) or {}
     else:
         requires = []
         root = {}
@@ -161,7 +166,7 @@ def flatten_dist_package_json(
     # Go from the earliest package down to the latest one, as we will
     # flatten children's d(evD)ependencies on top of parent's.
     for dist in reversed(working_set.resolve(requires)):
-        obj = get_dist_package_json(dist, filename)
+        obj = get_dist_egginfo_json(dist, filename)
         if not obj:
             continue
 
@@ -181,10 +186,15 @@ def flatten_dist_package_json(
     return root
 
 
-def flatten_package_json(
+def flatten_egginfo_json(
         pkg_name, filename=DEFAULT_JSON, dep_keys=DEP_KEYS,
         working_set=default_working_set):
     """
+    A shorthand calling convention where the package name is supplied
+    instead of a distribution.
+
+    Originally written for this:
+
     Generate a flattened package.json of a package `pkg_name` that's
     already installed within the current Python environment (defaults
     to the current global working_set which should have been set up
@@ -192,5 +202,5 @@ def flatten_package_json(
     """
 
     dist = get_pkg_dist(pkg_name, working_set=working_set)
-    return flatten_dist_package_json(
+    return flatten_dist_egginfo_json(
         dist, filename=filename, dep_keys=dep_keys, working_set=working_set)

@@ -165,10 +165,10 @@ class DistTestCase(unittest.TestCase):
         # Try reading a fake package.json from setuptools package
         # directly and see that it will just return nothing while not
         # exploding.
-        self.assertIsNone(calmjs_dist.read_package_json(
+        self.assertIsNone(calmjs_dist.read_egginfo_json(
             'setuptools', filename='_not_package.json'))
 
-    def test_get_dist_package_json(self):
+    def test_get_dist_egginfo_json(self):
         package_json = {"dependencies": {"left-pad": "~1.1.1"}}
 
         # We will mock up a Distribution object with some fake metadata.
@@ -179,7 +179,7 @@ class DistTestCase(unittest.TestCase):
         mock_dist = pkg_resources.Distribution(
             metadata=mock_provider, project_name='dummydist', version='0.0.0')
 
-        results = calmjs_dist.get_dist_package_json(mock_dist)
+        results = calmjs_dist.get_dist_egginfo_json(mock_dist)
 
         self.assertEqual(results, package_json)
 
@@ -196,7 +196,7 @@ class DistTestCase(unittest.TestCase):
         mock_dist = pkg_resources.Distribution(
             metadata=mock_provider, project_name='dummydist', version='0.0.0')
 
-        results = calmjs_dist.get_dist_package_json(mock_dist)
+        results = calmjs_dist.get_dist_egginfo_json(mock_dist)
 
         # Should still not fail.
         self.assertIsNone(results)
@@ -210,7 +210,7 @@ class DistTestCase(unittest.TestCase):
         })
         mock_dist = pkg_resources.Distribution(
             metadata=mock_provider, project_name='dummydist', version='0.0.0')
-        results = calmjs_dist.get_dist_package_json(mock_dist)
+        results = calmjs_dist.get_dist_egginfo_json(mock_dist)
         # Should still not fail.
         self.assertIsNone(results)
 
@@ -226,10 +226,10 @@ class DistTestCase(unittest.TestCase):
                 (self.pkgname, json.dumps(package_json)),
             ), pkgname='dummydist'
         )
-        results = calmjs_dist.get_dist_package_json(mock_dist)
+        results = calmjs_dist.get_dist_egginfo_json(mock_dist)
         self.assertEqual(results['dependencies']['left-pad'], '~1.1.1')
 
-    def test_get_dist_package_json_alternative_name_args(self):
+    def test_get_dist_egginfo_json_alternative_name_args(self):
         package_json = {"dependencies": {"left-pad": "~1.1.1"}}
 
         # We will mock up a Distribution object with some fake metadata.
@@ -240,7 +240,7 @@ class DistTestCase(unittest.TestCase):
         mock_dist = pkg_resources.Distribution(
             metadata=mock_provider, project_name='dummydist', version='0.0.0')
 
-        results = calmjs_dist.get_dist_package_json(
+        results = calmjs_dist.get_dist_egginfo_json(
             mock_dist, filename='bower.json')
 
         self.assertEqual(results, package_json)
@@ -248,18 +248,18 @@ class DistTestCase(unittest.TestCase):
         working_set = pkg_resources.WorkingSet()
         working_set.add(mock_dist)
 
-        self.assertEqual(package_json, calmjs_dist.read_package_json(
+        self.assertEqual(package_json, calmjs_dist.read_egginfo_json(
             'dummydist', filename='bower.json', working_set=working_set))
 
         # Finally do the flattening
         flattened_json = {
             "dependencies": {"left-pad": "~1.1.1"}, "devDependencies": {}}
-        self.assertEqual(flattened_json, calmjs_dist.flatten_dist_package_json(
+        self.assertEqual(flattened_json, calmjs_dist.flatten_dist_egginfo_json(
             mock_dist, filename='bower.json', working_set=working_set))
-        self.assertEqual(flattened_json, calmjs_dist.flatten_package_json(
+        self.assertEqual(flattened_json, calmjs_dist.flatten_egginfo_json(
             'dummydist', filename='bower.json', working_set=working_set))
 
-    def tests_flatten_package_json_deps(self):
+    def tests_flatten_egginfo_json_deps(self):
         # Quiet stdout from distutils logs
         stub_stdouts(self)
         make_dummy_dist(self, (
@@ -361,16 +361,16 @@ class DistTestCase(unittest.TestCase):
         working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
 
         # Ensure that this works with a raw requirement object
-        result = calmjs_dist.flatten_dist_package_json(
+        result = calmjs_dist.flatten_dist_egginfo_json(
             site, working_set=working_set)
         self.assertEqual(result, answer)
 
         # Also a raw requirement (package) string on the other function.
-        result = calmjs_dist.flatten_package_json(
+        result = calmjs_dist.flatten_egginfo_json(
             'site', working_set=working_set)
         self.assertEqual(result, answer)
 
-    def tests_flatten_package_json_multi_version(self):
+    def tests_flatten_egginfo_json_multi_version(self):
         """
         Need to ensure the *correct* version is picked.
         """
@@ -426,7 +426,7 @@ class DistTestCase(unittest.TestCase):
             },
             'devDependencies': {},
         }
-        result = calmjs_dist.flatten_package_json(
+        result = calmjs_dist.flatten_egginfo_json(
             'app', working_set=working_set)
         self.assertEqual(result, answer)
 
@@ -444,11 +444,11 @@ class DistTestCase(unittest.TestCase):
             },
             'devDependencies': {},
         }
-        result = calmjs_dist.flatten_package_json(
+        result = calmjs_dist.flatten_egginfo_json(
             'app', working_set=working_set)
         self.assertEqual(result, answer)
 
-    def tests_flatten_package_json_missing_complete(self):
+    def tests_flatten_egginfo_json_missing_complete(self):
         """
         A completely missing egg should not just blow up.
         """
@@ -456,10 +456,10 @@ class DistTestCase(unittest.TestCase):
         working_set = pkg_resources.WorkingSet()
         self.assertEqual(
             {'dependencies': {}, 'devDependencies': {}},
-            calmjs_dist.flatten_package_json(
+            calmjs_dist.flatten_egginfo_json(
                 'nosuchpkg', working_set=working_set))
 
-    def tests_flatten_package_json_missing_deps(self):
+    def tests_flatten_egginfo_json_missing_deps(self):
         """
         Missing dependencies should not cause a hard failure.
         """
@@ -474,9 +474,9 @@ class DistTestCase(unittest.TestCase):
 
         # Python dependency acquisition failures should fail hard.
         with self.assertRaises(pkg_resources.DistributionNotFound):
-            calmjs_dist.flatten_package_json('app', working_set=working_set)
+            calmjs_dist.flatten_egginfo_json('app', working_set=working_set)
 
-    def tests_flatten_package_json_nulled(self):
+    def tests_flatten_egginfo_json_nulled(self):
         """
         Need to ensure the *correct* version is picked.
         """
@@ -512,6 +512,6 @@ class DistTestCase(unittest.TestCase):
             },
             'devDependencies': {},
         }
-        result = calmjs_dist.flatten_package_json(
+        result = calmjs_dist.flatten_egginfo_json(
             'app', working_set=working_set)
         self.assertEqual(result, answer)
