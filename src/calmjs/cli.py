@@ -287,10 +287,7 @@ class BaseDriver(object):
         if self.binary is None:
             return None
 
-        if self.env_path:
-            return which(self.binary, path=self.env_path)
-        else:
-            return which(self.binary)
+        return which(self.binary, path=self.env_path)
 
     def _set_env_path_with_node_modules(self, warn=False):
         """
@@ -307,6 +304,10 @@ class BaseDriver(object):
             # Only setting the path specific for the binary; side effect
             # will be whoever else borrowing the _exec in here might not
             # get the binary they want.  That's why it's private.
+            logger.debug(
+                "located '%s' binary at '%s'; setting environment path for "
+                "instance", self.binary,  env_path
+            )
             self.env_path = env_path
         elif warn:
             warnings.warn(
