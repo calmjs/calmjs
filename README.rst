@@ -1,8 +1,9 @@
 calmjs
 ======
 
-A framework for building toolchains and machineries for working with
-JavaScript from the Python environment.
+A framework for building toolchains and utilities for working with
+JavaScript, either source from NodeJS based package repositories or
+shipped with Python packages from the Python environment.
 
 .. image:: https://travis-ci.org/calmjs/calmjs.svg?branch=master
     :target: https://travis-ci.org/calmjs/calmjs
@@ -45,7 +46,7 @@ framework.
 Features
 --------
 
-Manage dependencies on JavaScript modules (hosted by ``npm`` or others).
+Manage dependencies of JavaScript modules (hosted by ``npm`` or others)
     By providing ``setuptools`` command hooks, ``calmjs`` enables the
     management of the ``package.json`` for Python modules.  In the
     typical use case, this means the management of ``dependencies`` /
@@ -61,7 +62,7 @@ Manage dependencies on JavaScript modules (hosted by ``npm`` or others).
     In other words, subsequent Python packages can readily generate and
     reuse its parent(s) ``package.json`` file with ease.
 
-Expose JavaScript code in a Python module as proper namespace modules
+Expose JavaScript code in a Python module as proper namespaced modules
     A given Python package that may have included JavaScript code
     associated for that project will be able to declare those code as
     JavaScript modules with the exact same namespace through
@@ -73,9 +74,9 @@ Expose JavaScript code in a Python module as proper namespace modules
     declared module structures.
 
 Better integration of JavaScript toolchains with Python environment
-    This basically is a framework for building toolchains for working
-    with JavaScript that integrates well with existing Python packages
-    and environment.
+    Rather, providing a framework for building toolchains for working
+    with tools written in JavaScript for JavaScript that integrates well
+    with existing Python packages and environment.
 
     There are no limitations as to how or what this can be done, as this
     is left as an implementation detail.  For an example (when this is
@@ -131,7 +132,8 @@ do something like this in its ``setup.py``:
     )
 
 Running ``setup.py install`` will write that ``package_json`` fragment
-into the package's egg-info metadata section.
+into the package's egg-info metadata section, provided that it is a
+valid JSON string or a dictionary without incompatible data types.
 
 All packages that ultimately depending on this ``example.package`` will
 have the option to inherit this ``package.json`` egg-info metadata.
@@ -140,6 +142,39 @@ One way to do this is through that package's ``setup.py``.  By invoking
 written to the current directory as if running ``npm init`` with all the
 dependencies declared through the Python package dependency tree for the
 given Python package.
+
+Declare explicit dependencies on paths inside ``node_modules``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Given that the dependencies on specific versions of packages sourced
+from ``npm`` is explicitly specified, build tools will benefit again
+from explicit declarations on files needed from those packages.  Namely,
+the compiled packages could be declared in the ``extras_calmjs`` section
+in JSON string much like ``package_json``, like so:
+
+.. code:: python
+
+    extras_calmjs = {
+        'node_modules': {
+            'jquery': 'jquery/dist/jquery.js',
+            'underscore': 'underscore/underscore.js',
+        },
+    }
+
+    setup(
+        name='example.package',
+        ...
+        extras_calmjs=extras_calmjs,
+        ...
+    )
+
+Since ``node_modules`` is declared to be an ``extras_key``, it will be
+merged much like how dependencies get dealt with.  Please do note that
+complete paths must be declared (note that the ``.js`` filename suffix
+is included in the example); directories can also be declared.  However,
+it is up to downstream integration packages to properly handle and/or
+convert this into the conventions that standard nodejs tools might
+expect.
 
 Expose JavaScript code from a Python module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
