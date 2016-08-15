@@ -1,16 +1,22 @@
 # -*- coding: utf-8 -*-
 import unittest
-from distutils.errors import DistutilsSetupError
 import json
-
+import sys
+import textwrap
+from os.path import join
+from subprocess import Popen
+from subprocess import PIPE
+from distutils.errors import DistutilsSetupError
 from setuptools.dist import Distribution
 
 import pkg_resources
 
 from calmjs import dist as calmjs_dist
+from calmjs.cli import locale
 from calmjs.testing.mocks import Mock_egg_info
 from calmjs.testing.mocks import MockProvider
 from calmjs.testing.utils import make_dummy_dist
+from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import stub_stdouts
 
 
@@ -564,3 +570,79 @@ class DistTestCase(unittest.TestCase):
         })
         # child takes precedences as this was not specified to be merged
         self.assertEqual(results['something_else'], {'child': 'named'})
+
+
+class DistIntegrationTestCase(unittest.TestCase):
+    """
+    Testing integration of dist with the rest of calmjs and setuptools.
+    """
+
+    def setUp(self):
+        """
+        Set up the dummy test files.
+        """
+
+        self.pkg_root = mkdtemp(self)
+        setup_py = join(self.pkg_root, 'setup.py')
+        dummy_pkg = join(self.pkg_root, 'dummy_pkg.py')
+
+        contents = (
+            (setup_py, '''
+                from setuptools import setup
+                setup(
+                    py_modules=['dummy_pkg'],
+                    name='dummy_pkg',
+                    package_json={
+                        'dependencies': {
+                            'jquery': '~3.0.0',
+                        },
+                    },
+                    extras_calmjs={
+                        'node_modules': {
+                            'jquery': 'jquery/dist/jquery.js',
+                        },
+                    },
+                    zip_safe=False,
+                )
+            '''),
+            (dummy_pkg, '''
+            foo = 'bar'
+            '''),
+        )
+
+        for fn, content in contents:
+            with open(fn, 'w') as fd:
+                fd.write(textwrap.dedent(content).lstrip())
+
+    def test_setup_egg_info(self):
+        """
+        Emulate the execution of ``python setup.py egg_info``.
+
+        Ensure everything is covered.
+        """
+
+        # naturally, run it like we mean it.
+        p = Popen(
+            [sys.executable, 'setup.py', 'egg_info'], stdout=PIPE, stderr=PIPE,
+            cwd=self.pkg_root,
+        )
+        stdout, stderr = p.communicate()
+        stdout = stdout.decode(locale)
+        self.assertIn('writing package_json', stdout)
+        self.assertIn('writing extras_calmjs', stdout)
+
+        egg_root = join(self.pkg_root, 'dummy_pkg.egg-info')
+
+        with open(join(egg_root, 'package.json')) as fd:
+            self.assertEqual(json.load(fd), {
+                'dependencies': {
+                    'jquery': '~3.0.0',
+                },
+            })
+
+        with open(join(egg_root, 'extras_calmjs.json')) as fd:
+            self.assertEqual(json.load(fd), {
+                'node_modules': {
+                    'jquery': 'jquery/dist/jquery.js',
+                },
+            })
