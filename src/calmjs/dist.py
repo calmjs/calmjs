@@ -6,6 +6,7 @@ Provides functions and classes that enable the management of npm
 dependencies for JavaScript sources that lives in Python packages.
 """
 
+from functools import partial
 from logging import getLogger
 
 from distutils.errors import DistutilsSetupError
@@ -19,6 +20,8 @@ logger = getLogger(__name__)
 
 # default package definition filename.
 DEFAULT_JSON = 'default.json'
+EXTRAS_CALMJS_FIELD = 'extras_calmjs'
+EXTRAS_CALMJS_JSON = 'extras_calmjs.json'
 DEP_KEYS = ('dependencies', 'devDependencies')
 
 
@@ -175,12 +178,13 @@ def flatten_dist_egginfo_json(
             depends[dep].update(obj.get(dep, {}))
 
     if source_dist:
-        # Layer on top
+        # Layer original on top
         logger.debug("merging '%s' for target '%s'", filename, source_dist)
         for dep in dep_keys:
             depends[dep].update(root.get(dep, {}))
 
     for dep in dep_keys:
+        # filtering out all the nulls.
         root[dep] = {k: v for k, v in depends[dep].items() if v is not None}
 
     return root
@@ -204,3 +208,16 @@ def flatten_egginfo_json(
     dist = get_pkg_dist(pkg_name, working_set=working_set)
     return flatten_dist_egginfo_json(
         dist, filename=filename, dep_keys=dep_keys, working_set=working_set)
+
+
+def flatten_extras(pkg_name, working_set=default_working_set):
+    from calmjs.registry import get
+
+    dep_keys = set(get('calmjs.extras_keys').iter_records())
+    dist = get_pkg_dist(pkg_name, working_set=working_set)
+    return flatten_dist_egginfo_json(
+        dist, filename=EXTRAS_CALMJS_JSON,
+        dep_keys=dep_keys, working_set=working_set
+    )
+
+write_extras_calmjs = partial(write_json_file, EXTRAS_CALMJS_FIELD)

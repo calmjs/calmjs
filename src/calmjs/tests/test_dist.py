@@ -515,3 +515,52 @@ class DistTestCase(unittest.TestCase):
         result = calmjs_dist.flatten_egginfo_json(
             'app', working_set=working_set)
         self.assertEqual(result, answer)
+
+    # While it really is for node/npm, the declaration is almost generic
+    # enough that the particular method should be used here.
+    def test_node_modules_registry_flattening(self):
+        lib = make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([])),
+            (self.pkgname, json.dumps({
+                'dependencies': {
+                    'jquery': '~1.8.3',
+                    'underscore': '1.8.3',
+                },
+            })),
+            ('extras_calmjs.json', json.dumps({
+                'node_modules': {
+                    'jquery': 'jquery/dist/jquery.js',
+                    'underscore': 'underscore/underscore-min.js',
+                },
+                'something_else': {'parent': 'lib'},
+            })),
+        ), 'lib', '1.0.0')
+
+        app = make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([
+                'lib>=1.0.0',
+            ])),
+            (self.pkgname, json.dumps({
+                'dependencies': {
+                    'jquery': '~3.0.0',
+                },
+            })),
+            ('extras_calmjs.json', json.dumps({
+                'node_modules': {
+                    'jquery': 'jquery/dist/jquery.min.js',
+                },
+                'something_else': {'child': 'named'},
+            })),
+        ), 'app', '2.0')
+
+        working_set = pkg_resources.WorkingSet()
+        working_set.add(lib, self._calmjs_testing_tmpdir)
+        working_set.add(app, self._calmjs_testing_tmpdir)
+
+        results = calmjs_dist.flatten_extras('app', working_set=working_set)
+        self.assertEqual(results['node_modules'], {
+            'jquery': 'jquery/dist/jquery.min.js',
+            'underscore': 'underscore/underscore-min.js',
+        })
+        # child takes precedences as this was not specified to be merged
+        self.assertEqual(results['something_else'], {'child': 'named'})

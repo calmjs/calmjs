@@ -42,11 +42,17 @@ setup(name='calmjs',
 
       [distutils.setup_keywords]
       package_json = calmjs.dist:validate_json_field
+      extras_calmjs = calmjs.dist:validate_json_field
 
       [egg_info.writers]
       package.json = calmjs.npm:write_package_json
+      extras_calmjs.json = calmjs.dist:write_extras_calmjs
+
+      [calmjs.extras_keys]
+      node_modules = enabled
 
       [calmjs.registry]
+      calmjs.extras_keys = calmjs.module:ExtrasJsonKeysRegistry
       calmjs.registry = calmjs.registry:Registry
       calmjs.module = calmjs.module:ModuleRegistry
       calmjs.module.pythonic = calmjs.module:PythonicModuleRegistry

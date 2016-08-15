@@ -9,11 +9,29 @@ point system.
 
 from logging import getLogger
 
+from calmjs.base import BaseRegistry
 from calmjs.base import BaseModuleRegistry
 from calmjs.indexer import mapper_es6
 from calmjs.indexer import mapper_python
 
 logger = getLogger(__name__)
+
+
+class ExtrasJsonKeysRegistry(BaseRegistry):
+    """
+    Python package may declare extra JSON information that will specify
+    what they need from the packages they declared, and so package
+    managers should declare the keys that those information should be
+    supplied from, in order to give downstream packages a specific set
+    of keys to merge.
+    """
+
+    def _init(self):
+        self.keys = [ep.name for ep in self.raw_entry_points]
+
+    def iter_records(self):
+        for k in self.keys:
+            yield k
 
 
 class ModuleRegistry(BaseModuleRegistry):

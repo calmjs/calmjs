@@ -95,3 +95,16 @@ class IntegratedModuleRegistryTestCase(unittest.TestCase):
                 'calmjs.testing.module3',
             ]
         )
+
+
+class ExtraJsonKeysRegistryTestCase(unittest.TestCase):
+
+    def test_integrated(self):
+        """
+        Since this module already immediately declares that, this can
+        simply be a quick integration test.
+        """
+
+        reg = get('calmjs.extras_keys')
+        results = set(reg.iter_records())
+        self.assertIn('node_modules', results)
