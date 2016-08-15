@@ -47,6 +47,7 @@ setup(name='calmjs',
       package.json = calmjs.npm:write_package_json
 
       [calmjs.registry]
+      calmjs.registry = calmjs.registry:Registry
       calmjs.module = calmjs.module:ModuleRegistry
       calmjs.module.pythonic = calmjs.module:PythonicModuleRegistry
       """,

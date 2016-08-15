@@ -69,4 +69,5 @@ class Registry(BaseRegistry):
 
 # Initialize the root registry instance
 _inst = Registry(__name__)  # __name__ == calmjs.registry
+_inst.records[__name__] = _inst
 get = _inst.get_record
