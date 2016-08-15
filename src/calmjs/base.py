@@ -105,7 +105,9 @@ class BaseModuleRegistry(BaseRegistry):
         Get a record by name
         """
 
-        return self.records.get(name)
+        result = {}
+        result.update(self.records.get(name, {}))
+        return result
 
     def iter_records(self):
         """

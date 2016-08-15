@@ -8,8 +8,7 @@ from calmjs.testing import mocks
 class DummyModuleRegistry(base.BaseModuleRegistry):
 
     def _register_entry_point_module(self, entry_point, module):
-        # adding the module straight into the record
-        self.records[entry_point.name] = module
+        self.records[entry_point.name] = {module.__name__: module}
 
 
 class BaseRegistryTestCase(unittest.TestCase):
@@ -64,7 +63,7 @@ class BaseModuleRegistryTestCase(unittest.TestCase):
         ])
         registry = base.BaseModuleRegistry(__name__, _working_set=working_set)
         self.assertEqual(len(registry.raw_entry_points), 1)
-        self.assertIsNone(registry.get_record('module'))
+        self.assertEqual(registry.get_record('module'), {})
         self.assertEqual(list(registry.iter_records()), [])
 
     def test_not_implemented(self):
@@ -75,11 +74,23 @@ class BaseModuleRegistryTestCase(unittest.TestCase):
             base.BaseModuleRegistry(__name__, _working_set=working_set)
 
     def test_dummy_implemented(self):
+        from calmjs.testing import module1
         working_set = mocks.WorkingSet([
             'calmjs.testing.module1 = calmjs.testing.module1',
         ])
         registry = DummyModuleRegistry(__name__, _working_set=working_set)
-        record = registry.get_record('calmjs.testing.module1')
-        self.assertEqual(record.__name__, 'calmjs.testing.module1')
+        result = registry.get_record('calmjs.testing.module1')
+        self.assertEqual(result, {'calmjs.testing.module1': module1})
         self.assertEqual(list(registry.iter_records()), [
-            ('calmjs.testing.module1', record)])
+            ('calmjs.testing.module1', {'calmjs.testing.module1': module1}),
+        ])
+
+    def test_got_record_cloned(self):
+        # returned records should clones.
+        working_set = mocks.WorkingSet([
+            'calmjs.testing.module1 = calmjs.testing.module1',
+        ])
+        registry = DummyModuleRegistry(__name__, _working_set=working_set)
+        record1 = registry.get_record('calmjs.testing.module1')
+        record2 = registry.get_record('calmjs.testing.module1')
+        self.assertIsNot(record1, record2)
