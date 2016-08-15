@@ -1,10 +1,28 @@
 # -*- coding: utf-8 -*-
 import os
+import logging
 from os.path import curdir
 from os.path import defpath
 from os.path import normcase
 from os.path import pathsep
 import sys
+
+
+def enable_pretty_logging(logger='calmjs', level=logging.DEBUG, stream=None):
+    """
+    Shorthand to enable pretty logging
+    """
+
+    if not isinstance(logger, logging.Logger):
+        logger = logging.getLogger(logger)
+    if logger.handlers:
+        # Only set up handlers if none already exists
+        return
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(logging.Formatter(
+        '%(asctime)s %(levelname)s %(name)s %(message)s'))
+    logger.addHandler(handler)
+    logger.setLevel(level)
 
 
 def which(cmd, mode=os.F_OK | os.X_OK, path=None):
