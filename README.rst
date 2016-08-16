@@ -203,6 +203,7 @@ like so in the ``setup.py`` file:
     setup(
         ...
         entry_points="""
+        ...
         [calmjs.module]
         example.package = example.package
         """
@@ -230,6 +231,7 @@ like so:
     setup(
         ...
         entry_points="""
+        ...
         [calmjs.registry]
         example.module = example.package.registry:ExampleModuleRegistry
         """
@@ -244,6 +246,7 @@ registry that was just declared.
     setup(
         ...
         entry_points="""
+        ...
         [example.module]
         example.package = example.package
         """
@@ -260,6 +263,7 @@ was declared like so:
     setup(
         ...
         entry_points="""
+        ...
         [calmjs.module.pythonic]
         example.package = example.package
         """
