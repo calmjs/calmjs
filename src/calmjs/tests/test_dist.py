@@ -564,7 +564,14 @@ class DistTestCase(unittest.TestCase):
         working_set.add(lib, self._calmjs_testing_tmpdir)
         working_set.add(app, self._calmjs_testing_tmpdir)
 
-        results = calmjs_dist.flatten_extras('app', working_set=working_set)
+        single = calmjs_dist.get_extras_calmjs(
+            'app', working_set=working_set)
+        self.assertEqual(single['node_modules'], {
+            'jquery': 'jquery/dist/jquery.min.js',
+        })
+
+        results = calmjs_dist.flatten_extras_calmjs(
+            'app', working_set=working_set)
         self.assertEqual(results['node_modules'], {
             'jquery': 'jquery/dist/jquery.min.js',
             'underscore': 'underscore/underscore-min.js',
@@ -572,11 +579,14 @@ class DistTestCase(unittest.TestCase):
         # child takes precedences as this was not specified to be merged
         self.assertEqual(results['something_else'], {'child': 'named'})
 
-    def test_flatten_module_registry_dependencies_failure_no_reg(self):
+    def test_module_registry_dependencies_failure_no_reg(self):
         self.assertEqual(calmjs_dist.flatten_module_registry_dependencies(
             'calmjs', registry_key='calmjs.no_reg',), {})
 
-    def test_flatten_module_registry_dependencies_success(self):
+        self.assertEqual(calmjs_dist.get_module_registry_dependencies(
+            'calmjs', registry_key='calmjs.no_reg',), {})
+
+    def test_module_registry_dependencies_success(self):
         from calmjs.registry import _inst
 
         make_dummy_dist(self, (
@@ -678,6 +688,17 @@ class DistTestCase(unittest.TestCase):
         missing_pkg = calmjs_dist.flatten_module_registry_dependencies(
             'missing_pkg', registry_key=dummy_regid, working_set=working_set)
         self.assertEqual(missing_pkg, {})
+
+        # singlular methods
+        self.assertEqual(calmjs_dist.get_module_registry_dependencies(
+            'site', registry_key=dummy_regid, working_set=working_set), {
+            'site/config': '/home/src/site/config.js'})
+
+        self.assertEqual(calmjs_dist.get_module_registry_dependencies(
+            'security', registry_key=dummy_regid, working_set=working_set), {})
+
+        self.assertEqual(calmjs_dist.get_module_registry_dependencies(
+            'missing', registry_key=dummy_regid, working_set=working_set), {})
 
 
 class DistIntegrationTestCase(unittest.TestCase):

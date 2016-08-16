@@ -223,12 +223,23 @@ def flatten_egginfo_json(
         dist, filename=filename, dep_keys=dep_keys, working_set=working_set)
 
 
-# Implementation specific functions
+# Default calmjs core implementation specific functions, to be used by
+# integrators intended to use this as a distribution.
 
-def flatten_extras(pkg_name, working_set=default_working_set):
+def get_extras_calmjs(pkg_name, working_set=default_working_set):
     """
-    Traverses through the dependency graph of pkg_name and flattens all
-    the egg_info calmjs registry information.
+    Only extract the extrasi_calmjs information for the given package
+    'pkg_name'.
+    """
+
+    dist = get_pkg_dist(pkg_name, working_set=working_set)
+    return get_dist_egginfo_json(dist, filename=EXTRAS_CALMJS_JSON)
+
+
+def flatten_extras_calmjs(pkg_name, working_set=default_working_set):
+    """
+    Traverses through the dependency graph of package 'pkg_name' and
+    flattens all the egg_info calmjs registry information.
     """
 
     # registry key must be explicit here as it was designed for this.
@@ -240,6 +251,20 @@ def flatten_extras(pkg_name, working_set=default_working_set):
     )
 
 write_extras_calmjs = partial(write_json_file, EXTRAS_CALMJS_FIELD)
+
+
+def get_module_registry_dependencies(
+        pkg_name, registry_key='calmjs.module',
+        working_set=default_working_set):
+    """
+    For the given package 'pkg_name' and the registry identified by
+    'registry_key', resolve the exported location for just the package.
+    """
+
+    registry = get(registry_key)
+    if not isinstance(registry, BaseModuleRegistry):
+        return {}
+    return registry.get_record(pkg_name)
 
 
 def flatten_module_registry_dependencies(
