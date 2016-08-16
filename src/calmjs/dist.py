@@ -6,6 +6,8 @@ Provides functions and classes that enable the management of npm
 dependencies for JavaScript sources that lives in Python packages.
 """
 
+import json
+
 from functools import partial
 from logging import getLogger
 
@@ -14,7 +16,8 @@ from distutils.errors import DistutilsSetupError
 from pkg_resources import Requirement
 from pkg_resources import working_set as default_working_set
 
-import json
+from calmjs.registry import get
+from calmjs.base import BaseModuleRegistry
 
 logger = getLogger(__name__)
 
@@ -220,9 +223,15 @@ def flatten_egginfo_json(
         dist, filename=filename, dep_keys=dep_keys, working_set=working_set)
 
 
-def flatten_extras(pkg_name, working_set=default_working_set):
-    from calmjs.registry import get
+# Implementation specific functions
 
+def flatten_extras(pkg_name, working_set=default_working_set):
+    """
+    Traverses through the dependency graph of pkg_name and flattens all
+    the egg_info calmjs registry information.
+    """
+
+    # registry key must be explicit here as it was designed for this.
     dep_keys = set(get('calmjs.extras_keys').iter_records())
     dist = get_pkg_dist(pkg_name, working_set=working_set)
     return flatten_dist_egginfo_json(
@@ -231,3 +240,24 @@ def flatten_extras(pkg_name, working_set=default_working_set):
     )
 
 write_extras_calmjs = partial(write_json_file, EXTRAS_CALMJS_FIELD)
+
+
+def flatten_module_registry_dependencies(
+        pkg_name, registry_key='calmjs.module',
+        working_set=default_working_set):
+    """
+    For the given package 'pkg_name' and the registry identified by
+    'registry_key', resolve and flatten all the exported locations.
+    """
+
+    result = {}
+    registry = get(registry_key)
+    if not isinstance(registry, BaseModuleRegistry):
+        return result
+
+    source_dist = get_pkg_dist(pkg_name, working_set=working_set)
+    for dist in iter_dist_requires(source_dist, working_set=working_set):
+        result.update(registry.get_record(dist.project_name))
+    result.update(registry.get_record(pkg_name))
+
+    return result
