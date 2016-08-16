@@ -1,4 +1,11 @@
 # -*- coding: utf-8 -*-
+"""
+This module intends to provide an interface between the underlying
+command-line interface (cli) based tools, at the same time also provide
+helpers and classes that also support and provide its own cli for calmjs
+framework.
+"""
+
 from __future__ import unicode_literals
 
 import difflib

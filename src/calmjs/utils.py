@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+"""
+Assortment of utility functions.
+"""
+
 import os
 import logging
 from os.path import curdir

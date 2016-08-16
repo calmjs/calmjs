@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Registry framework for calmjs
+calmjs.base
 
-This intends to be an extensible, pluggable registry system for the
-calmjs infrastructure that leverages on the underlying setuptools entry
-point system.
+This module contains various base classes from which other parts of this
+framework will inherit/extend from.
 """
 
 import os
