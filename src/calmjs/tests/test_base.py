@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 import unittest
+import os
 
 from calmjs import base
 from calmjs.testing import mocks
+from calmjs.testing.utils import mkdtemp
 
 
 class DummyModuleRegistry(base.BaseModuleRegistry):
@@ -94,3 +96,45 @@ class BaseModuleRegistryTestCase(unittest.TestCase):
         record1 = registry.get_record('calmjs.testing.module1')
         record2 = registry.get_record('calmjs.testing.module1')
         self.assertIsNot(record1, record2)
+
+
+class BaseDriverClassTestCase(unittest.TestCase):
+    """
+    BaseDriver class test case.
+    """
+
+    def test_construction(self):
+        driver = base.BaseDriver(
+            node_path='node_path', env_path='env_path', working_dir='cwd',
+            indent=2, separators=(', ', ':'))
+        self.assertEqual(driver.node_path, 'node_path')
+        self.assertEqual(driver.env_path, 'env_path')
+        self.assertEqual(driver.working_dir, 'cwd')
+        self.assertEqual(driver.indent, 2)
+        self.assertEqual(driver.separators, (', ', ':'))
+
+    def test_join_cwd(self):
+        driver = base.BaseDriver()
+        self.assertTrue(driver.join_cwd('bar').startswith(os.getcwd()))
+        driver.working_dir = mkdtemp(self)
+
+        result = driver.join_cwd('bar')
+        self.assertTrue(result.startswith(driver.working_dir))
+        self.assertTrue(result.endswith('bar'))
+
+        result = driver.join_cwd()
+        self.assertEqual(result, driver.working_dir)
+
+    def test_which(self):
+        driver = base.BaseDriver()
+        # no binary, no nothing.
+        self.assertIsNone(driver.which())
+
+    def test_set_env_path_with_node_modules_undefined(self):
+        driver = base.BaseDriver()
+        with self.assertRaises(ValueError) as e:
+            driver._set_env_path_with_node_modules()
+        self.assertEqual(
+            str(e.exception),
+            "binary undefined for 'calmjs.base:BaseDriver' instance"
+        )

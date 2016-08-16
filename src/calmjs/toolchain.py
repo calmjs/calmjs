@@ -45,7 +45,7 @@ from os.path import isdir
 from os.path import realpath
 from tempfile import mkdtemp
 
-from calmjs.cli import BaseDriver
+from calmjs.base import BaseDriver
 
 logger = logging.getLogger(__name__)
 
@@ -106,9 +106,11 @@ class Toolchain(BaseDriver):
     """
     For shared methods between all toolchains.
 
-    This class inherits from the BaseDriver in the cli class, as this is
-    typically used for interfacing with various nodejs cli tools so that
-    the final artifacts (bundles) can be created.
+    The objective of this class is to provide a consistent interface
+    from calmjs to the various cli nodejs tools, this class inherits
+    from the BaseDriver class.  This means having the same foundation
+    and also the ability to reuse a number of useful utility methods
+    for talking to those scripts and binaries.
     """
 
     def __init__(self, *a, **kw):
