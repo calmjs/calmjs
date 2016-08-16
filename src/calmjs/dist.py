@@ -129,6 +129,18 @@ def read_egginfo_json(
     return get_dist_egginfo_json(dist, filename)
 
 
+def iter_dist_requires(source_dist, working_set=default_working_set):
+    """
+    Generator to get requirements of a distribution.
+    """
+
+    requires = source_dist.requires() if source_dist else []
+    # Go from the earliest package down to the latest one and apply it
+    # to the callable 'f'
+    for dist in reversed(working_set.resolve(requires)):
+        yield dist
+
+
 def flatten_dist_egginfo_json(
         source_dist, filename=DEFAULT_JSON, dep_keys=DEP_KEYS,
         working_set=default_working_set):
@@ -158,17 +170,15 @@ def flatten_dist_egginfo_json(
 
     depends = {dep: {} for dep in dep_keys}
 
-    # ensure that we have at least a dummy value
+    # ensure that root is populated with something.
     if source_dist:
-        requires = source_dist.requires()
         root = get_dist_egginfo_json(source_dist, filename) or {}
     else:
-        requires = []
         root = {}
 
     # Go from the earliest package down to the latest one, as we will
     # flatten children's d(evD)ependencies on top of parent's.
-    for dist in reversed(working_set.resolve(requires)):
+    for dist in iter_dist_requires(source_dist, working_set=working_set):
         obj = get_dist_egginfo_json(dist, filename)
         if not obj:
             continue
