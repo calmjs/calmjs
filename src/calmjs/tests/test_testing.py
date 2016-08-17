@@ -245,3 +245,8 @@ class IntegrationGeneratorTestCase(unittest.TestCase):
         framework_dist = working_set.find(Requirement.parse('framework'))
         self.assertEqual(framework_dist.project_name, 'framework')
         self.assertEqual(framework_dist.location, tmpdir)
+
+        self.assertTrue(exists(
+            join(tmpdir, 'node_modules', 'jquery', 'dist', 'jquery.js')))
+        self.assertTrue(exists(
+            join(tmpdir, 'node_modules', 'underscore', 'underscore.js')))

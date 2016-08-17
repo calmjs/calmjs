@@ -151,6 +151,9 @@ def generate_integration_environment(
             extras_calmjs_key: {
                 'underscore': 'underscore/underscore.js',
             },
+            '_bad_dir_': {
+                'unsupported': 'unsupported',
+            },
         })),
         ('entry_points.txt', make_entry_points(
             dummy_regid,
@@ -246,6 +249,27 @@ def generate_integration_environment(
             makedirs(base)
         with open(target, 'w') as fd:
             fd.write(textwrap.dedent(content).lstrip())
+
+    extras_sources = [
+        'jquery/dist/jquery.js',
+        'jquery/dist/jquery.min.js',
+        'underscore/underscore.js',
+        'underscore/underscore-min.js',
+    ]
+
+    # Generate the extras, too
+    for source in extras_sources:
+        fn = source.split('/')
+        target = join(working_dir, extras_calmjs_key, *fn)
+        base = dirname(target)
+        if not isdir(base):
+            makedirs(base)
+        with open(target, 'w') as fd:
+            pass  # yeah right.
+
+    makedirs(join(working_dir, '_bad_dir_'))
+    with open(join(working_dir, '_bad_dir_', 'unsupported'), 'w') as fd:
+        pass
 
     # Now create and assign the registry with our things
     registry = ModuleRegistry(dummy_regid)
