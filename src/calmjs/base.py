@@ -74,6 +74,9 @@ class BaseRegistry(object):
     def get_record(self, name):
         raise NotImplementedError
 
+    def get(self, name):
+        return self.get_record(name)
+
     def iter_records(self):
         raise NotImplementedError
 
