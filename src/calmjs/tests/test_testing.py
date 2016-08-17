@@ -204,3 +204,44 @@ class TestingUtilsTestCase(unittest.TestCase):
         self.doCleanups()
         self.assertIs(o_stdout, sys.stdout)
         self.assertIs(o_stderr, sys.stderr)
+
+
+class IntegrationGeneratorTestCase(unittest.TestCase):
+    """
+    Just to put this separate from the rest, as this tests the creation
+    of an integration working set for use by other tools integrating
+    calmjs for their integration testing.
+
+    The testing utils better be working already.
+    """
+
+    def test_integration_generator(self):
+        tmpdir = mkdtemp(self)
+        results = utils.generate_integration_environment(working_dir=tmpdir)
+        working_set, registry = results
+        # validate the underlying information
+        self.assertEqual(sorted(registry.records.keys()), [
+            'forms', 'framework', 'service', 'service.rpc', 'widget',
+        ])
+        self.assertEqual(sorted(registry.package_module_map.keys()), [
+            'forms', 'framework', 'service', 'widget',
+        ])
+        self.assertEqual(sorted(registry.package_module_map['service']), [
+            'service', 'service.rpc',
+        ])
+
+        # Test out the registry
+        service_records = registry.get_records_for_package('service')
+        self.assertEqual(len(service_records), 2)
+        self.assertTrue(exists(service_records['service/rpc/lib']))
+        self.assertTrue(service_records['service/rpc/lib'].endswith(
+            '/service/rpc/lib.js'))
+        self.assertTrue(service_records['service/rpc/lib'].startswith(tmpdir))
+        self.assertTrue(service_records['service/endpoint'].endswith(
+            '/service/endpoint.js'))
+        self.assertTrue(service_records['service/endpoint'].startswith(tmpdir))
+
+        # Test out the working set
+        framework_dist = working_set.find(Requirement.parse('framework'))
+        self.assertEqual(framework_dist.project_name, 'framework')
+        self.assertEqual(framework_dist.location, tmpdir)

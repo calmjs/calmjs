@@ -1,20 +1,26 @@
+# -*- coding: utf-8 -*-
+import json
 import tempfile
+import textwrap
 import os
 import sys
 from os import makedirs
 from os.path import join
+from os.path import dirname
+from os.path import isdir
 from shutil import rmtree
 from types import ModuleType
 from unittest import TestCase
 
 from pkg_resources import PathMetadata
 from pkg_resources import Distribution
+from pkg_resources import WorkingSet
 
-# Do not invoke/import the calmjs namespace here.  If they are needed
-# please import from a scope.
+# Do not invoke/import the root calmjs namespace here.  If modules from
+# there are needed, the import must be done from within the scope that
+# requires it to avoid possible circular imports.
 from . import module3
 from .mocks import StringIO
-
 
 TMPDIR_ID = '_calmjs_testing_tmpdir'
 
@@ -28,6 +34,226 @@ def fake_error(exception):
     def stub(*a, **kw):
         raise exception
     return stub
+
+
+def generate_integration_environment(
+        working_dir,
+        pkgman_filename='package.json', extras_calmjs_key='node_modules'):
+    """
+    Generate a comprehensive integration testing environment for test
+    cases in other packages that integrates with calmjs.
+
+    Arguments:
+
+    working_dir
+        The working directory to write all the distribution information
+        and dummy test scripts to.
+
+    pkgman_filename
+        The package manager's expected filename.  Defaults to the npm
+        default of 'package.json'.
+
+    extras_calmjs_key
+        The extras keys for the extras_calmjs definition.  Defaults to
+        node_modules.
+
+    Returns a tuple of the mock working set and the registry.
+    """
+
+    from calmjs.module import ModuleRegistry
+    from calmjs.dist import EXTRAS_CALMJS_JSON
+
+    dummy_regid = 'calmjs.module.simulated'
+
+    def make_entry_points(registry_id, *raw):
+        return '\n'.join(['[%s]' % registry_id] + list(raw))
+
+    make_dummy_dist(None, (
+        ('requires.txt', '\n'.join([
+        ])),
+    ), 'security', '9999', working_dir=working_dir)
+
+    make_dummy_dist(None, (
+        ('requires.txt', '\n'.join([
+            'security',
+        ])),
+        (pkgman_filename, json.dumps({
+            'dependencies': {
+                'left-pad': '~1.1.1',
+            },
+            'devDependencies': {
+                'sinon': '~1.15.0',
+            },
+        })),
+        ('entry_points.txt', make_entry_points(
+            dummy_regid,
+            'framework = framework',
+        )),
+        (EXTRAS_CALMJS_JSON, json.dumps({
+            extras_calmjs_key: {
+                'jquery': 'jquery/dist/jquery.min.js',
+                'underscore': 'underscore/underscore-min.js',
+            },
+        })),
+    ), 'framework', '2.4', working_dir=working_dir)
+
+    make_dummy_dist(None, (
+        ('requires.txt', '\n'.join([
+            'framework>=2.1',
+        ])),
+        (pkgman_filename, json.dumps({
+            'dependencies': {
+                'jquery': '~2.0.0',
+                'underscore': '~1.7.0',
+            },
+        })),
+        (EXTRAS_CALMJS_JSON, json.dumps({
+            extras_calmjs_key: {
+                'jquery': 'jquery/dist/jquery.min.js',
+            },
+        })),
+        ('entry_points.txt', make_entry_points(
+            dummy_regid,
+            'widget = widget',
+        )),
+    ), 'widget', '1.1', working_dir=working_dir)
+
+    make_dummy_dist(None, (
+        ('requires.txt', '\n'.join([
+            'framework>=2.2',
+            'widget>=1.0',
+        ])),
+        (pkgman_filename, json.dumps({
+            'dependencies': {
+                'backbone': '~1.3.0',
+                'jquery-ui': '~1.12.0',
+            },
+        })),
+        ('entry_points.txt', make_entry_points(
+            dummy_regid,
+            'forms = forms',
+        )),
+    ), 'forms', '1.6', working_dir=working_dir)
+
+    make_dummy_dist(None, (
+        ('requires.txt', '\n'.join([
+            'framework>=2.1',
+        ])),
+        (pkgman_filename, json.dumps({
+            'dependencies': {
+                'underscore': '~1.8.0',
+            },
+            'devDependencies': {
+                'sinon': '~1.17.0',
+            },
+        })),
+        (EXTRAS_CALMJS_JSON, json.dumps({
+            extras_calmjs_key: {
+                'underscore': 'underscore/underscore.js',
+            },
+        })),
+        ('entry_points.txt', make_entry_points(
+            dummy_regid,
+            'service = service',
+            'service.rpc = service.rpc',
+        )),
+    ), 'service', '1.1', working_dir=working_dir)
+
+    make_dummy_dist(None, (
+        ('requires.txt', '\n'.join([
+            'framework>=2.1',
+            'widget>=1.1',
+            'forms>=1.6',
+        ])),
+        (pkgman_filename, json.dumps({
+            'name': 'site',
+            'dependencies': {
+                'underscore': '~1.8.0',
+                'jquery': '~1.9.0',
+            },
+        })),
+        (EXTRAS_CALMJS_JSON, json.dumps({
+            extras_calmjs_key: {
+                'jquery': 'jquery/dist/jquery.js',
+                'underscore': 'underscore/underscore.js',
+            },
+        })),
+    ), 'site', '2.0', working_dir=working_dir)
+
+    # The mocked mock_working_set
+    mock_working_set = WorkingSet([working_dir])
+
+    contents = (
+        (('framework', 'lib.js'), '''
+            exports.Core = 'framework.lib.Core';
+        '''),
+        (('widget', 'core.js'), '''
+            var framework_lib = require('framework/lib');
+            var Core = framework_lib.Core;
+            exports.Core = Core + '/' + 'widget.core.Core';
+        '''),
+        (('widget', 'richedit.js'), '''
+            var core = require('widget/core');
+            exports.RichEditWidget = 'widget.richedit.RichEditWidget';
+        '''),
+        (('widget', 'datepicker.js'), '''
+            var core = require('widget/core');
+            exports.DatePickerWidget = 'widget.datepicker.DatePickerWidget';
+        '''),
+        (('forms', 'ui.js'), '''
+            var richedit = require('widget/richedit');
+            var datepicker = require('widget/datepicker');
+            exports.RichForm = [
+                'forms.ui.RichForm',
+                richedit.RichEditWidget,
+                datepicker.DatePickerWidget,
+            ];
+        '''),
+        (('service', 'endpoint.js'), '''
+            var framework_lib = require('framework/lib');
+            var Core = framework_lib.Core;
+            exports.Endpoint = 'service.endpoint.Endpoint';
+        '''),
+        (('service', 'rpc', 'lib.js'), '''
+            var framework_lib = require('framework/lib');
+            var Core = framework_lib.Core;
+            exports.Library = 'service.rpc.lib.Library';
+        '''),
+    )
+
+    records = {}
+    package_module_map = {}
+
+    # I kind of want to do something like
+    # registry = ModuleRegistry(dummy_regid, _working_set=mock_working_set)
+    # However, this requires actually stubbing out a bunch of other
+    # stuff and I really don't want to muck about with imports for a
+    # setup... so we are going to mock the registry like so:
+
+    for ep in mock_working_set.iter_entry_points(dummy_regid):
+        package_module_map[ep.dist.project_name] = package_module_map.get(
+            ep.dist.project_name, [])
+        package_module_map[ep.dist.project_name].append(ep.module_name)
+
+    for fn, content in contents:
+        target = join(working_dir, *fn)
+        modname = '/'.join(fn)[:-3]
+        record_key = '.'.join(fn[:-1])
+        records[record_key] = records.get(record_key, {})
+        records[record_key][modname] = target
+        base = dirname(target)
+        if not isdir(base):
+            makedirs(base)
+        with open(target, 'w') as fd:
+            fd.write(textwrap.dedent(content).lstrip())
+
+    # Now create and assign the registry with our things
+    registry = ModuleRegistry(dummy_regid)
+    registry.records = records
+    registry.package_module_map = package_module_map
+
+    # Return dummy working set (for dist resolution) and the registry
+    return mock_working_set, registry
 
 
 def mkdtemp(testcase_inst):
