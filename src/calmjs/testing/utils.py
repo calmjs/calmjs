@@ -170,8 +170,8 @@ def stub_dist_flatten_egginfo_json(testcase_inst, modules, working_set):
         module.flatten_egginfo_json = original_flatten_egginfo_json
 
     for module in modules:
-        module.flatten_egginfo_json = flatten_egginfo_json
         testcase_inst.addCleanup(restore, module)
+        module.flatten_egginfo_json = flatten_egginfo_json
 
 
 def stub_mod_call(testcase_inst, mod, f=None):
@@ -181,9 +181,6 @@ def stub_mod_call(testcase_inst, mod, f=None):
     # if f:
     #     fake_call = f
 
-    call, mod.call = mod.call, fake_call
-    testcase_inst.call_args = None
-
     def cleanup():
         # Restore original module level functions
         mod.call = call
@@ -191,6 +188,8 @@ def stub_mod_call(testcase_inst, mod, f=None):
             delattr(testcase_inst, 'call_args')
 
     testcase_inst.addCleanup(cleanup)
+    testcase_inst.call_args = None
+    call, mod.call = mod.call, fake_call
 
 
 def stub_mod_check_output(testcase_inst, mod, f=None):
@@ -201,15 +200,14 @@ def stub_mod_check_output(testcase_inst, mod, f=None):
     if f:
         fake_check_output = f   # noqa: F811
 
-    check_output, mod.check_output = mod.check_output, fake_check_output
-    testcase_inst.check_output_answer = None
-
     def cleanup():
         mod.check_output = check_output
         if hasattr(testcase_inst, 'check_output_answer'):
             delattr(testcase_inst, 'check_output_answer')
 
     testcase_inst.addCleanup(cleanup)
+    testcase_inst.check_output_answer = None
+    check_output, mod.check_output = mod.check_output, fake_check_output
 
 
 def stub_mod_check_interactive(testcase_inst, modules, result):
@@ -229,8 +227,8 @@ def stub_mod_check_interactive(testcase_inst, modules, result):
         module.check_interactive = original_check_interactive
 
     for module in modules:
-        module.check_interactive = check_interactive
         testcase_inst.addCleanup(restore, module)
+        module.check_interactive = check_interactive
 
 
 def stub_mod_working_set(testcase_inst, modules, working_set):
