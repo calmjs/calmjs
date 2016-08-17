@@ -654,6 +654,12 @@ class DistTestCase(unittest.TestCase):
                 'service/lib': '/home/src/forms/lib.js',
             },
         }
+        dummy_reg.package_module_map = {
+            'site': ['site'],
+            'widget': ['widget'],
+            'forms': ['forms'],
+            'service': ['service'],
+        }
 
         site = calmjs_dist.flatten_module_registry_dependencies(
             'site', registry_key=dummy_regid, working_set=working_set)

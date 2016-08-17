@@ -264,7 +264,7 @@ def get_module_registry_dependencies(
     registry = get(registry_key)
     if not isinstance(registry, BaseModuleRegistry):
         return {}
-    return registry.get_record(pkg_name)
+    return registry.get_records_for_package(pkg_name)
 
 
 def flatten_module_registry_dependencies(
@@ -282,7 +282,7 @@ def flatten_module_registry_dependencies(
 
     source_dist = get_pkg_dist(pkg_name, working_set=working_set)
     for dist in iter_dist_requires(source_dist, working_set=working_set):
-        result.update(registry.get_record(dist.project_name))
-    result.update(registry.get_record(pkg_name))
+        result.update(registry.get_records_for_package(dist.project_name))
+    result.update(registry.get_records_for_package(pkg_name))
 
     return result
