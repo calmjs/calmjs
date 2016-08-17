@@ -7,14 +7,10 @@ calmjs infrastructure that leverages on the underlying setuptools entry
 point system.
 """
 
-from logging import getLogger
-
 from calmjs.base import BaseRegistry
 from calmjs.base import BaseModuleRegistry
 from calmjs.indexer import mapper_es6
 from calmjs.indexer import mapper_python
-
-logger = getLogger(__name__)
 
 
 class ExtrasJsonKeysRegistry(BaseRegistry):
@@ -40,8 +36,9 @@ class ModuleRegistry(BaseModuleRegistry):
     with Python modules within the running Python environment.
 
     Subclass can either override ``_init`` completely to specify its own
-    mapper, or subclass `_register_entry_point_module`` and use the same
-    mapper but modify its results before assigment to ``self.records``.
+    mapper, or override `_map_entry_point_module`` and use the same
+    mapper but modify its results before returning for usage by parent
+    class.
 
     This is to be registered in calmjs.registry entry point as
     ``calmjs.module``.
@@ -50,8 +47,8 @@ class ModuleRegistry(BaseModuleRegistry):
     def _init(self):
         self.mapper = mapper_es6
 
-    def _register_entry_point_module(self, entry_point, module):
-        self.records[module.__name__] = self.mapper(module)
+    def _map_entry_point_module(self, entry_point, module):
+        return {module.__name__: self.mapper(module)}
 
 
 class PythonicModuleRegistry(ModuleRegistry):

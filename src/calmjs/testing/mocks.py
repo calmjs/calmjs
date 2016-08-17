@@ -7,19 +7,20 @@ from pkg_resources import EmptyProvider
 
 from setuptools.command.egg_info import egg_info
 
-dist = Distribution()
+_dist = Distribution()
 
 
 class WorkingSet(object):
 
-    def __init__(self, items):
+    def __init__(self, items, dist=_dist):
         self.items = items
+        self.dist = dist
 
     def iter_entry_points(self, name):
         # no distinction on name whatsoever because this is a mock
         for item in self.items:
             entry_point = EntryPoint.parse(item)
-            entry_point.dist = dist
+            entry_point.dist = self.dist
             yield entry_point
 
 

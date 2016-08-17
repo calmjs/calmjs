@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import unittest
+from pkg_resources import Distribution
 from pkg_resources import EntryPoint
-from pkg_resources import iter_entry_points
 
 import calmjs.base
 from calmjs.registry import Registry
@@ -13,9 +13,6 @@ from calmjs.testing import mocks
 from calmjs.testing import utils
 
 
-@unittest.skipIf(
-    list(iter_entry_points(__name__)),
-    'basic module tests cannot run if %s is used as entry_point' % __name__)
 class ModuleRegistryTestCase(unittest.TestCase):
     """
     Test the JavaScript module registry.
@@ -78,7 +75,7 @@ class IntegratedModuleRegistryTestCase(unittest.TestCase):
             'module1 = calmjs.testing.module1',
             'module2 = calmjs.testing.module2',
             'module3 = calmjs.testing.module3',
-        ])
+        ], dist=Distribution(project_name='calmjs.testing'))
         utils.stub_mod_working_set(self, [calmjs.base], working_set)
 
         # Not going to use the global registry
@@ -95,6 +92,17 @@ class IntegratedModuleRegistryTestCase(unittest.TestCase):
                 'calmjs.testing.module3',
             ]
         )
+
+        results = registry.get_records_for_package('calmjs.testing')
+        self.assertEqual(sorted(results.keys()), [
+           'calmjs/testing/module1/hello',
+           'calmjs/testing/module2/helper',
+           'calmjs/testing/module2/index',
+           'calmjs/testing/module3/math',
+        ])
+
+        module1 = registry.get_record('calmjs.testing.module1')
+        self.assertIn('calmjs/testing/module1/hello', module1)
 
 
 class ExtraJsonKeysRegistryTestCase(unittest.TestCase):

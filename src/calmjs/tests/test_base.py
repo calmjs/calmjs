@@ -2,6 +2,9 @@
 import unittest
 import os
 
+from pkg_resources import EntryPoint
+from pkg_resources import Distribution
+
 from calmjs import base
 from calmjs.testing import mocks
 from calmjs.testing.utils import mkdtemp
@@ -9,8 +12,8 @@ from calmjs.testing.utils import mkdtemp
 
 class DummyModuleRegistry(base.BaseModuleRegistry):
 
-    def _register_entry_point_module(self, entry_point, module):
-        self.records[entry_point.name] = {module.__name__: module}
+    def _map_entry_point_module(self, entry_point, module):
+        return {module.__name__: {module.__name__: module}}
 
 
 class BaseRegistryTestCase(unittest.TestCase):
@@ -86,6 +89,55 @@ class BaseModuleRegistryTestCase(unittest.TestCase):
         self.assertEqual(list(registry.iter_records()), [
             ('calmjs.testing.module1', {'calmjs.testing.module1': module1}),
         ])
+
+    def test_dummy_implemented_multiple_modules(self):
+        from calmjs.testing import module1
+        from calmjs.testing import module2
+        working_set = mocks.WorkingSet([
+            'calmjs.testing.module1 = calmjs.testing.module1',
+            'calmjs.testing.module2 = calmjs.testing.module2',
+        ], dist=Distribution(project_name='calmjs.testing'))
+        registry = DummyModuleRegistry(__name__, _working_set=working_set)
+
+        # it should be merged like so:
+        result = registry.get_records_for_package('calmjs.testing')
+        self.assertEqual(result, {
+            'calmjs.testing.module1': module1,
+            'calmjs.testing.module2': module2,
+        })
+
+        # root will not work
+        result = registry.get_records_for_package('calmjs')
+        self.assertEqual(result, {})
+        # likewise not for the module.
+        result = registry.get_records_for_package('calmjs.testing.module1')
+        self.assertEqual(result, {})
+
+        # singular result at the module level should still work
+        result = registry.get('calmjs.testing.module2')
+        self.assertEqual(result, {'calmjs.testing.module2': module2})
+
+    def test_dummy_implemented_manual_entrypoint(self):
+        from calmjs.testing import module1
+        registry = DummyModuleRegistry(__name__)
+        registry.register_entry_point(
+            EntryPoint.parse('calmjs.testing.module1 = calmjs.testing.module1')
+        )
+        result = registry.get_record('calmjs.testing.module1')
+        self.assertEqual(result, {'calmjs.testing.module1': module1})
+
+    def test_dummy_implemented_manual_entrypoint_double_regisetr(self):
+        from calmjs.testing import module1
+        registry = DummyModuleRegistry(__name__)
+        registry.register_entry_point(
+            EntryPoint.parse('calmjs.testing.module1 = calmjs.testing.module1')
+        )
+        registry.register_entry_point(
+            EntryPoint.parse('calmjs.testing.module1 = calmjs.testing.module1')
+        )
+        result = registry.get_record('calmjs.testing.module1')
+        # just merged together.
+        self.assertEqual(result, {'calmjs.testing.module1': module1})
 
     def test_got_record_cloned(self):
         # returned records should clones.

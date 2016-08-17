@@ -89,6 +89,7 @@ class BaseModuleRegistry(BaseRegistry):
 
     def __init__(self, registry_name, *a, **kw):
         super(BaseModuleRegistry, self).__init__(registry_name, *a, **kw)
+        self.package_module_map = {}
         self.register_entry_points(self.raw_entry_points)
 
     def register_entry_points(self, entry_points):
@@ -127,7 +128,54 @@ class BaseModuleRegistry(BaseRegistry):
 
     def _register_entry_point_module(self, entry_point, module):
         """
+        Private method that registers an entry_point with a provided
+        module.
+        """
+
+        records_map = self._map_entry_point_module(entry_point, module)
+
+        if entry_point.dist is None:
+            # it's probably manually added not through the standard
+            # setuptools procedures.
+            logger.warning(
+                "manually registering entry_point '%s' without associated "
+                "distribution to registry '%s'",
+                entry_point, self.registry_name,
+            )
+        else:
+            logger.debug(
+                "registering entry_point '%s' from '%s' to registry '%s'",
+                entry_point, entry_point.dist, self.registry_name,
+            )
+            if entry_point.dist.project_name not in self.package_module_map:
+                self.package_module_map[entry_point.dist.project_name] = []
+            # if duplicates exist, it means a package declared multiple
+            # keys for the same namespace and they really shouldn't do
+            # that.
+            self.package_module_map[entry_point.dist.project_name].extend(
+                list(records_map.keys()))
+
+        for module_name, records in records_map.items():
+            if module_name in self.records:
+                logger.info(
+                    "module '%s' was already declared in registry '%s'; "
+                    "applying new records on top.",
+                    module_name, self.registry_name,
+                )
+                self.records[module_name].update(records)
+            else:
+                logger.debug(
+                    "adding records for module '%s' to registry '%s'",
+                    module_name, self.registry_name,
+                )
+                self.records[module_name] = records
+
+    def _map_entry_point_module(self, entry_point, module):
+        """
         Subclass need to implement this.
+
+        The implementation is to return a map (dict) of the name of the
+        module(s) with their mapped source files.
         """
 
         raise NotImplementedError
@@ -139,6 +187,17 @@ class BaseModuleRegistry(BaseRegistry):
 
         result = {}
         result.update(self.records.get(name, {}))
+        return result
+
+    def get_records_for_package(self, package_name):
+        """
+        Get all records identified by package.
+        """
+
+        names = self.package_module_map.get(package_name, [])
+        result = {}
+        for name in names:
+            result.update(self.get_record(name))
         return result
 
     def iter_records(self):
