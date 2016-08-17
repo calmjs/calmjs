@@ -12,7 +12,7 @@ from os.path import join
 
 from calmjs.testing import utils
 from calmjs.testing.utils import mkdtemp
-from calmjs.testing.utils import mkdtemp_single
+from calmjs.testing.utils import mkdtemp_singleton
 from calmjs.testing.utils import make_dummy_dist
 
 
@@ -67,9 +67,9 @@ class TestingUtilsTestCase(unittest.TestCase):
         self.assertFalse(exists(target2))
         self.assertEqual(self.mock_tempfile.count, 2)
 
-    def test_mkdtemp_single_clean_ups(self):
-        target = mkdtemp_single(self)
-        repeated = mkdtemp_single(self)
+    def test_mkdtemp_singleton_clean_ups(self):
+        target = mkdtemp_singleton(self)
+        repeated = mkdtemp_singleton(self)
         self.assertTrue(exists(target))
         self.assertEqual(target, repeated)  # same dir returned.
         self.assertEqual(self.mock_tempfile.count, 1)  # called once.
@@ -79,7 +79,7 @@ class TestingUtilsTestCase(unittest.TestCase):
         self.assertFalse(hasattr(self, '_calmjs_testing_tmpdir'))
 
         # pretend we go into a different scope
-        new_target = mkdtemp_single(self)
+        new_target = mkdtemp_singleton(self)
         # The next test should of course have a new directory.
         self.assertNotEqual(target, new_target)
         self.doCleanups()

@@ -51,7 +51,7 @@ def mkdtemp(testcase_inst):
     return tmpdir
 
 
-def mkdtemp_single(testcase_inst):
+def mkdtemp_singleton(testcase_inst):
     """
     A temporary directory creation helper function that cleans itself up
     by removing itself after the TestCase instance completes the current
@@ -111,24 +111,26 @@ def make_multipath_module3(testcase_inst):
 
 
 def make_dummy_dist(testcase_inst, metadata_map=(),
-                    pkgname='dummydist', version='0.0'):
+                    pkgname='dummydist', version='0.0', working_dir=None):
     """
     Test case helper function for creating a distribution dummy that
     uses PathMetadata for the foundation for integration level testing.
     """
 
-    tmpdir = mkdtemp_single(testcase_inst)
+    if working_dir is None:
+        working_dir = mkdtemp_singleton(testcase_inst)
+
     egg_info = '%s-%s.egg-info' % (pkgname, version)
-    egg_info_dir = join(tmpdir, egg_info)
+    egg_info_dir = join(working_dir, egg_info)
     makedirs(egg_info_dir)
-    metadata = PathMetadata(tmpdir, egg_info_dir)
+    metadata = PathMetadata(working_dir, egg_info_dir)
 
     for fn, data in metadata_map:
         with open(join(egg_info_dir, fn), 'w') as fd:
             fd.write(data)
 
     return Distribution(
-        tmpdir, project_name=pkgname, metadata=metadata, version=version)
+        working_dir, project_name=pkgname, metadata=metadata, version=version)
 
 
 def remember_cwd(testcase_inst):
