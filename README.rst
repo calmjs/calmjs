@@ -1,9 +1,12 @@
 calmjs
 ======
 
-A framework for building toolchains and utilities for working with
-JavaScript, either source from NodeJS based package repositories or
-shipped with Python packages from the Python environment.
+A Python framework for building toolchains and utilities for working
+with JavaScript packages.  The packages can be sourced from any Node.js
+based repositories or from Python packages, and the calmjs framework
+makes it possible to make use of all that from a well-integrated
+environment with minimal work to ensure reproducibility for usage within
+a continuous integration/deployment environment.
 
 .. image:: https://travis-ci.org/calmjs/calmjs.svg?branch=master
     :target: https://travis-ci.org/calmjs/calmjs
@@ -62,7 +65,7 @@ Manage dependencies of JavaScript modules (hosted by ``npm`` or others)
     In other words, subsequent Python packages can readily generate and
     reuse its parent(s) ``package.json`` file with ease.
 
-Expose JavaScript code in a Python module as proper namespaced modules
+Expose JavaScript code in Python packages, while using their namespaces
     A given Python package that may have included JavaScript code
     associated for that project will be able to declare those code as
     JavaScript modules with the exact same namespace through
@@ -71,9 +74,12 @@ Expose JavaScript code in a Python module as proper namespaced modules
     These declarations will be available through registries exposed by
     ``calmjs`` for other packages to turn those declarations through the
     API available into working JavaScript code following the same
-    declared module structures.
+    declared module and namespace structures, though the default module
+    registry will make use of the ``/`` character as the separator for
+    the names due to established naming conventions in JavaScript (and
+    in ES6 towards the future).
 
-Better integration of JavaScript toolchains with Python environment
+Better integration of JavaScript toolchains into Python environments
     Rather, providing a framework for building toolchains for working
     with tools written in JavaScript for JavaScript that integrates well
     with existing Python packages and environment.
@@ -173,10 +179,10 @@ merged much like how dependencies get dealt with.  Please do note that
 complete paths must be declared (note that the ``.js`` filename suffix
 is included in the example); directories can also be declared.  However,
 it is up to downstream integration packages to properly handle and/or
-convert this into the conventions that standard nodejs tools might
+convert this into the conventions that standard Node.js tools might
 expect.
 
-Expose JavaScript code from a Python module
+Export JavaScript code from Python packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Furthering the previous example, if the files and directories inside
@@ -272,9 +278,12 @@ was declared like so:
 
 The separator for the namespace and the module will use the ``.``
 character instead of ``/``.  However given that the ``.`` character is
-a valid name for a JavaScript module, the usage of this is ill-advised,
-but it does make JavaScript code look a bit more Pythonic at the cost of
-lessened standards compliance with the target language.
+a valid name for a JavaScript module, the usage of this may create
+issues with certain JavaScript tools.  However, AMD based module systems
+can generally deal with ``.`` without issues so using those may end up
+resulting in somewhat more Python-like feel when dealing with imports
+while using JavaScript, though at a slight cost of whatever standards
+compliance with it.
 
 
 Toolchain

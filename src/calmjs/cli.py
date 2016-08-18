@@ -335,8 +335,9 @@ class PackageManagerDriver(NodeDriver):
         """
         This was originally designed to be invoked at the module level
         for packages that implement specific support, but this can be
-        used to create an instance that has the nodejs backed executable
-        be found via current directory's node_modules or NODE_PATH.
+        used to create an instance that has the Node.js backed
+        executable be found via current directory's node_modules or
+        NODE_PATH.
         """
 
         inst = cls()

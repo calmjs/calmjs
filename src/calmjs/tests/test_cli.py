@@ -264,7 +264,7 @@ class CliDriverTestCase(unittest.TestCase):
         self.assertEqual(version, (0, 10, 25))
 
     # live test, no stubbing
-    @unittest.skipIf(cli.get_node_version() is None, 'nodejs not found.')
+    @unittest.skipIf(cli.get_node_version() is None, 'Node.js not found.')
     def test_node_version_get(self):
         version = cli.get_node_version()
         self.assertIsNotNone(version)
@@ -276,7 +276,7 @@ class CliDriverTestCase(unittest.TestCase):
             cli.node('process.stdout.write("Hello World!");')
 
     # live test, no stubbing
-    @unittest.skipIf(cli.get_node_version() is None, 'nodejs not found.')
+    @unittest.skipIf(cli.get_node_version() is None, 'Node.js not found.')
     def test_node_run(self):
         stdout, stderr = cli.node('process.stdout.write("Hello World!");')
         self.assertEqual(stdout, 'Hello World!')

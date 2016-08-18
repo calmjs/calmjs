@@ -107,7 +107,7 @@ class Toolchain(BaseDriver):
     For shared methods between all toolchains.
 
     The objective of this class is to provide a consistent interface
-    from calmjs to the various cli nodejs tools, this class inherits
+    from calmjs to the various cli Node.js tools, this class inherits
     from the BaseDriver class.  This means having the same foundation
     and also the ability to reuse a number of useful utility methods
     for talking to those scripts and binaries.

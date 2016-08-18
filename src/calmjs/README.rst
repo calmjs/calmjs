@@ -35,7 +35,7 @@ toolchain
 cli
     Module that provides interface between the cli tools and also to
     provide more cli functionalities that expand on those.  Provides the
-    expanded driver classes for interfacing with nodejs and its tools,
+    expanded driver classes for interfacing with Node.js and its tools,
     so it might end up inheriting from toolchain also.
 
 command

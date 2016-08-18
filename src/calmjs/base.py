@@ -211,14 +211,14 @@ class BaseModuleRegistry(BaseRegistry):
 
 class BaseDriver(object):
     """
-    The nodejs interfacing base driver class.
+    The Node.js interfacing base driver class.
 
-    Classes under the calmjs framework that make use of nodejs or nodejs
-    binaries should make this as the base class to make accessing the
-    nodejs environment in a manner consistent with the framework, where
-    various defined attributes and helper methods that makes use of
-    those will make interfacing with the nodejs environment be under a
-    consistently managed scheme.
+    Classes under the calmjs framework that make use of Node.js or
+    Node.js binaries should make this as the base class to make
+    accessing the Node.js environment in a manner consistent with the
+    framework, where various defined attributes and helper methods that
+    makes use of those will make interfacing with the Node.js
+    environment be under a consistently managed scheme.
 
     Helper methods such as _exec will ensure the binary is executed
     with the right arguments (via _gen_call_kws).  The dump/dumps method

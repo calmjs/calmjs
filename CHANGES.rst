@@ -8,4 +8,5 @@ Changelog
 - Provide core integration with ``npm`` and generation of
   ``package.json`` through the ``setuptools`` framework.
 - Provide core registries for registering packages for use by ``calmjs``
-  through the predefined ``setuptools`` entry point groups.
+  through the predefined ``setuptools`` entry points and groups.
+- Provide integration testing modules.
