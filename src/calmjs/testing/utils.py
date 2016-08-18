@@ -5,6 +5,7 @@ import textwrap
 import os
 import sys
 from os import makedirs
+from os.path import exists
 from os.path import join
 from os.path import dirname
 from os.path import isdir
@@ -37,7 +38,7 @@ def fake_error(exception):
 
 
 def generate_integration_environment(
-        working_dir,
+        working_dir, registry_id='calmjs.module.simulated',
         pkgman_filename='package.json', extras_calmjs_key='node_modules'):
     """
     Generate a comprehensive integration testing environment for test
@@ -48,6 +49,10 @@ def generate_integration_environment(
     working_dir
         The working directory to write all the distribution information
         and dummy test scripts to.
+
+    registry_id
+        The registry id to be used for the dummy module registry.
+        Default is 'calmjs.module.simulated'
 
     pkgman_filename
         The package manager's expected filename.  Defaults to the npm
@@ -62,8 +67,6 @@ def generate_integration_environment(
 
     from calmjs.module import ModuleRegistry
     from calmjs.dist import EXTRAS_CALMJS_JSON
-
-    dummy_regid = 'calmjs.module.simulated'
 
     def make_entry_points(registry_id, *raw):
         return '\n'.join(['[%s]' % registry_id] + list(raw))
@@ -86,7 +89,7 @@ def generate_integration_environment(
             },
         })),
         ('entry_points.txt', make_entry_points(
-            dummy_regid,
+            registry_id,
             'framework = framework',
         )),
         (EXTRAS_CALMJS_JSON, json.dumps({
@@ -113,7 +116,7 @@ def generate_integration_environment(
             },
         })),
         ('entry_points.txt', make_entry_points(
-            dummy_regid,
+            registry_id,
             'widget = widget',
         )),
     ), 'widget', '1.1', working_dir=working_dir)
@@ -130,7 +133,7 @@ def generate_integration_environment(
             },
         })),
         ('entry_points.txt', make_entry_points(
-            dummy_regid,
+            registry_id,
             'forms = forms',
         )),
     ), 'forms', '1.6', working_dir=working_dir)
@@ -156,7 +159,7 @@ def generate_integration_environment(
             },
         })),
         ('entry_points.txt', make_entry_points(
-            dummy_regid,
+            registry_id,
             'service = service',
             'service.rpc = service.rpc',
         )),
@@ -172,7 +175,7 @@ def generate_integration_environment(
             'name': 'site',
             'dependencies': {
                 'underscore': '~1.8.0',
-                'jquery': '~1.9.0',
+                'jquery': '~3.0.0',
             },
         })),
         (EXTRAS_CALMJS_JSON, json.dumps({
@@ -228,12 +231,12 @@ def generate_integration_environment(
     package_module_map = {}
 
     # I kind of want to do something like
-    # registry = ModuleRegistry(dummy_regid, _working_set=mock_working_set)
+    # registry = ModuleRegistry(registry_id, _working_set=mock_working_set)
     # However, this requires actually stubbing out a bunch of other
     # stuff and I really don't want to muck about with imports for a
     # setup... so we are going to mock the registry like so:
 
-    for ep in mock_working_set.iter_entry_points(dummy_regid):
+    for ep in mock_working_set.iter_entry_points(registry_id):
         package_module_map[ep.dist.project_name] = package_module_map.get(
             ep.dist.project_name, [])
         package_module_map[ep.dist.project_name].append(ep.module_name)
@@ -272,12 +275,32 @@ def generate_integration_environment(
         pass
 
     # Now create and assign the registry with our things
-    registry = ModuleRegistry(dummy_regid)
+    registry = ModuleRegistry(registry_id)
     registry.records = records
     registry.package_module_map = package_module_map
 
     # Return dummy working set (for dist resolution) and the registry
     return mock_working_set, registry
+
+
+def setup_class_integration_environment(cls, **kw):
+    from calmjs import dist as calmjs_dist
+    from calmjs.registry import _inst as root_registry
+    cls.dist_dir = tempfile.mkdtemp()
+    results = generate_integration_environment(cls.dist_dir, **kw)
+    working_set, registry = results
+    cls.registry_name = registry.registry_name
+    root_registry.records[cls.registry_name] = registry
+    cls.root_working_set, calmjs_dist.default_working_set = (
+        calmjs_dist.default_working_set, working_set)
+
+
+def teardown_class_integration_environment(cls):
+    from calmjs import dist as calmjs_dist
+    from calmjs.registry import _inst as root_registry
+    rmtree(cls.dist_dir)
+    root_registry.records.pop(cls.registry_name)
+    calmjs_dist.default_working_set = cls.root_working_set
 
 
 def mkdtemp(testcase_inst):
@@ -295,9 +318,13 @@ def mkdtemp(testcase_inst):
             '%s does not support addCleanup; package requires python2.7+ or '
             'unittest2.' % testcase_inst)
 
+    def cleanup(tmpdir):
+        if exists(tmpdir):
+            rmtree(tmpdir)
+
     # create the temporary dir and add the cleanup for that immediately.
     tmpdir = tempfile.mkdtemp()
-    testcase_inst.addCleanup(rmtree, tmpdir)
+    testcase_inst.addCleanup(cleanup, tmpdir)
     return tmpdir
 
 

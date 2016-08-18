@@ -9,6 +9,7 @@ from pkg_resources import Requirement
 import os
 from os.path import exists
 from os.path import join
+from shutil import rmtree
 
 from calmjs.testing import utils
 from calmjs.testing.utils import mkdtemp
@@ -20,10 +21,43 @@ class MockTempfile(object):
 
     def __init__(self):
         self.count = 0
+        self.dirs = []
 
     def mkdtemp(self):
         self.count += 1
-        return tempfile.mkdtemp()
+        result = tempfile.mkdtemp()
+        self.dirs.append(result)
+        return result
+
+    def cleanup(self):
+        for p in self.dirs:
+            if exists(p):
+                rmtree(p)
+
+
+class BootstrapTestingUtilsTestCase(unittest.TestCase):
+    """
+    These BETTER work.
+    """
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        tempfile.tempdir = self.tmpdir
+
+    def tearDown(self):
+        # This is safe - the module will just call gettempdir() again
+        tempfile.tempdir = None
+        rmtree(self.tmpdir)
+
+    def test_mock_tempfile(self):
+        mock_tempfile = MockTempfile()
+        mock_tempfile.mkdtemp()
+        self.assertEqual(mock_tempfile.count, 1)
+        self.assertTrue(exists(mock_tempfile.dirs[0]))
+        # If this is NOT true, we probably left tmpdirs around.
+        self.assertTrue(mock_tempfile.dirs[0].startswith(self.tmpdir))
+        mock_tempfile.cleanup()
+        self.assertFalse(exists(mock_tempfile.dirs[0]))
 
 
 class TestingUtilsTestCase(unittest.TestCase):
@@ -38,11 +72,13 @@ class TestingUtilsTestCase(unittest.TestCase):
         utils.tempfile, self.old_tempfile = self.mock_tempfile, utils.tempfile
 
     def tearDown(self):
+        self.mock_tempfile.cleanup()
         utils.tempfile = self.old_tempfile
 
     def test_mkdtemp_not_test(self):
         with self.assertRaises(TypeError):
             mkdtemp(object)
+        self.assertEqual(self.mock_tempfile.count, 0)
 
     def test_mkdtemp_missing_addcleanup(self):
         # Quick and dirty subclassing for type signature and cleanup
@@ -215,6 +251,15 @@ class IntegrationGeneratorTestCase(unittest.TestCase):
     The testing utils better be working already.
     """
 
+    def setUp(self):
+        # Again setting up this mock for safety while testing.
+        self.mock_tempfile = MockTempfile()
+        utils.tempfile, self.old_tempfile = self.mock_tempfile, utils.tempfile
+
+    def tearDown(self):
+        self.mock_tempfile.cleanup()
+        utils.tempfile = self.old_tempfile
+
     def test_integration_generator(self):
         tmpdir = mkdtemp(self)
         results = utils.generate_integration_environment(working_dir=tmpdir)
@@ -250,3 +295,15 @@ class IntegrationGeneratorTestCase(unittest.TestCase):
             join(tmpdir, 'node_modules', 'jquery', 'dist', 'jquery.js')))
         self.assertTrue(exists(
             join(tmpdir, 'node_modules', 'underscore', 'underscore.js')))
+
+    def test_integration_setup_and_teardown(self):
+        from calmjs.registry import get
+        TestCase = type('TestCase', (unittest.TestCase,), {})
+        utils.setup_class_integration_environment(TestCase)
+        self.assertIn(TestCase.dist_dir, self.mock_tempfile.dirs)
+        registry = get('calmjs.registry')
+        self.assertEqual(TestCase.registry_name, 'calmjs.module.simulated')
+        self.assertTrue(registry.get('calmjs.module.simulated'))
+        utils.teardown_class_integration_environment(TestCase)
+        self.assertIsNone(registry.get('calmjs.module.simulated'))
+        self.assertFalse(exists(TestCase.dist_dir))
