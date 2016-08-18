@@ -114,6 +114,18 @@ class ToolchainTestCase(unittest.TestCase):
         # Also that it got deleted properly.
         self.assertFalse(exists(spec['build_dir']))
 
+    def test_toolchain_calf_with_build_dir_null(self):
+        spec = Spec(build_dir=None)
+
+        with self.assertRaises(NotImplementedError):
+            self.toolchain(spec)
+
+        # While build_dir is defined, no value was assigned.  See that
+        # the process will give it a new one.
+        self.assertTrue(spec['build_dir'].startswith(tempfile.gettempdir()))
+        # Also that it got deleted properly.
+        self.assertFalse(exists(spec['build_dir']))
+
     def test_toolchain_standard_compile_all(self):
         spec = Spec()
         self.toolchain.compile_all(spec)
