@@ -417,7 +417,7 @@ class PackageManagerDriver(NodeDriver):
                 self.pkg_name_field, NotImplemented) is NotImplemented:
             pkgdef_json[self.pkg_name_field] = package_name
 
-        # Now we figure out the actual fiel we want to work with.
+        # Now we figure out the actual file we want to work with.
 
         pkgdef_path = self.join_cwd(self.pkgdef_filename)
         existed = exists(pkgdef_path)
@@ -426,6 +426,9 @@ class PackageManagerDriver(NodeDriver):
         # however this is still relatively easy to reason over.  Should
         # consider this more of a shell and have the heavy lifting be
         # arranged in a more functional approach.
+
+        # Also, do we want to support the initialization of multiple
+        # packages?  For instance, [dev] extras?
 
         if existed:
             try:

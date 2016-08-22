@@ -17,6 +17,17 @@ registry
     Root registry class.  Inherits from base.  Should not inherit from
     anything else.
 
+indexer
+    Constains a microregistry and a number of functions for generation
+    of mappings of files within modules in Python packages for theu
+    purpose of exporting the paths of the JavaScript sources they hold.
+    Shouldn't really need expanding or shouldn't need to inherit from
+    calmjs.
+
+module
+    Defines module related registries, uses the indexer to generate the
+    module path mapping entries.
+
 dist
     Module that interfaces with distutils/setuptools in order to provide
     functions for dealing with distributions (i.e. dependencies and
@@ -33,33 +44,31 @@ toolchain
     provide the user facing entry points.
 
 cli
-    Module that provides interface between the cli tools and also to
-    provide more cli functionalities that expand on those.  Provides the
-    expanded driver classes for interfacing with Node.js and its tools,
-    so it might end up inheriting from toolchain also.
+    Module that provides the functions that call out to cli tools that
+    will support the functionality needed by the calmjs framework.
+    Provides the expanded driver classes for interfacing with Node.js
+    and its tools, and also the primative exposed functions that provide
+    its own shell.  This latter part could be exposed as the runtime
+    library.
+
+runtime
+    The module that provides the classes and functions that aid with
+    providing the entry point into calmjs from cli and elsewhere.
+    Supports the generation of the texts for users from the shell.
 
 command
     Provides the primative package manager command.  While it doesn't
     really inherit from anything here, implementations will likely
-    inherit from dist for helpers and cli for the actual cli interfacing
-    part for the underlying binary for the command.  This is what the
-    cli_driver is for.
-
-indexer
-    Constains a microregistry and a number of functions for generation
-    of mappings of files within modules in Python packages for theu
-    purpose of exporting the paths of the JavaScript sources they hold.
-    Shouldn't really need expanding or shouldn't need to inherit from
-    calmjs.
-
-module
-    Defines module related registries, uses the indexer to generate the
-    module path mapping entries.
+    inherit from dist for helpers, cli for the actual cli interfacing
+    part for the underlying binary for the command, and runtime for the
+    help tests.  The classes will hold onto an instance of a cli Driver
+    and also the appropriate runtime constructed using that.
 
 npm
     The npm specific tools.  Whole module can in theory be generated
-    from code, however without the source users will be loss.  So that's
+    from code, however without the source users will be lost.  So that's
     done like so for the integrated thing that could inherit from
     anything.
 
-As a general rule, modules above should not inherit from modules below.
+As a general rule, a module should not inherit from modules listed below
+their respective position on the above list.
