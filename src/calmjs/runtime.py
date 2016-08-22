@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
+import logging
+import sys
 from argparse import ArgumentParser
 
-# TODO, provide runtime/entrypoint into the cli
+from pkg_resources import working_set as default_working_set
 
+CALMJS_RUNTIME = 'calmjs.runtime'
+logger = logging.getLogger(__name__)
 pkg_manager_options = (
     ('init', None,
      "action: generate and write '%(pkgdef_filename)s' to the "
@@ -39,23 +43,60 @@ def make_cli_options(cli_driver):
     ]
 
 
-class DriverRuntime(object):
+class Runtime(object):
     """
-    A calmjs driver runtime
+    calmjs runtime collection
     """
 
-    def __init__(self, cli_driver, argparser=None):
+    def __init__(self, working_set=default_working_set):
+        self.argparser = ArgumentParser(description=self.__doc__)
+        commands = self.argparser.add_subparsers()
+
+        for entry_point in working_set.iter_entry_points(CALMJS_RUNTIME):
+            try:
+                inst = entry_point.load()
+            except ImportError:
+                logger.exception(
+                    "bad '%s' entry point '%s' from '%s'",
+                    CALMJS_RUNTIME, entry_point, entry_point.dist,
+                )
+                continue
+
+            if not isinstance(inst, DriverRuntime):
+                logger.error(
+                    "bad '%s' entry point '%s' from '%s': "
+                    "not a calmjs.runtime.DriverRuntime instance.",
+                    CALMJS_RUNTIME, entry_point, entry_point.dist,
+                )
+                continue
+
+            subparser = commands.add_parser(
+                inst.cli_driver.binary,
+                help=inst.cli_driver.description,
+            )
+            inst.init_argparser(subparser)
+
+    def __call__(self, args):
+        self.argparser.parse_args(args)
+
+
+class DriverRuntime(Runtime):
+    """
+    runtime for driver
+    """
+
+    def __init__(self, cli_driver):
         self.cli_driver = cli_driver
-
-        if argparser is None:
-            argparser = ArgumentParser()
-        self.argparser = argparser
+        self.argparser = None
         self.init()
 
     def init(self):
-        self.init_argparser()
+        if self.argparser is None:
+            self.argparser = ArgumentParser(
+                description=self.cli_driver.description)
+            self.init_argparser(self.argparser)
 
-    def init_argparser(self, argparser):
+    def init_argparser(self, argparser=None):
         """
         Initialize the argparser
         """
@@ -71,10 +112,12 @@ class PackageManagerRuntime(DriverRuntime):
     $ calmjs npm --install example.package
     """
 
-    def init_argparser(self):
-        # provide this for the setuptools command class.
+    def init(self):
         self.pkg_manager_options = make_cli_options(self.cli_driver)
-        argparser = self.argparser
+        super(PackageManagerRuntime, self).init()
+
+    def init_argparser(self, argparser):
+        # provide this for the setuptools command class.
         actions = argparser.add_argument_group('actions arguments')
 
         for full, short, desc in self.pkg_manager_options:
@@ -90,3 +133,8 @@ class PackageManagerRuntime(DriverRuntime):
 
         argparser.add_argument(
             'package_name', help='Name of the python package to use')
+
+
+def main(args=None):
+    runtime = Runtime()
+    runtime(args or sys.argv[1:])

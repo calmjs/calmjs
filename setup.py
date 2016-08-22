@@ -37,6 +37,12 @@ setup(
     ],
     python_requires='>=2.7,!=3.0.*,!=3.1.*,!=3.2.*',
     entry_points={
+        'console_scripts': [
+            'calmjs = calmjs.runtime:main',
+        ],
+        'calmjs.runtime': [
+            'npm = calmjs.npm:npm.runtime',
+        ],
         'distutils.commands': [
             'npm = calmjs.npm:npm',
         ],
