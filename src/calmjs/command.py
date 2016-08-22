@@ -41,62 +41,28 @@ class DistutilsLogHandler(logging.Handler):
             # LogRecord.__str__ shouldn't fail... probably.
             self.log.warn('Failed to convert %s' % record)
 
-
 distutils_log_handler = DistutilsLogHandler()
 
 
-class GenericPackageManagerCommand(Command):
+class PackageManagerCommand(Command):
     """
     Simple compatibility hook for a package manager
     """
 
     # subclasses need to define these
-    cli_driver = None
+    runtime = None
     # description = "base command for package manager compatibility helper"
 
     indent = 4
 
     # We are really only interested logs from these modules.
-    handle_logger_ids = ('calmjs.cli', 'calmjs.dist',)
-
-    user_options = [
-        ('init', None,
-         "action: generate and write '%(pkgdef_filename)s' to the "
-         "current directory for this Python package"),
-        # this required implicit step is done, otherwise there are no
-        # difference to running ``npm init`` directly from the shell.
-        ('install', None,
-         "action: run '%(pkg_manager_bin)s install' with generated "
-         "'%(pkgdef_filename)s'; implies init; will abort if init fails "
-         "to write the generated file"),
-        # as far as I know typically setuptools setup.py are not
-        # interactive, so we keep it that way unless user explicitly
-        # want this.
-        ('interactive', 'i',
-         "enable interactive prompt; if an action requires an explicit "
-         "response but none were specified through flags "
-         "(i.e. overwrite), prompt for response; disabled by default"),
-        ('merge', None,
-         "merge generated 'package.json' with the one in current "
-         "directory; if interactive mode is not enabled, implies "
-         "overwrite, else the difference will be displayed"),
-        ('overwrite', None,
-         "automatically overwrite any file changes to current directory "
-         "without prompting"),
-    ]
-    # TODO implement support for other install args like specifying the
-    # location of stuff.
+    handle_logger_ids = ('calmjs',)
 
     @classmethod
     def _initialize_user_options(cls):
-        cls.user_options = [
-            (full, s, desc % {
-                'pkgdef_filename': cls.cli_driver.pkgdef_filename,
-                'pkg_manager_bin': cls.cli_driver.pkg_manager_bin,
-            }) for full, s, desc in cls.user_options
-        ]
+        cls.user_options = cls.runtime.pkg_manager_options
 
-    # the actions that result in effects that we support
+    # keywords that are actions that result in effects that we support
     actions = ('init', 'install')
 
     def _opt_keys(self):

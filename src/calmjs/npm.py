@@ -8,9 +8,10 @@ setuptools integration of certain npm features.
 
 from functools import partial
 
-from calmjs import cli
+from calmjs.cli import PackageManagerDriver
+from calmjs.command import PackageManagerCommand
 from calmjs.dist import write_json_file
-from calmjs.command import GenericPackageManagerCommand
+from calmjs.runtime import PackageManagerRuntime
 
 PACKAGE_FIELD = 'package_json'
 PACKAGE_JSON = package_json = 'package.json'
@@ -18,7 +19,7 @@ NPM = 'npm'
 write_package_json = partial(write_json_file, PACKAGE_FIELD)
 
 
-class Driver(cli.PackageManagerDriver):
+class Driver(PackageManagerDriver):
 
     def __init__(self, **kw):
         kw['pkg_manager_bin'] = NPM
@@ -26,13 +27,14 @@ class Driver(cli.PackageManagerDriver):
         super(Driver, self).__init__(**kw)
 
 
-class npm(GenericPackageManagerCommand):
+class npm(PackageManagerCommand):
     """
     The npm specific setuptools command.
     """
 
     # modules globals will be populated with friendly exported names.
     cli_driver = Driver.create(globals())
+    runtime = PackageManagerRuntime(cli_driver)
     description = "npm compatibility helper"
 
 npm._initialize_user_options()
