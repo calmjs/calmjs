@@ -12,6 +12,7 @@ import json
 import warnings
 from locale import getpreferredencoding
 from os import getcwd
+from os.path import dirname
 from os.path import isdir
 from os.path import join
 from os.path import pathsep
@@ -249,7 +250,7 @@ class BaseDriver(object):
             left as is (',', ': ').
         """
 
-        self.node_path = node_path
+        self.node_path = node_path or os.environ.get(NODE_PATH)
         self.env_path = env_path
         self.working_dir = working_dir
         self.indent = indent
@@ -292,11 +293,11 @@ class BaseDriver(object):
                 default, modcls_name)
             return
 
-        node_path = os.environ.get(NODE_PATH)
+        node_path = self.node_path
         if node_path:
             logger.debug(
-                "environment variable '%s' defined (%s); "
-                "selected as base directory for finding node binaries.",
+                "environment variable '%s' defined '%s'; "
+                "their bin directories will be searched.",
                 NODE_PATH, node_path,
             )
         else:
@@ -308,17 +309,19 @@ class BaseDriver(object):
                 NODE_PATH, node_path,
             )
 
-        env_path = join(node_path, '.bin')
-        if which(self.binary, path=env_path):
+        target = which(self.binary, path=pathsep.join(
+            join(p, '.bin') for p in node_path.split(pathsep)))
+
+        if target:
             # Only setting the path specific for the binary; side effect
             # will be whoever else borrowing the _exec in here might not
             # get the binary they want.  That's why it's private.
+            self.env_path = dirname(target)
             logger.debug(
                 "located '%s' binary at '%s'; setting PATH environment "
                 "variable for '%s' instance.",
-                self.binary, env_path, modcls_name
+                self.binary, self.env_path, modcls_name
             )
-            self.env_path = env_path
         elif warn:
             msg = (
                 "Unable to locate the '%(binary)s' binary; default module "
@@ -352,7 +355,7 @@ class BaseDriver(object):
     def _gen_call_kws(self, **env):
         kw = {}
         if self.node_path is not None:
-            _check_isdir_assign_key(env, NODE_PATH, self.node_path)
+            env[NODE_PATH] = self.node_path
         if self.env_path is not None:
             # Initial assignment with check
             _check_isdir_assign_key(env, 'PATH', self.env_path)

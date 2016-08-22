@@ -438,7 +438,6 @@ class CliDriverTestCase(unittest.TestCase):
                 "Unable to locate the 'mgr' binary;", str(w[-1].message))
 
     def fake_mgr_bin(self):
-        stub_os_environ(self)
         tmpdir = mkdtemp(self)
         # fake an executable in node_modules
         bin_dir = join(tmpdir, 'node_modules', '.bin')
@@ -467,12 +466,39 @@ class CliDriverTestCase(unittest.TestCase):
         driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
         self.assertIsNone(driver.env_path)
         # using NODE_PATH set to a valid node_modules
-        os.environ['NODE_PATH'] = join(tmpdir, 'node_modules')
+        driver.node_path = join(tmpdir, 'node_modules')
         driver._set_env_path_with_node_modules()
         self.assertEqual(driver.env_path, bin_dir)
         # should still result in the same thing.
         driver._set_env_path_with_node_modules()
         self.assertEqual(driver.env_path, bin_dir)
+
+    def test_set_env_path_with_node_path_with_environ(self):
+        stub_os_environ(self)
+        tmpdir, bin_dir = self.fake_mgr_bin()
+        # define a NODE_PATH set to a valid node_modules
+        os.environ['NODE_PATH'] = join(tmpdir, 'node_modules')
+        driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
+        driver._set_env_path_with_node_modules()
+        self.assertEqual(driver.env_path, bin_dir)
+
+    def test_set_env_path_with_node_path_multiple_with_environ(self):
+        tmp = mkdtemp(self)
+        tmp1, bin_dir1 = self.fake_mgr_bin()
+        tmp2, bin_dir2 = self.fake_mgr_bin()
+        node_path = pathsep.join(
+            join(d, 'node_modules') for d in (tmp, tmp1, tmp2))
+        driver = cli.PackageManagerDriver(
+            pkg_manager_bin='mgr', node_path=node_path)
+        driver._set_env_path_with_node_modules()
+        # First one.  Whether the node modules loads correctly, that's
+        # up to the nodejs circus.
+        self.assertEqual(driver.env_path, bin_dir1)
+
+        # ensure the kws generated correctly.
+        env = driver._gen_call_kws()['env']
+        self.assertEqual(env['NODE_PATH'], node_path)
+        self.assertEqual(env['PATH'].split(pathsep)[0], bin_dir1)
 
     def test_driver_run_failure(self):
         # testing for success may actually end up being extremely
