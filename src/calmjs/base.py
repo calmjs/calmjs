@@ -231,7 +231,7 @@ class BaseDriver(object):
     """
 
     def __init__(self, node_path=None, env_path=None, working_dir=None,
-                 indent=4, separators=(',', ': ')):
+                 indent=4, separators=(',', ': '), description=None):
         """
         Optional Arguments (defaults to None when not stated):
 
@@ -248,6 +248,8 @@ class BaseDriver(object):
         separators
             Set as a workaround to remove trailing spaces.  Should be
             left as is (',', ': ').
+        description
+            A description for this driver.  Optional string.
         """
 
         self.node_path = node_path or os.environ.get(NODE_PATH)
@@ -256,6 +258,7 @@ class BaseDriver(object):
         self.indent = indent
         self.separators = separators
         self.binary = None
+        self.description = description
 
     def which(self):
         """

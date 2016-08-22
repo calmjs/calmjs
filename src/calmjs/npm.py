@@ -24,6 +24,7 @@ class Driver(PackageManagerDriver):
     def __init__(self, **kw):
         kw['pkg_manager_bin'] = NPM
         kw['pkgdef_filename'] = PACKAGE_JSON
+        kw['description'] = "npm compatibility helper"
         super(Driver, self).__init__(**kw)
 
 
@@ -35,6 +36,6 @@ class npm(PackageManagerCommand):
     # modules globals will be populated with friendly exported names.
     cli_driver = Driver.create(globals())
     runtime = PackageManagerRuntime(cli_driver)
-    description = "npm compatibility helper"
+    description = cli_driver.description
 
 npm._initialize_user_options()
