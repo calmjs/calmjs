@@ -5,6 +5,8 @@ from argparse import ArgumentParser
 
 from pkg_resources import working_set as default_working_set
 
+from calmjs.utils import pretty_logging
+
 CALMJS_RUNTIME = 'calmjs.runtime'
 logger = logging.getLogger(__name__)
 pkg_manager_options = (
@@ -35,6 +37,12 @@ pkg_manager_options = (
 DEST_ACTION = 'action'
 DEST_RUNTIME = 'runtime'
 
+levels = {
+    0: logging.WARNING,
+    1: logging.INFO,
+    2: logging.DEBUG,
+}
+
 
 def make_cli_options(cli_driver):
     return [
@@ -64,6 +72,10 @@ class Runtime(object):
     def init_argparser(self, argparser):
         commands = argparser.add_subparsers(
             dest=DEST_RUNTIME, metavar='<command>')
+
+        argparser.add_argument(
+            '-v', '--verbosity', action='count', default=0,
+            help="enable debug logging")
 
         for entry_point in self.working_set.iter_entry_points(CALMJS_RUNTIME):
             try:
@@ -99,7 +111,10 @@ class Runtime(object):
 
     def __call__(self, args):
         kwargs = vars(self.argparser.parse_args(args))
-        self.run(**kwargs)
+        # should have own api to add this to aid with popping root flags
+        level = levels.get(kwargs.pop('verbosity'), logging.DEBUG)
+        with pretty_logging(logger='calmjs', level=level, stream=sys.stderr):
+            self.run(**kwargs)
 
 
 class DriverRuntime(Runtime):
@@ -177,5 +192,6 @@ class PackageManagerRuntime(DriverRuntime):
 
 
 def main(args=None):
-    runtime = Runtime()
-    runtime(args or sys.argv[1:])
+    with pretty_logging(logger=logger, level=logging.ERROR, stream=sys.stderr):
+        runtime = Runtime()
+        runtime(args or sys.argv[1:])
