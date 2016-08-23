@@ -33,6 +33,7 @@ pkg_manager_options = (
      "without prompting"),
 )
 DEST_ACTION = 'action'
+DEST_RUNTIME = 'runtime'
 
 
 def make_cli_options(cli_driver):
@@ -52,6 +53,7 @@ class Runtime(object):
     def __init__(self, working_set=default_working_set):
         self.working_set = working_set
         self.argparser = None
+        self.runtimes = {}
         self.init()
 
     def init(self):
@@ -60,10 +62,12 @@ class Runtime(object):
             self.init_argparser(self.argparser)
 
     def init_argparser(self, argparser):
-        commands = argparser.add_subparsers()
+        commands = argparser.add_subparsers(
+            dest=DEST_RUNTIME, metavar='<command>')
 
         for entry_point in self.working_set.iter_entry_points(CALMJS_RUNTIME):
             try:
+                # load the runtime instance
                 inst = entry_point.load()
             except ImportError:
                 logger.exception(
@@ -84,12 +88,18 @@ class Runtime(object):
                 entry_point.name,
                 help=inst.cli_driver.description,
             )
+            self.runtimes[entry_point.name] = inst
             inst.init_argparser(subparser)
+
+    def run(self, **kwargs):
+        runtime = self.runtimes.get(kwargs.pop(DEST_RUNTIME))
+        if runtime:
+            runtime.run(**kwargs)
+        # nothing is going to happen otherwise?
 
     def __call__(self, args):
         kwargs = vars(self.argparser.parse_args(args))
-        action = kwargs.pop(DEST_ACTION)
-        action(**kwargs)
+        self.run(**kwargs)
 
 
 class DriverRuntime(Runtime):
@@ -104,6 +114,11 @@ class DriverRuntime(Runtime):
     def init_argparser(self, argparser=None):
         """
         DriverRuntime should have their own init_argparer method.
+        """
+
+    def run(self, **kwargs):
+        """
+        DriverRuntime should have their own running method.
         """
 
 
@@ -144,6 +159,10 @@ class PackageManagerRuntime(DriverRuntime):
 
         argparser.add_argument(
             'package_name', help='Name of the python package to use')
+
+    def run(self, **kwargs):
+        action = kwargs.pop(DEST_ACTION)
+        action(**kwargs)
 
 
 def main(args=None):
