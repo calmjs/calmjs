@@ -28,9 +28,9 @@ class RegistryIntegrationTestCase(unittest.TestCase):
             'calmjs.module'))
 
     def test_registry_graceful_fail(self):
-        working_set = mocks.WorkingSet([
+        working_set = mocks.WorkingSet({'calmjs.registry': [
             'failure = calmjs.testing.no_such_module:NoClass',
-        ])
+        ]})
         registry = calmjs.registry.Registry(
             'calmjs.registry', _working_set=working_set)
         # This should not be registered or available
@@ -38,9 +38,9 @@ class RegistryIntegrationTestCase(unittest.TestCase):
         self.assertIsNone(registry.get_record('failure'))
 
     def test_registry_graceful_fail_bad_constructor(self):
-        working_set = mocks.WorkingSet([
+        working_set = mocks.WorkingSet({'calmjs.registry': [
             'failure = calmjs.testing.module3.module:NotRegistry',
-        ])
+        ]})
         registry = calmjs.registry.Registry(
             'calmjs.registry', _working_set=working_set)
         # This should not be registered or available
@@ -48,9 +48,9 @@ class RegistryIntegrationTestCase(unittest.TestCase):
         self.assertIsNone(registry.get_record('failure'))
 
     def test_registry_fresh_from_entrypoint(self):
-        working_set = mocks.WorkingSet([
+        working_set = mocks.WorkingSet({'calmjs.registry': [
             'custom = calmjs.testing.module3.module:CustomModuleRegistry',
-        ])
+        ]})
         registry = calmjs.registry.Registry(
             'calmjs.registry', _working_set=working_set)
         self.assertEqual(len(registry.records), 0)

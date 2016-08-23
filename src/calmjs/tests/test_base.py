@@ -22,16 +22,16 @@ class BaseRegistryTestCase(unittest.TestCase):
     """
 
     def test_empty(self):
-        working_set = mocks.WorkingSet([])
+        working_set = mocks.WorkingSet({__name__: []})
         registry = base.BaseRegistry(__name__, _working_set=working_set)
         self.assertEqual(registry.raw_entry_points, [])
 
     def test_entry_points(self):
-        working_set = mocks.WorkingSet([
+        working_set = mocks.WorkingSet({__name__: [
             'module1 = calmjs.testing.module1',
             'module2 = calmjs.testing.module2',
             'module3 = calmjs.testing.module3',
-        ])
+        ]})
 
         registry = base.BaseRegistry(__name__, _working_set=working_set)
         self.assertEqual(len(registry.raw_entry_points), 3)
@@ -58,31 +58,31 @@ class BaseModuleRegistryTestCase(unittest.TestCase):
         base.working_set = self.original_working_set
 
     def test_empty(self):
-        working_set = mocks.WorkingSet([])
+        working_set = mocks.WorkingSet({__name__: []})
         registry = base.BaseModuleRegistry(__name__, _working_set=working_set)
         self.assertEqual(list(registry.iter_records()), [])
 
     def test_bad_record(self):
-        working_set = mocks.WorkingSet([
+        working_set = mocks.WorkingSet({__name__: [
             'calmjs.testing.not_a_module = calmjs.testing.not_a_module',
-        ])
+        ]})
         registry = base.BaseModuleRegistry(__name__, _working_set=working_set)
         self.assertEqual(len(registry.raw_entry_points), 1)
         self.assertEqual(registry.get_record('module'), {})
         self.assertEqual(list(registry.iter_records()), [])
 
     def test_not_implemented(self):
-        working_set = mocks.WorkingSet([
+        working_set = mocks.WorkingSet({__name__: [
             'calmjs.testing.module1 = calmjs.testing.module1',
-        ])
+        ]})
         with self.assertRaises(NotImplementedError):
             base.BaseModuleRegistry(__name__, _working_set=working_set)
 
     def test_dummy_implemented(self):
         from calmjs.testing import module1
-        working_set = mocks.WorkingSet([
+        working_set = mocks.WorkingSet({__name__: [
             'calmjs.testing.module1 = calmjs.testing.module1',
-        ])
+        ]})
         registry = DummyModuleRegistry(__name__, _working_set=working_set)
         result = registry.get_record('calmjs.testing.module1')
         self.assertEqual(result, {'calmjs.testing.module1': module1})
@@ -93,10 +93,10 @@ class BaseModuleRegistryTestCase(unittest.TestCase):
     def test_dummy_implemented_multiple_modules(self):
         from calmjs.testing import module1
         from calmjs.testing import module2
-        working_set = mocks.WorkingSet([
+        working_set = mocks.WorkingSet({__name__: [
             'calmjs.testing.module1 = calmjs.testing.module1',
             'calmjs.testing.module2 = calmjs.testing.module2',
-        ], dist=Distribution(project_name='calmjs.testing'))
+        ]}, dist=Distribution(project_name='calmjs.testing'))
         registry = DummyModuleRegistry(__name__, _working_set=working_set)
 
         # it should be merged like so:
@@ -141,9 +141,9 @@ class BaseModuleRegistryTestCase(unittest.TestCase):
 
     def test_got_record_cloned(self):
         # returned records should clones.
-        working_set = mocks.WorkingSet([
+        working_set = mocks.WorkingSet({__name__: [
             'calmjs.testing.module1 = calmjs.testing.module1',
-        ])
+        ]})
         registry = DummyModuleRegistry(__name__, _working_set=working_set)
         record1 = registry.get_record('calmjs.testing.module1')
         record2 = registry.get_record('calmjs.testing.module1')

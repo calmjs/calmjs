@@ -17,8 +17,8 @@ class WorkingSet(object):
         self.dist = dist
 
     def iter_entry_points(self, name):
-        # no distinction on name whatsoever because this is a mock
-        for item in self.items:
+        items = self.items.get(name, [])
+        for item in items:
             entry_point = EntryPoint.parse(item)
             entry_point.dist = self.dist
             yield entry_point

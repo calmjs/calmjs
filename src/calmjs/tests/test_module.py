@@ -66,16 +66,22 @@ class IntegratedModuleRegistryTestCase(unittest.TestCase):
     def test_module_registry_through_registry(self):
         """
         Show that the module registry instantiated through the global
-        registry get function will result in the resulting module
-        registry being populated properly with the module entries.
+        registry's get function will result in the resulting module
+        registry being populated properly with the module entries when
+        using a constrained set of entry points.
         """
 
-        working_set = mocks.WorkingSet([
-            'calmjs.module = calmjs.module:ModuleRegistry',
-            'module1 = calmjs.testing.module1',
-            'module2 = calmjs.testing.module2',
-            'module3 = calmjs.testing.module3',
-        ], dist=Distribution(project_name='calmjs.testing'))
+        working_set = mocks.WorkingSet({
+            'calmjs.module': [
+                'module1 = calmjs.testing.module1',
+                'module2 = calmjs.testing.module2',
+                'module3 = calmjs.testing.module3',
+            ],
+            __name__: [
+                'calmjs.module = calmjs.module:ModuleRegistry',
+            ]},
+            dist=Distribution(project_name='calmjs.testing')
+        )
         utils.stub_mod_working_set(self, [calmjs.base], working_set)
 
         # Not going to use the global registry
@@ -84,9 +90,7 @@ class IntegratedModuleRegistryTestCase(unittest.TestCase):
         registry = local_root_registry.get_record('calmjs.module')
         self.assertIsNot(registry, global_registry)
         self.assertEqual(
-            # the if v is to filter out the "global" dummy calmjs.module
-            # entry, which normally isn't in production.
-            sorted(k for k, v in registry.iter_records() if v), [
+            sorted(k for k, v in registry.iter_records()), [
                 'calmjs.testing.module1',
                 'calmjs.testing.module2',
                 'calmjs.testing.module3',

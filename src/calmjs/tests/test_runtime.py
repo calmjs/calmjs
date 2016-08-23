@@ -30,11 +30,11 @@ class PackageManagerDriverTestCase(unittest.TestCase):
 
     def test_root_runtime_errors_ignored(self):
         stub_stdouts(self)
-        working_set = WorkingSet([
+        working_set = WorkingSet({'calmjs.runtime': [
             'foo = calmjs.nosuchmodule:no.where',
             'bar = calmjs.npm:npm',
             'npm = calmjs.npm:npm.runtime',
-        ])
+        ]})
         rt = runtime.Runtime(working_set=working_set)
         with self.assertRaises(SystemExit):
             rt(['-h'])
