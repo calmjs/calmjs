@@ -350,6 +350,55 @@ class PackageManagerDriver(NodeDriver):
         kw = self._gen_call_kws()
         return _get_bin_version(self.pkg_manager_bin, kw=kw)
 
+    def pkg_manager_view(self, package_names):
+        """
+        Returns the manifest JSON for the Python package name.  Default
+        npm implementation calls for package.json.
+
+        If this class is initiated using standard procedures, this will
+        mimic the functionality of ``npm view`` but mostly for showing
+        the dependencies.  This is done as a default action.
+
+        Arguments:
+
+        package_names
+            The names of the python packages with their requirements to
+            source the package.json from.
+
+        Returns the manifest json as a dict.
+        """
+
+        # assuming string, and assume whitespaces are invalid.
+        package_names = (
+            package_names.split()
+            if hasattr(package_names, 'split') else package_names
+        )
+
+        if len(package_names) == 1:
+            logger.info(
+                "generating a flattened '%s' for '%s'",
+                self.pkgdef_filename, package_names[0],
+            )
+        else:
+            logger.info(
+                "generating a flattened '%s' for packages {%s}",
+                self.pkgdef_filename, ', '.join(package_names),
+            )
+
+        # remember the filename is in the context of the distribution,
+        # not the filesystem.
+        pkgdef_json = flatten_egginfo_json(
+            package_names, filename=self.pkgdef_filename,
+            dep_keys=self.dep_keys,
+        )
+
+        if pkgdef_json.get(
+                self.pkg_name_field, NotImplemented) is NotImplemented:
+            # use the last item.
+            pkgdef_json[self.pkg_name_field] = package_names[-1]
+
+        return pkgdef_json
+
     def pkg_manager_init(
             self, package_names,
             interactive=None,
@@ -391,24 +440,11 @@ class PackageManagerDriver(NodeDriver):
         Returns False otherwise.
         """
 
-        cwd = self.cwd
-
         # assuming string, and assume whitespaces are invalid.
         package_names = (
             package_names.split()
             if hasattr(package_names, 'split') else package_names
         )
-
-        if len(package_names) == 1:
-            logger.info(
-                "generating a flattened '%s' for '%s' into '%s'",
-                self.pkgdef_filename, package_names[0], cwd
-            )
-        else:
-            logger.info(
-                "generating a flattened '%s' for packages {%s} into '%s'",
-                self.pkgdef_filename, ', '.join(package_names), cwd
-            )
 
         if interactive is None:
             interactive = self.interactive
@@ -417,22 +453,10 @@ class PackageManagerDriver(NodeDriver):
 
         # this will be modified in place
         original_json = {}
-        # pkgdef_filename is the one that will get written out, if
-        # needed.
-        # remember the filename is in the context of the distribution,
-        # not the filesystem.
-        pkgdef_json = flatten_egginfo_json(
-            package_names, filename=self.pkgdef_filename,
-            dep_keys=self.dep_keys,
-        )
 
-        if pkgdef_json.get(
-                self.pkg_name_field, NotImplemented) is NotImplemented:
-            # use the last item.
-            pkgdef_json[self.pkg_name_field] = package_names[-1]
+        pkgdef_json = self.pkg_manager_view(package_names)
 
         # Now we figure out the actual file we want to work with.
-
         pkgdef_path = self.join_cwd(self.pkgdef_filename)
         existed = exists(pkgdef_path)
 

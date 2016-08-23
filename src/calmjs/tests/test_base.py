@@ -167,9 +167,11 @@ class BaseDriverClassTestCase(unittest.TestCase):
 
     def test_join_cwd(self):
         driver = base.BaseDriver()
+        self.assertEqual(driver.cwd, os.getcwd())
         self.assertTrue(driver.join_cwd('bar').startswith(os.getcwd()))
         driver.working_dir = mkdtemp(self)
 
+        self.assertEqual(driver.cwd, driver.working_dir)
         result = driver.join_cwd('bar')
         self.assertTrue(result.startswith(driver.working_dir))
         self.assertTrue(result.endswith('bar'))

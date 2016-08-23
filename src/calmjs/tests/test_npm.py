@@ -594,8 +594,8 @@ class DistCommandTestCase(unittest.TestCase):
         target = join(tmpdir, 'package.json')
 
         self.assertIn(
-            "generating a flattened 'package.json' for 'foo' into '%s'\n"
-            "Generated 'package.json' differs with '%s'" % (tmpdir, target),
+            "generating a flattened 'package.json' for 'foo'\n"
+            "Generated 'package.json' differs with '%s'" % (target),
             stdout,
         )
 

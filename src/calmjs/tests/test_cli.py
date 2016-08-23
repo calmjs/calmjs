@@ -562,6 +562,18 @@ class CliDriverTestCase(unittest.TestCase):
         working_set.add(mock_dist)
         stub_dist_flatten_egginfo_json(self, [cli], working_set)
 
+    def test_pkg_manager_view(self):
+        self.setup_requirements_json()
+        driver = cli.PackageManagerDriver(
+            pkg_manager_bin='mgr', pkgdef_filename='requirements.json',
+            dep_keys=('require',),
+        )
+        result = driver.pkg_manager_view('calmpy.pip')
+        self.assertEqual(result, {
+            "require": {"setuptools": "25.1.6"},
+            "name": "calmpy.pip",
+        })
+
     def test_pkg_manager_init(self):
         # we still need a temporary directory, but the difference is
         # that whether the instance contains it or not.
