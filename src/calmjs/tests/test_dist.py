@@ -566,7 +566,7 @@ class DistTestCase(unittest.TestCase):
         working_set.add(app, self._calmjs_testing_tmpdir)
 
         single = calmjs_dist.get_extras_calmjs(
-            'app', working_set=working_set)
+            ['app'], working_set=working_set)
         self.assertEqual(single['node_modules'], {
             'jquery': 'jquery/dist/jquery.min.js',
         })
@@ -709,14 +709,16 @@ class DistTestCase(unittest.TestCase):
 
         # singlular methods
         self.assertEqual(calmjs_dist.get_module_registry_dependencies(
-            'site', registry_key=dummy_regid, working_set=working_set), {
+            ['site'], registry_key=dummy_regid, working_set=working_set), {
             'site/config': '/home/src/site/config.js'})
 
         self.assertEqual(calmjs_dist.get_module_registry_dependencies(
-            'security', registry_key=dummy_regid, working_set=working_set), {})
+            ['security'],
+            registry_key=dummy_regid, working_set=working_set), {})
 
         self.assertEqual(calmjs_dist.get_module_registry_dependencies(
-            'missing', registry_key=dummy_regid, working_set=working_set), {})
+            ['missing'],
+            registry_key=dummy_regid, working_set=working_set), {})
 
 
 class DistIntegrationTestCase(unittest.TestCase):
