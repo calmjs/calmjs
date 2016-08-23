@@ -85,7 +85,7 @@ def write_json_file(argname, cmd, basename, filename):
     cmd.write_or_delete_file(argname, filename, value, force=True)
 
 
-def get_pkg_dist(pkg_name, working_set=None):
+def find_pkg_dist(pkg_name, working_set=None):
     """
     Locate a package's distribution by its name.
     """
@@ -95,7 +95,7 @@ def get_pkg_dist(pkg_name, working_set=None):
     return working_set.find(req)
 
 
-def get_packages_requirements_dists(packages, working_set=None):
+def find_packages_requirements_dists(packages, working_set=None):
     """
     Return the entire list of dependency requirements, reversed from the
     bottom.
@@ -109,7 +109,7 @@ def get_packages_requirements_dists(packages, working_set=None):
     return list(reversed(working_set.resolve(requirements)))
 
 
-def get_dist_egginfo_json(dist, filename=DEFAULT_JSON):
+def read_dist_egginfo_json(dist, filename=DEFAULT_JSON):
     """
     Safely get a json within an egginfo from a distribution.
     """
@@ -143,8 +143,8 @@ def read_egginfo_json(pkg_name, filename=DEFAULT_JSON, working_set=None):
     """
 
     working_set = working_set or default_working_set
-    dist = get_pkg_dist(pkg_name, working_set=working_set)
-    return get_dist_egginfo_json(dist, filename)
+    dist = find_pkg_dist(pkg_name, working_set=working_set)
+    return read_dist_egginfo_json(dist, filename)
 
 
 def flatten_dist_egginfo_json(
@@ -187,7 +187,7 @@ def flatten_dist_egginfo_json(
     # Go from the earliest package down to the latest one, as we will
     # flatten children's d(evD)ependencies on top of parent's.
     for dist in source_dists:
-        obj = get_dist_egginfo_json(dist, filename)
+        obj = read_dist_egginfo_json(dist, filename)
         if not obj:
             continue
 
@@ -222,7 +222,8 @@ def flatten_egginfo_json(
 
     working_set = working_set or default_working_set
     # Ensure only grabbing packages that exists in working_set
-    dists = get_packages_requirements_dists(pkg_names, working_set=working_set)
+    dists = find_packages_requirements_dists(
+        pkg_names, working_set=working_set)
     return flatten_dist_egginfo_json(
         dists, filename=filename, dep_keys=dep_keys, working_set=working_set)
 
@@ -239,7 +240,7 @@ def get_extras_calmjs(pkg_names, working_set=None):
     working_set = working_set or default_working_set
     dep_keys = set(get('calmjs.extras_keys').iter_records())
     dists = [
-        get_pkg_dist(pkg_name, working_set=working_set)
+        find_pkg_dist(pkg_name, working_set=working_set)
         for pkg_name in pkg_names
     ]
     return flatten_dist_egginfo_json(
@@ -257,7 +258,8 @@ def flatten_extras_calmjs(pkg_names, working_set=None):
     working_set = working_set or default_working_set
     # registry key must be explicit here as it was designed for this.
     dep_keys = set(get('calmjs.extras_keys').iter_records())
-    dists = get_packages_requirements_dists(pkg_names, working_set=working_set)
+    dists = find_packages_requirements_dists(
+        pkg_names, working_set=working_set)
     return flatten_dist_egginfo_json(
         dists, filename=EXTRAS_CALMJS_JSON,
         dep_keys=dep_keys, working_set=working_set
@@ -296,7 +298,8 @@ def flatten_module_registry_dependencies(
     if not isinstance(registry, BaseModuleRegistry):
         return result
 
-    dists = get_packages_requirements_dists(pkg_names, working_set=working_set)
+    dists = find_packages_requirements_dists(
+        pkg_names, working_set=working_set)
     for dist in dists:
         result.update(registry.get_records_for_package(dist.project_name))
 

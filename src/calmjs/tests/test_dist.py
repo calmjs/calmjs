@@ -161,9 +161,9 @@ class DistTestCase(unittest.TestCase):
         # that it's been called...
         self.assertEqual(ei.called[self.pkgname], None)
 
-    def test_get_pkg_dist(self):
+    def test_find_pkg_dist(self):
         # Only really testing that this returns an actual distribution
-        result = calmjs_dist.get_pkg_dist('setuptools')
+        result = calmjs_dist.find_pkg_dist('setuptools')
         # it's the Distribution class from pkg_resources...
         self.assertTrue(isinstance(result, pkg_resources.Distribution))
         self.assertEqual(result.project_name, 'setuptools')
@@ -175,7 +175,7 @@ class DistTestCase(unittest.TestCase):
         self.assertIsNone(calmjs_dist.read_egginfo_json(
             'setuptools', filename='_not_package.json'))
 
-    def test_get_dist_egginfo_json(self):
+    def test_read_dist_egginfo_json(self):
         package_json = {"dependencies": {"left-pad": "~1.1.1"}}
 
         # We will mock up a Distribution object with some fake metadata.
@@ -186,7 +186,7 @@ class DistTestCase(unittest.TestCase):
         mock_dist = pkg_resources.Distribution(
             metadata=mock_provider, project_name='dummydist', version='0.0.0')
 
-        results = calmjs_dist.get_dist_egginfo_json(mock_dist)
+        results = calmjs_dist.read_dist_egginfo_json(mock_dist)
 
         self.assertEqual(results, package_json)
 
@@ -203,7 +203,7 @@ class DistTestCase(unittest.TestCase):
         mock_dist = pkg_resources.Distribution(
             metadata=mock_provider, project_name='dummydist', version='0.0.0')
 
-        results = calmjs_dist.get_dist_egginfo_json(mock_dist)
+        results = calmjs_dist.read_dist_egginfo_json(mock_dist)
 
         # Should still not fail.
         self.assertIsNone(results)
@@ -217,7 +217,7 @@ class DistTestCase(unittest.TestCase):
         })
         mock_dist = pkg_resources.Distribution(
             metadata=mock_provider, project_name='dummydist', version='0.0.0')
-        results = calmjs_dist.get_dist_egginfo_json(mock_dist)
+        results = calmjs_dist.read_dist_egginfo_json(mock_dist)
         # Should still not fail.
         self.assertIsNone(results)
 
@@ -233,10 +233,10 @@ class DistTestCase(unittest.TestCase):
                 (self.pkgname, json.dumps(package_json)),
             ), pkgname='dummydist'
         )
-        results = calmjs_dist.get_dist_egginfo_json(mock_dist)
+        results = calmjs_dist.read_dist_egginfo_json(mock_dist)
         self.assertEqual(results['dependencies']['left-pad'], '~1.1.1')
 
-    def test_get_dist_egginfo_json_alternative_name_args(self):
+    def test_read_dist_egginfo_json_alternative_name_args(self):
         package_json = {"dependencies": {"left-pad": "~1.1.1"}}
 
         # We will mock up a Distribution object with some fake metadata.
@@ -247,7 +247,7 @@ class DistTestCase(unittest.TestCase):
         mock_dist = pkg_resources.Distribution(
             metadata=mock_provider, project_name='dummydist', version='0.0.0')
 
-        results = calmjs_dist.get_dist_egginfo_json(
+        results = calmjs_dist.read_dist_egginfo_json(
             mock_dist, filename='bower.json')
 
         self.assertEqual(results, package_json)
