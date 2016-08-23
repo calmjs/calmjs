@@ -5,6 +5,7 @@ Assortment of utility functions.
 
 import os
 import logging
+from contextlib import contextmanager
 from os.path import curdir
 from os.path import defpath
 from os.path import normcase
@@ -17,16 +18,27 @@ def enable_pretty_logging(logger='calmjs', level=logging.DEBUG, stream=None):
     Shorthand to enable pretty logging
     """
 
+    def cleanup():
+        logger.removeHandler(handler)
+
     if not isinstance(logger, logging.Logger):
         logger = logging.getLogger(logger)
-    if logger.handlers:
-        # Only set up handlers if none already exists
-        return
+
     handler = logging.StreamHandler(stream)
     handler.setFormatter(logging.Formatter(
         '%(asctime)s %(levelname)s %(name)s %(message)s'))
     logger.addHandler(handler)
     logger.setLevel(level)
+    return cleanup
+
+
+@contextmanager
+def pretty_logging(logger='calmjs', level=logging.DEBUG, stream=None):
+    try:
+        cleanup = enable_pretty_logging(logger, level, stream)
+        yield
+    finally:
+        cleanup()
 
 
 def which(cmd, mode=os.F_OK | os.X_OK, path=None):

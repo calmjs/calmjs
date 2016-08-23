@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import unittest
+import io
 import logging
 import os
 from os.path import join
@@ -8,6 +9,7 @@ import sys
 
 from calmjs.utils import which
 from calmjs.utils import enable_pretty_logging
+from calmjs.utils import pretty_logging
 
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import stub_os_environ
@@ -72,12 +74,23 @@ class LoggingTestCase(unittest.TestCase):
     Pretty logging can be pretty.
     """
 
-    def test_enable(self):
+    def test_enable_pretty_logging(self):
         logger_id = 'calmjs.testing.dummy_logger'
         logger = logging.getLogger(logger_id)
         self.assertEqual(len(logger.handlers), 0)
-        enable_pretty_logging(logger=logger_id)
+        cleanup1 = enable_pretty_logging(logger=logger_id)
         self.assertEqual(len(logger.handlers), 1)
-        # calling again shouldn't double this
-        enable_pretty_logging(logger=logger_id)
-        self.assertEqual(len(logger.handlers), 1)
+        cleanup2 = enable_pretty_logging(logger=logger)
+        self.assertEqual(len(logger.handlers), 2)
+        cleanup1()
+        cleanup2()
+        self.assertEqual(len(logger.handlers), 0)
+
+    def test_logging_contextmanager(self):
+        logger_id = 'calmjs.testing.dummy_logger'
+        logger = logging.getLogger(logger_id)
+        stream = io.StringIO()
+        with pretty_logging(logger=logger_id, stream=stream):
+            logger.info(u'hello')
+        self.assertIn(u'hello', stream.getvalue())
+        self.assertEqual(len(logger.handlers), 0)
