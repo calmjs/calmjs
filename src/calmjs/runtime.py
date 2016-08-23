@@ -32,6 +32,7 @@ pkg_manager_options = (
      "automatically overwrite any file changes to current directory "
      "without prompting"),
 )
+DEST_ACTION = 'action'
 
 
 def make_cli_options(cli_driver):
@@ -49,10 +50,19 @@ class Runtime(object):
     """
 
     def __init__(self, working_set=default_working_set):
-        self.argparser = ArgumentParser(description=self.__doc__)
-        commands = self.argparser.add_subparsers()
+        self.working_set = working_set
+        self.argparser = None
+        self.init()
 
-        for entry_point in working_set.iter_entry_points(CALMJS_RUNTIME):
+    def init(self):
+        if self.argparser is None:
+            self.argparser = ArgumentParser(description=self.__doc__)
+            self.init_argparser(self.argparser)
+
+    def init_argparser(self, argparser):
+        commands = argparser.add_subparsers()
+
+        for entry_point in self.working_set.iter_entry_points(CALMJS_RUNTIME):
             try:
                 inst = entry_point.load()
             except ImportError:
@@ -71,13 +81,15 @@ class Runtime(object):
                 continue
 
             subparser = commands.add_parser(
-                inst.cli_driver.binary,
+                entry_point.name,
                 help=inst.cli_driver.description,
             )
             inst.init_argparser(subparser)
 
     def __call__(self, args):
-        self.argparser.parse_args(args)
+        kwargs = vars(self.argparser.parse_args(args))
+        action = kwargs.pop(DEST_ACTION)
+        action(**kwargs)
 
 
 class DriverRuntime(Runtime):
@@ -85,20 +97,13 @@ class DriverRuntime(Runtime):
     runtime for driver
     """
 
-    def __init__(self, cli_driver):
+    def __init__(self, cli_driver, *a, **kw):
         self.cli_driver = cli_driver
-        self.argparser = None
-        self.init()
-
-    def init(self):
-        if self.argparser is None:
-            self.argparser = ArgumentParser(
-                description=self.cli_driver.description)
-            self.init_argparser(self.argparser)
+        super(DriverRuntime, self).__init__(*a, **kw)
 
     def init_argparser(self, argparser=None):
         """
-        Initialize the argparser
+        DriverRuntime should have their own init_argparer method.
         """
 
 
@@ -126,10 +131,16 @@ class PackageManagerRuntime(DriverRuntime):
                 for dash, key in zip(('-', '--'), (short, full))
                 if key
             ]
-            if short:
-                argparser.add_argument(*args, help=desc, action='store_true')
-            else:
-                actions.add_argument(*args, help=desc, action='store_true')
+            if not short:
+                f = getattr(self.cli_driver, '%s_%s' % (
+                    self.cli_driver.binary, full), None)
+                if callable(f):
+                    actions.add_argument(
+                        *args, help=desc, action='store_const',
+                        dest=DEST_ACTION, const=f
+                    )
+                    continue
+            argparser.add_argument(*args, help=desc, action='store_true')
 
         argparser.add_argument(
             'package_name', help='Name of the python package to use')
