@@ -163,6 +163,12 @@ class NpmDriverInitTestCase(unittest.TestCase):
                 'dependencies': {'jquery': '~1.11.0'},
             })),
         ), 'foo', '1.9.0')
+        underscore = make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([])),
+            ('package.json', json.dumps({
+                'dependencies': {'underscore': '~1.8.0'},
+            })),
+        ), 'underscore', '1.8.0')
         named = make_dummy_dist(self, (
             ('requires.txt', '\n'.join([])),
             ('package.json', json.dumps({
@@ -172,6 +178,7 @@ class NpmDriverInitTestCase(unittest.TestCase):
         ), 'named', '2.0.0')
         working_set = WorkingSet()
         working_set.add(app, self._calmjs_testing_tmpdir)
+        working_set.add(underscore, self._calmjs_testing_tmpdir)
         working_set.add(named, self._calmjs_testing_tmpdir)
         stub_dist_flatten_egginfo_json(self, [cli], working_set)
         stub_mod_check_interactive(self, [cli], True)
@@ -194,6 +201,36 @@ class NpmDriverInitTestCase(unittest.TestCase):
             'dependencies': {'jquery': '~1.11.0'},
             'devDependencies': {},
             'name': 'foo',
+        })
+
+    def test_npm_init_new_multiple(self):
+        tmpdir = mkdtemp(self)
+        os.chdir(tmpdir)
+
+        self.assertTrue(
+            npm.npm_init(['named', 'underscore'], interactive=False))
+        with open(join(tmpdir, 'package.json')) as fd:
+            result = json.load(fd)
+
+        self.assertEqual(result, {
+            'dependencies': {'jquery': '~3.0.0', 'underscore': '~1.8.0'},
+            'devDependencies': {},
+            'name': 'underscore',
+        })
+
+    def test_npm_init_with_invalid_valid_mix(self):
+        tmpdir = mkdtemp(self)
+        os.chdir(tmpdir)
+
+        self.assertTrue(
+            npm.npm_init(['invalid', 'underscore'], interactive=False))
+        with open(join(tmpdir, 'package.json')) as fd:
+            result = json.load(fd)
+
+        self.assertEqual(result, {
+            'dependencies': {'underscore': '~1.8.0'},
+            'devDependencies': {},
+            'name': 'underscore',
         })
 
     def test_npm_init_existing_standard_non_interactive(self):

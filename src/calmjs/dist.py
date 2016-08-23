@@ -174,10 +174,6 @@ def flatten_dist_egginfo_json(
     Flat is better than nested.
     """
 
-    if not isinstance(source_dists, (list, tuple)):
-        # XXX deprecated
-        source_dists = (source_dists,)
-
     working_set = working_set or default_working_set
     obj = {}
 
@@ -224,7 +220,6 @@ def flatten_egginfo_json(
     correctly by pkg_resources).
     """
 
-    pkg_names = pkg_names.split() if hasattr(pkg_names, 'split') else pkg_names
     working_set = working_set or default_working_set
     # Ensure only grabbing packages that exists in working_set
     dists = get_packages_requirements_dists(pkg_names, working_set=working_set)
@@ -253,7 +248,6 @@ def flatten_extras_calmjs(pkg_names, working_set=None):
     """
 
     working_set = working_set or default_working_set
-    pkg_names = pkg_names.split() if hasattr(pkg_names, 'split') else pkg_names
     # registry key must be explicit here as it was designed for this.
     dep_keys = set(get('calmjs.extras_keys').iter_records())
     dists = get_packages_requirements_dists(pkg_names, working_set=working_set)

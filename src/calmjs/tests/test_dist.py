@@ -262,9 +262,9 @@ class DistTestCase(unittest.TestCase):
         flattened_json = {
             "dependencies": {"left-pad": "~1.1.1"}, "devDependencies": {}}
         self.assertEqual(flattened_json, calmjs_dist.flatten_dist_egginfo_json(
-            mock_dist, filename='bower.json', working_set=working_set))
+            [mock_dist], filename='bower.json', working_set=working_set))
         self.assertEqual(flattened_json, calmjs_dist.flatten_egginfo_json(
-            'dummydist', filename='bower.json', working_set=working_set))
+            ['dummydist'], filename='bower.json', working_set=working_set))
 
     def tests_flatten_egginfo_json_deps(self):
         # Quiet stdout from distutils logs
@@ -375,7 +375,7 @@ class DistTestCase(unittest.TestCase):
 
         # Also a raw requirement (package) string on the other function.
         result = calmjs_dist.flatten_egginfo_json(
-            'site', working_set=working_set)
+            ['site'], working_set=working_set)
         self.assertEqual(result, answer)
 
     def tests_flatten_egginfo_json_multi_version(self):
@@ -435,7 +435,7 @@ class DistTestCase(unittest.TestCase):
             'devDependencies': {},
         }
         result = calmjs_dist.flatten_egginfo_json(
-            'app', working_set=working_set)
+            ['app'], working_set=working_set)
         self.assertEqual(result, answer)
 
         # Now emulate an older version, with a different working set.
@@ -453,7 +453,7 @@ class DistTestCase(unittest.TestCase):
             'devDependencies': {},
         }
         result = calmjs_dist.flatten_egginfo_json(
-            'app', working_set=working_set)
+            ['app'], working_set=working_set)
         self.assertEqual(result, answer)
 
     def tests_flatten_egginfo_json_missing_complete(self):
@@ -482,7 +482,7 @@ class DistTestCase(unittest.TestCase):
 
         # Python dependency acquisition failures should fail hard.
         with self.assertRaises(pkg_resources.DistributionNotFound):
-            calmjs_dist.flatten_egginfo_json('app', working_set=working_set)
+            calmjs_dist.flatten_egginfo_json(['app'], working_set=working_set)
 
     def tests_flatten_egginfo_json_nulled(self):
         """
@@ -521,7 +521,7 @@ class DistTestCase(unittest.TestCase):
             'devDependencies': {},
         }
         result = calmjs_dist.flatten_egginfo_json(
-            'app', working_set=working_set)
+            ['app'], working_set=working_set)
         self.assertEqual(result, answer)
 
     # While it really is for node/npm, the declaration is almost generic
@@ -684,6 +684,17 @@ class DistTestCase(unittest.TestCase):
             'forms/ui': '/home/src/forms/ui.js',
             'widget/ui': '/home/src/widget/ui.js',
             'widget/widget': '/home/src/widget/widget.js',
+        })
+
+        # merger
+        merged = calmjs_dist.flatten_module_registry_dependencies(
+            ['forms', 'service'], registry_key=dummy_regid,
+            working_set=working_set)
+        self.assertEqual(merged, {
+            'forms/ui': '/home/src/forms/ui.js',
+            'widget/ui': '/home/src/widget/ui.js',
+            'widget/widget': '/home/src/widget/widget.js',
+            'service/lib': '/home/src/forms/lib.js',
         })
 
         # no declared exports/registry entries in security.
