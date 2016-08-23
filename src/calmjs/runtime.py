@@ -137,6 +137,12 @@ class PackageManagerRuntime(DriverRuntime):
         super(PackageManagerRuntime, self).init()
 
     def init_argparser(self, argparser):
+        # Ideally, we could use more subparsers for each action (i.e.
+        # init and install).  However, this is complicated by the fact
+        # that setuptools has its own calling conventions through the
+        # setup.py file, and to present a consistent cli to end-users
+        # there are bits of work that needs to be set up.
+
         # provide this for the setuptools command class.
         actions = argparser.add_argument_group('actions arguments')
 
@@ -158,9 +164,14 @@ class PackageManagerRuntime(DriverRuntime):
             argparser.add_argument(*args, help=desc, action='store_true')
 
         argparser.add_argument(
-            'package_name', help='Name of the python package to use')
+            'package_names', help='Names of the python package to use',
+            metavar='package_names', nargs='+',
+        )
 
     def run(self, **kwargs):
+        # Run the underlying package manager.  As the arguments in this
+        # subparser is constructed in a way that maps directly with the
+        # underlying actions, it can be invoked directly.
         action = kwargs.pop(DEST_ACTION)
         action(**kwargs)
 

@@ -351,7 +351,7 @@ class PackageManagerDriver(NodeDriver):
         return _get_bin_version(self.pkg_manager_bin, kw=kw)
 
     def pkg_manager_init(
-            self, package_name=None,
+            self, package_names,
             interactive=None,
             overwrite=False, merge=False):
         """
@@ -367,8 +367,9 @@ class PackageManagerDriver(NodeDriver):
 
         Arguments:
 
-        package_name
-            The python package to source the package.json from.
+        package_names
+            The names of the python packages with their requirements to
+            source the package.json from.
 
         interactive
             Boolean flag; if set, prompts user on what to do when choice
@@ -392,10 +393,22 @@ class PackageManagerDriver(NodeDriver):
 
         cwd = self.cwd
 
-        logger.info(
-            "generating a flattened '%s' for '%s' into '%s'",
-            self.pkgdef_filename, package_name, cwd
+        # assuming string, and assume whitespaces are invalid.
+        package_names = (
+            package_names.split()
+            if hasattr(package_names, 'split') else package_names
         )
+
+        if len(package_names) == 1:
+            logger.info(
+                "generating a flattened '%s' for '%s' into '%s'",
+                self.pkgdef_filename, package_names[0], cwd
+            )
+        else:
+            logger.info(
+                "generating a flattened '%s' for packages {%s} into '%s'",
+                self.pkgdef_filename, ', '.join(package_names), cwd
+            )
 
         if interactive is None:
             interactive = self.interactive
@@ -409,13 +422,14 @@ class PackageManagerDriver(NodeDriver):
         # remember the filename is in the context of the distribution,
         # not the filesystem.
         pkgdef_json = flatten_egginfo_json(
-            package_name, filename=self.pkgdef_filename,
+            package_names, filename=self.pkgdef_filename,
             dep_keys=self.dep_keys,
         )
 
         if pkgdef_json.get(
                 self.pkg_name_field, NotImplemented) is NotImplemented:
-            pkgdef_json[self.pkg_name_field] = package_name
+            # use the last item.
+            pkgdef_json[self.pkg_name_field] = package_names[-1]
 
         # Now we figure out the actual file we want to work with.
 
@@ -509,7 +523,7 @@ class PackageManagerDriver(NodeDriver):
 
         return True
 
-    def pkg_manager_install(self, package_name=None, args=(), env={},
+    def pkg_manager_install(self, package_names=None, args=(), env={},
                             *a, **kw):
         """
         This will install all dependencies into the current working
@@ -540,15 +554,15 @@ class PackageManagerDriver(NodeDriver):
 
         Arguments:
 
-        package_name
-            Then name of the Python package to generate the manifest
+        package_names
+            The names of the Python package to generate the manifest
             for.
         args
             The arguments to pass into the command line install.
         """
 
-        if package_name:
-            result = self.pkg_manager_init(package_name, *a, **kw)
+        if package_names:
+            result = self.pkg_manager_init(package_names, *a, **kw)
             if not result:
                 logger.warn(
                     "not continuing with '%s %s' as the generation of "

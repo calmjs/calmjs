@@ -275,7 +275,7 @@ class DistTestCase(unittest.TestCase):
             (self.pkgname, 'This is very NOT a package.json.'),
         ), 'security', '9999')
 
-        make_dummy_dist(self, (
+        framework = make_dummy_dist(self, (
             ('requires.txt', '\n'.join([
                 'security',
             ])),
@@ -291,7 +291,7 @@ class DistTestCase(unittest.TestCase):
             })),
         ), 'framework', '2.4')
 
-        make_dummy_dist(self, (
+        widget = make_dummy_dist(self, (
             ('requires.txt', '\n'.join([
                 'framework>=2.1',
             ])),
@@ -303,7 +303,7 @@ class DistTestCase(unittest.TestCase):
             })),
         ), 'widget', '1.1')
 
-        make_dummy_dist(self, (
+        forms = make_dummy_dist(self, (
             ('requires.txt', '\n'.join([
                 'framework>=2.2',
                 'widget>=1.0',
@@ -316,7 +316,7 @@ class DistTestCase(unittest.TestCase):
             })),
         ), 'forms', '1.6')
 
-        make_dummy_dist(self, (
+        service = make_dummy_dist(self, (
             ('requires.txt', '\n'.join([
                 'framework>=2.1',
             ])),
@@ -367,9 +367,10 @@ class DistTestCase(unittest.TestCase):
 
         working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
 
-        # Ensure that this works with a raw requirement object
+        # Ensure that this works with a raw requirements object, that
+        # should normally be automatically resolved from a name.
         result = calmjs_dist.flatten_dist_egginfo_json(
-            site, working_set=working_set)
+            [framework, widget, forms, service, site], working_set=working_set)
         self.assertEqual(result, answer)
 
         # Also a raw requirement (package) string on the other function.
@@ -571,7 +572,7 @@ class DistTestCase(unittest.TestCase):
         })
 
         results = calmjs_dist.flatten_extras_calmjs(
-            'app', working_set=working_set)
+            ['app'], working_set=working_set)
         self.assertEqual(results['node_modules'], {
             'jquery': 'jquery/dist/jquery.min.js',
             'underscore': 'underscore/underscore-min.js',
@@ -581,10 +582,10 @@ class DistTestCase(unittest.TestCase):
 
     def test_module_registry_dependencies_failure_no_reg(self):
         self.assertEqual(calmjs_dist.flatten_module_registry_dependencies(
-            'calmjs', registry_key='calmjs.no_reg',), {})
+            ['calmjs'], registry_key='calmjs.no_reg',), {})
 
         self.assertEqual(calmjs_dist.get_module_registry_dependencies(
-            'calmjs', registry_key='calmjs.no_reg',), {})
+            ['calmjs'], registry_key='calmjs.no_reg',), {})
 
     def test_module_registry_dependencies_success(self):
         from calmjs.registry import _inst
@@ -662,7 +663,7 @@ class DistTestCase(unittest.TestCase):
         }
 
         site = calmjs_dist.flatten_module_registry_dependencies(
-            'site', registry_key=dummy_regid, working_set=working_set)
+            ['site'], registry_key=dummy_regid, working_set=working_set)
         self.assertEqual(site, {
             'site/config': '/home/src/site/config.js',
             'widget/ui': '/home/src/widget/ui.js',
@@ -672,13 +673,13 @@ class DistTestCase(unittest.TestCase):
         })
 
         service = calmjs_dist.flatten_module_registry_dependencies(
-            'service', registry_key=dummy_regid, working_set=working_set)
+            ['service'], registry_key=dummy_regid, working_set=working_set)
         self.assertEqual(service, {
             'service/lib': '/home/src/forms/lib.js',
         })
 
         forms = calmjs_dist.flatten_module_registry_dependencies(
-            'forms', registry_key=dummy_regid, working_set=working_set)
+            ['forms'], registry_key=dummy_regid, working_set=working_set)
         self.assertEqual(forms, {
             'forms/ui': '/home/src/forms/ui.js',
             'widget/ui': '/home/src/widget/ui.js',
@@ -687,12 +688,12 @@ class DistTestCase(unittest.TestCase):
 
         # no declared exports/registry entries in security.
         security = calmjs_dist.flatten_module_registry_dependencies(
-            'security', registry_key=dummy_regid, working_set=working_set)
+            ['security'], registry_key=dummy_regid, working_set=working_set)
         self.assertEqual(security, {})
 
         # package not even in working set
         missing_pkg = calmjs_dist.flatten_module_registry_dependencies(
-            'missing_pkg', registry_key=dummy_regid, working_set=working_set)
+            ['missing_pkg'], registry_key=dummy_regid, working_set=working_set)
         self.assertEqual(missing_pkg, {})
 
         # singlular methods

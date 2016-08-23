@@ -67,11 +67,19 @@ class IntegrationTestCase(unittest.TestCase):
             ('package.json', json.dumps({
                 'name': 'site',
                 'dependencies': {
-                    'underscore': '~1.8.3',
                     'jquery': '~3.1.0',
                 },
             })),
-        ), 'example.package', '2.0')
+        ), 'example.package1', '1.0')
+
+        make_dummy_dist(self, (
+            ('package.json', json.dumps({
+                'name': 'site',
+                'dependencies': {
+                    'underscore': '~1.8.3',
+                },
+            })),
+        ), 'example.package2', '2.0')
 
         working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
 
@@ -96,7 +104,7 @@ class IntegrationTestCase(unittest.TestCase):
         os.chdir(tmpdir)
 
         rt = self.setup_runtime()
-        rt(['foo', '--init', 'example.package'])
+        rt(['foo', '--init', 'example.package1'])
 
         with open(join(tmpdir, 'package.json')) as fd:
             result = json.load(fd)
@@ -109,12 +117,13 @@ class IntegrationTestCase(unittest.TestCase):
         os.chdir(tmpdir)
         stub_mod_call(self, cli)
         rt = self.setup_runtime()
-        rt(['foo', '--install', 'example.package'])
+        rt(['foo', '--install', 'example.package1', 'example.package2'])
 
         with open(join(tmpdir, 'package.json')) as fd:
             result = json.load(fd)
 
         self.assertEqual(result['dependencies']['jquery'], '~3.1.0')
+        self.assertEqual(result['dependencies']['underscore'], '~1.8.3')
         # not foo install, but npm install since entry point specified
         # the actual runtime instance.
         self.assertEqual(self.call_args, ((['npm', 'install'],), {}))

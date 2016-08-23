@@ -95,6 +95,20 @@ def get_pkg_dist(pkg_name, working_set=None):
     return working_set.find(req)
 
 
+def get_packages_requirements_dists(packages, working_set=None):
+    """
+    Return the entire list of dependency requirements, reversed from the
+    bottom.
+    """
+
+    working_set = working_set or default_working_set
+    requirements = [
+        r for r in (Requirement.parse(package) for package in packages)
+        if working_set.find(r)
+    ]
+    return list(reversed(working_set.resolve(requirements)))
+
+
 def get_dist_egginfo_json(dist, filename=DEFAULT_JSON):
     """
     Safely get a json within an egginfo from a distribution.
@@ -133,21 +147,8 @@ def read_egginfo_json(pkg_name, filename=DEFAULT_JSON, working_set=None):
     return get_dist_egginfo_json(dist, filename)
 
 
-def iter_dist_requires(source_dist, working_set=None):
-    """
-    Generator to get requirements of a distribution.
-    """
-
-    working_set = working_set or default_working_set
-    requires = source_dist.requires() if source_dist else []
-    # Go from the earliest package down to the latest one and apply it
-    # to the callable 'f'
-    for dist in reversed(working_set.resolve(requires)):
-        yield dist
-
-
 def flatten_dist_egginfo_json(
-        source_dist, filename=DEFAULT_JSON, dep_keys=DEP_KEYS,
+        source_dists, filename=DEFAULT_JSON, dep_keys=DEP_KEYS,
         working_set=None):
     """
     Flatten a distribution's egginfo json, with the depended keys to be
@@ -173,7 +174,12 @@ def flatten_dist_egginfo_json(
     Flat is better than nested.
     """
 
+    if not isinstance(source_dists, (list, tuple)):
+        # XXX deprecated
+        source_dists = (source_dists,)
+
     working_set = working_set or default_working_set
+    obj = {}
 
     # TODO figure out the best way to explicitly report back to caller
     # how the keys came to be (from which dist).  Perhaps create a
@@ -182,15 +188,9 @@ def flatten_dist_egginfo_json(
 
     depends = {dep: {} for dep in dep_keys}
 
-    # ensure that root is populated with something.
-    if source_dist:
-        root = get_dist_egginfo_json(source_dist, filename) or {}
-    else:
-        root = {}
-
     # Go from the earliest package down to the latest one, as we will
     # flatten children's d(evD)ependencies on top of parent's.
-    for dist in iter_dist_requires(source_dist, working_set=working_set):
+    for dist in source_dists:
         obj = get_dist_egginfo_json(dist, filename)
         if not obj:
             continue
@@ -199,21 +199,19 @@ def flatten_dist_egginfo_json(
         for dep in dep_keys:
             depends[dep].update(obj.get(dep, {}))
 
-    if source_dist:
-        # Layer original on top
-        logger.debug("merging '%s' for target '%s'", filename, source_dist)
-        for dep in dep_keys:
-            depends[dep].update(root.get(dep, {}))
+    if obj is None:
+        # top level object does not have egg-info defined
+        return depends
 
     for dep in dep_keys:
         # filtering out all the nulls.
-        root[dep] = {k: v for k, v in depends[dep].items() if v is not None}
+        obj[dep] = {k: v for k, v in depends[dep].items() if v is not None}
 
-    return root
+    return obj
 
 
 def flatten_egginfo_json(
-        pkg_name, filename=DEFAULT_JSON, dep_keys=DEP_KEYS, working_set=None):
+        pkg_names, filename=DEFAULT_JSON, dep_keys=DEP_KEYS, working_set=None):
     """
     A shorthand calling convention where the package name is supplied
     instead of a distribution.
@@ -226,10 +224,12 @@ def flatten_egginfo_json(
     correctly by pkg_resources).
     """
 
+    pkg_names = pkg_names.split() if hasattr(pkg_names, 'split') else pkg_names
     working_set = working_set or default_working_set
-    dist = get_pkg_dist(pkg_name, working_set=working_set)
+    # Ensure only grabbing packages that exists in working_set
+    dists = get_packages_requirements_dists(pkg_names, working_set=working_set)
     return flatten_dist_egginfo_json(
-        dist, filename=filename, dep_keys=dep_keys, working_set=working_set)
+        dists, filename=filename, dep_keys=dep_keys, working_set=working_set)
 
 
 # Default calmjs core implementation specific functions, to be used by
@@ -246,18 +246,19 @@ def get_extras_calmjs(pkg_name, working_set=None):
     return get_dist_egginfo_json(dist, filename=EXTRAS_CALMJS_JSON)
 
 
-def flatten_extras_calmjs(pkg_name, working_set=None):
+def flatten_extras_calmjs(pkg_names, working_set=None):
     """
     Traverses through the dependency graph of package 'pkg_name' and
     flattens all the egg_info calmjs registry information.
     """
 
     working_set = working_set or default_working_set
+    pkg_names = pkg_names.split() if hasattr(pkg_names, 'split') else pkg_names
     # registry key must be explicit here as it was designed for this.
     dep_keys = set(get('calmjs.extras_keys').iter_records())
-    dist = get_pkg_dist(pkg_name, working_set=working_set)
+    dists = get_packages_requirements_dists(pkg_names, working_set=working_set)
     return flatten_dist_egginfo_json(
-        dist, filename=EXTRAS_CALMJS_JSON,
+        dists, filename=EXTRAS_CALMJS_JSON,
         dep_keys=dep_keys, working_set=working_set
     )
 
@@ -279,7 +280,7 @@ def get_module_registry_dependencies(
 
 
 def flatten_module_registry_dependencies(
-        pkg_name, registry_key='calmjs.module', working_set=None):
+        pkg_names, registry_key='calmjs.module', working_set=None):
     """
     For the given package 'pkg_name' and the registry identified by
     'registry_key', resolve and flatten all the exported locations.
@@ -291,9 +292,8 @@ def flatten_module_registry_dependencies(
     if not isinstance(registry, BaseModuleRegistry):
         return result
 
-    source_dist = get_pkg_dist(pkg_name, working_set=working_set)
-    for dist in iter_dist_requires(source_dist, working_set=working_set):
+    dists = get_packages_requirements_dists(pkg_names, working_set=working_set)
+    for dist in dists:
         result.update(registry.get_records_for_package(dist.project_name))
-    result.update(registry.get_records_for_package(pkg_name))
 
     return result
