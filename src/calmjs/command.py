@@ -60,7 +60,12 @@ class PackageManagerCommand(Command):
 
     @classmethod
     def _initialize_user_options(cls):
-        cls.user_options = cls.runtime.pkg_manager_options
+        cls.user_options = []
+        for full, short, desc in cls.runtime.pkg_manager_options:
+            if short is None:
+                cls.user_options.append((full, short, 'action: ' + desc))
+            else:
+                cls.user_options.append((full, short, desc))
 
     # keywords that are actions that result in effects that we support
     actions = ('init', 'install')

@@ -306,7 +306,7 @@ class PackageManagerDriver(NodeDriver):
         # overwritten by subclasses
         names = [
             'pkg_manager_bin', 'get_pkg_manager_version', 'pkg_manager_init',
-            'pkg_manager_install', 'install_cmd',
+            'pkg_manager_install', 'pkg_manager_view', 'install_cmd',
         ]
 
         g = {}
@@ -317,6 +317,8 @@ class PackageManagerDriver(NodeDriver):
         return {
             'get_%(pkg_manager_bin)s_version' % g:
                 g['get_pkg_manager_version'],
+            '%(pkg_manager_bin)s_view' % g:
+                g['pkg_manager_view'],
             '%(pkg_manager_bin)s_init' % g:
                 g['pkg_manager_init'],
             '%(pkg_manager_bin)s_%(install_cmd)s' % g:

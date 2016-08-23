@@ -573,6 +573,8 @@ class CliDriverTestCase(unittest.TestCase):
             "require": {"setuptools": "25.1.6"},
             "name": "calmpy.pip",
         })
+        result2 = driver.mgr_view('calmpy.pip')
+        self.assertEqual(result, result2)
 
     def test_pkg_manager_init(self):
         # we still need a temporary directory, but the difference is

@@ -30,8 +30,7 @@ class PackageManagerDriverTestCase(unittest.TestCase):
         cmd = runtime.PackageManagerRuntime(driver)
         text = cmd.argparser.format_help()
         self.assertIn(
-            "action: run 'mgr install' with generated 'default.json';",
-            text,
+            "run 'mgr install' with generated 'default.json';", text,
         )
 
     def test_duplicate_init_no_error(self):

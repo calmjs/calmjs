@@ -11,12 +11,12 @@ CALMJS_RUNTIME = 'calmjs.runtime'
 logger = logging.getLogger(__name__)
 pkg_manager_options = (
     ('init', None,
-     "action: generate and write '%(pkgdef_filename)s' to the "
+     "generate and write '%(pkgdef_filename)s' to the "
      "current directory for this Python package"),
     # this required implicit step is done, otherwise there are no
     # difference to running ``npm init`` directly from the shell.
     ('install', None,
-     "action: run '%(pkg_manager_bin)s install' with generated "
+     "run '%(pkg_manager_bin)s install' with generated "
      "'%(pkgdef_filename)s'; implies init; will abort if init fails "
      "to write the generated file"),
     # as far as I know typically setuptools setup.py are not
@@ -159,7 +159,7 @@ class PackageManagerRuntime(DriverRuntime):
         # there are bits of work that needs to be set up.
 
         # provide this for the setuptools command class.
-        actions = argparser.add_argument_group('actions arguments')
+        actions = argparser.add_argument_group('action arguments')
 
         for full, short, desc in self.pkg_manager_options:
             args = [
