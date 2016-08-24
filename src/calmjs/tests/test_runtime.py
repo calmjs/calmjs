@@ -3,12 +3,15 @@ import unittest
 import json
 import os
 import sys
+from argparse import ArgumentParser
 from os.path import join
+from logging import DEBUG
 
 import pkg_resources
 
 from calmjs import cli
 from calmjs import runtime
+from calmjs.utils import pretty_logging
 
 from calmjs.testing import mocks
 from calmjs.testing.utils import make_dummy_dist
@@ -48,8 +51,177 @@ class PackageManagerDriverTestCase(unittest.TestCase):
         rt = runtime.Runtime(working_set=working_set)
         with self.assertRaises(SystemExit):
             rt(['-h'])
-        self.assertNotIn('foo', sys.stdout.getvalue())
-        self.assertIn('npm', sys.stdout.getvalue())
+        out = sys.stdout.getvalue()
+        self.assertNotIn('foo', out)
+        self.assertIn('npm', out)
+
+    def test_root_runtime_bad_names(self):
+        working_set = mocks.WorkingSet({'calmjs.runtime': [
+            'bad name = calmjs.npm:npm.runtime',
+            'bad.name = calmjs.npm:npm.runtime',
+            'badname:likethis = calmjs.npm:npm.runtime',
+        ]})
+
+        stderr = mocks.StringIO()
+        with pretty_logging(
+                logger='calmjs.runtime', level=DEBUG, stream=stderr):
+            rt = runtime.Runtime(working_set=working_set)
+        err = stderr.getvalue()
+
+        self.assertIn("bad 'calmjs.runtime' entry point", err)
+
+        stub_stdouts(self)
+        with self.assertRaises(SystemExit):
+            rt(['-h'])
+        out = sys.stdout.getvalue()
+        self.assertNotIn('bad name', out)
+        self.assertNotIn('bad.name', out)
+        self.assertNotIn('badname:likethis', out)
+        self.assertNotIn('npm', out)
+
+    def setup_dupe_runtime(self):
+        from calmjs.testing import utils
+        from calmjs.npm import npm
+        utils.foo_runtime = runtime.PackageManagerRuntime(npm.cli_driver)
+        utils.runtime_foo = runtime.PackageManagerRuntime(npm.cli_driver)
+
+        def cleanup():
+            del utils.foo_runtime
+            del utils.runtime_foo
+        self.addCleanup(cleanup)
+
+    def test_duplication_and_runtime_errors(self):
+        """
+        Duplicated entry point names
+
+        Naturally, there may be situations where different packages have
+        registered entry_points with the same name.  It will be great if
+        that can be addressed.
+        """
+
+        self.setup_dupe_runtime()
+
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.runtime]\n'
+            'bar = calmjs.testing.utils:foo_runtime\n'
+        ),), 'example1.foo', '1.0')
+
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.runtime]\n'
+            'bar = calmjs.testing.utils:foo_runtime\n'
+        ),), 'example2.foo', '1.0')
+
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.runtime]\n'
+            'bar = calmjs.testing.utils:runtime_foo\n'
+            'baz = calmjs.testing.utils:runtime_foo\n'
+        ),), 'example3.foo', '1.0')
+
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.runtime]\n'
+            'bar = calmjs.testing.utils:runtime_foo\n'
+            'baz = calmjs.testing.utils:runtime_foo\n'
+        ),), 'example4.foo', '1.0')
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+
+        stderr = mocks.StringIO()
+        with pretty_logging(
+                logger='calmjs.runtime', level=DEBUG, stream=stderr):
+            rt = runtime.Runtime(working_set=working_set)
+
+        msg = stderr.getvalue()
+        self.assertIn(
+            "duplicated registration of command 'baz' via entry point "
+            "'baz = calmjs.testing.utils:runtime_foo' ignored; ",
+            msg
+        )
+        self.assertIn(
+            "a calmjs runtime command named 'bar' already registered.", msg)
+        self.assertIn(
+            "'bar = calmjs.testing.utils:foo_runtime' from 'example", msg)
+        self.assertIn(
+            "'bar = calmjs.testing.utils:runtime_foo' from 'example", msg)
+        self.assertIn(
+            "fallback entry point is already added.", msg)
+
+        # Try to use it
+        stub_stdouts(self)
+        with self.assertRaises(SystemExit):
+            rt(['-h'])
+        out = sys.stdout.getvalue()
+        self.assertIn('bar', out)
+        self.assertIn('baz', out)
+        # The full import names are available for the one that had a
+        # fallback naming triggered - order determined by filesystem.
+        foo_runtime = 'calmjs.testing.utils:foo_runtime'
+        fr_check = foo_runtime, (foo_runtime in out)
+        runtime_foo = 'calmjs.testing.utils:runtime_foo'
+        rf_check = runtime_foo, (runtime_foo in out)
+        self.assertNotEqual(fr_check[1], rf_check[1])
+        cmd = [c for c, check in [rf_check, fr_check] if check][0]
+
+        # see that the full one can be invoked and actually invoke the
+        # underlying runtime
+        stub_stdouts(self)
+        with self.assertRaises(SystemExit):
+            rt([cmd, '-h'])
+        out = sys.stdout.getvalue()
+        self.assertIn(cmd, out)
+        self.assertIn("run 'npm install' with generated 'package.json';", out)
+
+        # Time to escalate the problems one can cause...
+        with self.assertRaises(RuntimeError):
+            # yeah instances of root runtimes are NOT meant for reuse
+            # by other runtime instances or argparsers, so this will
+            # fail.
+            rt.init_argparser(ArgumentParser())
+
+        stderr = mocks.StringIO()
+        with pretty_logging(
+                logger='calmjs.runtime', level=DEBUG, stream=stderr):
+            rt.argparser = None
+            rt.init()
+
+        # A forced reinit shouldn't cause a major issue, but it will
+        # definitely result in a distinct lack of named commands.
+        self.assertNotIn(
+            "Runtime instance has been used or initialized improperly.", msg)
+
+        stub_stdouts(self)
+        with self.assertRaises(SystemExit):
+            rt(['-h'])
+        out = sys.stdout.getvalue()
+        self.assertNotIn('bar', out)
+        self.assertNotIn('baz', out)
+
+        # Now for the finale, where we really muck with the internals.
+        stderr = mocks.StringIO()
+        with pretty_logging(
+                logger='calmjs.runtime', level=DEBUG, stream=stderr):
+            # This normally shouldn't happen due to naming restriction,
+            # i.e. where names with "." or ":" are disallowed so that
+            # they are reserved for fallbacks; although if some other
+            # forces are at work, like this...
+            rt.runtimes[foo_runtime] = runtime.DriverRuntime(None)
+            rt.runtimes[runtime_foo] = runtime.DriverRuntime(None)
+            # Now, if one were to force a bad init to happen with
+            # (hopefully forcibly) mismatched runtime instances, the
+            # main runtime instance will simply explode into the logger
+            # in a fit of critical level agony.
+            rt.argparser = None
+            rt.init()
+
+        # EXPLOSION
+        msg = stderr.getvalue()
+        self.assertIn("CRITICAL", msg)
+        self.assertIn(
+            "Runtime instance has been used or initialized improperly.", msg)
+        # Naisu Bakuretsu - Megumin.
 
 
 class IntegrationTestCase(unittest.TestCase):

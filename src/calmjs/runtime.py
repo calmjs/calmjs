@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+import re
 import sys
 from argparse import Action
 from argparse import ArgumentParser
@@ -21,8 +22,40 @@ levels = {
     2: logging.DEBUG,
 }
 
+valid_command_name = re.compile('^[0-9a-zA-Z]*$')
 
-class Runtime(object):
+
+class BootstrapRuntime(object):
+    """
+    calmjs bootstrap runtime.
+    """
+
+    def __init__(self):
+        self.verbosity = 0
+        self.argparser = ArgumentParser(add_help=False)
+        self.init_argparser(self.argparser)
+
+    def init_argparser(self, argparser):
+        argparser.add_argument(
+            '-v', '--verbose', action='count', default=0,
+            help="be more verbose")
+
+        argparser.add_argument(
+            '-q', '--quiet', action='count', default=0,
+            help="be more quiet")
+
+    def prepare_keywords(self, kwargs):
+        v = min(max(
+            self.verbosity + kwargs.pop('verbose') - kwargs.pop('quiet'),
+            -2), 2)
+        self.log_level = levels.get(v)
+
+    def __call__(self, args):
+        kwargs = vars(self.argparser.parse_known_args(args)[0])
+        self.prepare_keywords(kwargs)
+
+
+class Runtime(BootstrapRuntime):
     """
     calmjs runtime collection
     """
@@ -47,8 +80,9 @@ class Runtime(object):
         self.log_level = logging.WARNING
         self.action_key = action_key
         self.working_set = working_set
-        self.argparser = None
         self.runtimes = {}
+        self.entry_points = {}
+        self.argparser = None
         self.init()
 
     def init(self):
@@ -57,24 +91,29 @@ class Runtime(object):
             self.init_argparser(self.argparser)
 
     def init_argparser(self, argparser):
+        """
+        This should not be called with an external argparser as it will
+        corrupt tracking data if forced.
+        """
+
+        if argparser is not self.argparser:
+            raise RuntimeError(
+                'instances of Runtime will not accept external instances of '
+                'ArgumentParsers'
+            )
+
+        super(Runtime, self).init_argparser(argparser)
+
         commands = argparser.add_subparsers(
             dest=self.action_key, metavar='<command>')
-
-        argparser.add_argument(
-            '-v', '--verbose', action='count', default=0,
-            help="be more verbose")
-
-        argparser.add_argument(
-            '-q', '--quiet', action='count', default=0,
-            help="be more quiet")
 
         for entry_point in self.working_set.iter_entry_points(CALMJS_RUNTIME):
             try:
                 # load the runtime instance
                 inst = entry_point.load()
             except ImportError:
-                logger.exception(
-                    "bad '%s' entry point '%s' from '%s'",
+                logger.error(
+                    "bad '%s' entry point '%s' from '%s': ImportError",
                     CALMJS_RUNTIME, entry_point, entry_point.dist,
                 )
                 continue
@@ -82,16 +121,82 @@ class Runtime(object):
             if not isinstance(inst, DriverRuntime):
                 logger.error(
                     "bad '%s' entry point '%s' from '%s': "
-                    "not a calmjs.runtime.DriverRuntime instance.",
+                    "target not a calmjs.runtime.DriverRuntime instance; "
+                    "not registering ignored entry point",
                     CALMJS_RUNTIME, entry_point, entry_point.dist,
                 )
                 continue
 
+            if not valid_command_name.match(entry_point.name):
+                logger.error(
+                    "bad '%s' entry point '%s' from '%s': "
+                    "entry point name must be a latin alphanumeric string; "
+                    "not registering ignored entry point",
+                    CALMJS_RUNTIME, entry_point, entry_point.dist,
+                )
+                continue
+
+            if entry_point.name in self.runtimes:
+                registered = self.entry_points[entry_point.name]
+
+                if self.runtimes[entry_point.name] is inst:
+                    # this is fine, multiple packages declared the same
+                    # thing with the same name.
+                    logger.debug(
+                        "duplicated registration of command '%s' via entry "
+                        "point '%s' ignored; registered '%s', confict '%s'",
+                        entry_point.name, entry_point, registered.dist,
+                        entry_point.dist,
+                    )
+                    continue
+
+                logger.error(
+                    "a calmjs runtime command named '%s' already registered.",
+                    entry_point.name
+                )
+                logger.info("conflicting entry points are:")
+                logger.info(
+                    "'%s' from '%s' (registered)", registered, registered.dist)
+                logger.info(
+                    "'%s' from '%s' (conflict)", entry_point, entry_point.dist)
+                # Fall back name should work if the class/instances are
+                # stable.
+                name = '%s:%s' % (
+                    entry_point.module_name, '.'.join(entry_point.attrs))
+
+                if name in self.runtimes:
+                    # Maybe this is the third time this module is
+                    # registered.  Test for its identity.
+                    if self.runtimes[name] is not inst:
+                        # Okay someone is having a fun time here mucking
+                        # with data structures internal to here, likely
+                        # (read hopefully) due to testing or random
+                        # monkey patching (or module level reload).
+                        registered = self.entry_points[name]
+                        logger.critical(
+                            "'%s' is already registered but points to a "
+                            "completely different instance; please try again "
+                            "with verbose logging and note which packages are "
+                            "reported as conflicted; alternatively this is a "
+                            "forced situation where this Runtime instance has "
+                            "been used or initialized improperly.",
+                            name
+                        )
+                    else:
+                        logger.debug('fallback entry point is already added.')
+                    continue
+
+                logger.error(
+                    "falling back to using full instance path '%s' as command "
+                    "name", name
+                )
+            else:
+                name = entry_point.name
+
             subparser = commands.add_parser(
-                entry_point.name,
-                help=inst.cli_driver.description,
-            )
-            self.runtimes[entry_point.name] = inst
+                name, help=inst.cli_driver.description)
+            self.runtimes[name] = inst
+            self.entry_points[name] = entry_point
             inst.init_argparser(subparser)
 
     def run(self, **kwargs):
@@ -99,12 +204,6 @@ class Runtime(object):
         if runtime:
             runtime.run(**kwargs)
         # nothing is going to happen otherwise?
-
-    def prepare_keywords(self, kwargs):
-        v = min(max(
-            self.verbosity + kwargs.pop('verbose') - kwargs.pop('quiet'),
-            -2), 2)
-        self.log_level = levels.get(v)
 
     def __call__(self, args):
         kwargs = vars(self.argparser.parse_args(args))
@@ -210,9 +309,17 @@ class PackageManagerRuntime(DriverRuntime):
     def init(self):
         self.default_action = None
         self.pkg_manager_options = self.make_cli_options()
+        # this will also initialize a local argparser that allow this
+        # to function as a standalone callable, if required.
         super(PackageManagerRuntime, self).init()
 
     def init_argparser(self, argparser):
+        """
+        Other runtimes (or users of ArgumentParser) can pass their
+        subparser into here to collect the arguments here for a
+        subcommand.
+        """
+
         # Ideally, we could use more subparsers for each action (i.e.
         # init and install).  However, this is complicated by the fact
         # that setuptools has its own calling conventions through the
@@ -263,6 +370,9 @@ class PackageManagerRuntime(DriverRuntime):
 
 
 def main(args=None):
-    with pretty_logging(logger=logger, level=logging.ERROR, stream=sys.stderr):
+    bootstrap = BootstrapRuntime()
+    bootstrap(args or sys.argv[1:])
+    with pretty_logging(
+            logger=logger, level=bootstrap.log_level, stream=sys.stderr):
         runtime = Runtime()
-        runtime(args or sys.argv[1:])
+    runtime(args or sys.argv[1:])
