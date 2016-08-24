@@ -116,10 +116,10 @@ class PackageManagerCommand(Command):
 
         try:
             self.run_command('egg_info')
-            if self.init:
-                self.do_init()
-            elif self.install:
+            if self.install:
                 self.do_install()
+            elif self.init:
+                self.do_init()
         finally:
             # Remove the logging handlers and restore the level.
             for logger_id in self.handle_logger_ids:

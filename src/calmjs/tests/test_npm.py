@@ -703,6 +703,7 @@ class DistCommandTestCase(unittest.TestCase):
         })
 
     def test_install_no_init(self):
+        # install implies init
         stub_mod_call(self, cli)
         tmpdir = mkdtemp(self)
         os.chdir(tmpdir)
@@ -724,6 +725,29 @@ class DistCommandTestCase(unittest.TestCase):
             'devDependencies': {},
             'name': 'foo',
         })
+        self.assertEqual(self.call_args, ((['npm', 'install'],), {}))
+
+    def test_install_init_install(self):
+        stub_mod_call(self, cli)
+        tmpdir = mkdtemp(self)
+        os.chdir(tmpdir)
+        dist = Distribution(dict(
+            script_name='setup.py',
+            script_args=['npm', '--init', '--install'],
+            name='foo',
+        ))
+        dist.parse_command_line()
+        dist.run_commands()
+
+        with open(os.path.join(tmpdir, 'package.json')) as fd:
+            result = json.load(fd)
+
+        self.assertEqual(result, {
+            'dependencies': {'jquery': '~1.11.0'},
+            'devDependencies': {},
+            'name': 'foo',
+        })
+        # Should still invoke install
         self.assertEqual(self.call_args, ((['npm', 'install'],), {}))
 
     def test_install_no_init_has_package_json_interactive_default_input(self):
