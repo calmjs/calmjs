@@ -49,26 +49,28 @@ framework.
 Features
 --------
 
-Manage dependencies of JavaScript modules (hosted by ``npm`` or others)
-    By providing ``setuptools`` command hooks, ``calmjs`` enables the
-    management of the ``package.json`` for Python modules.  In the
-    typical use case, this means the management of ``dependencies`` /
-    ``devDependencies`` for the declaration of required JavaScript
-    packages needed by a given Python project.
+Integration with Node.js based package managers (default: ``npm``)
+    Through ``setuptools`` command hooks, ``calmjs`` provides Python
+    packages with the ability to declare and manage manifest definition
+    files for Node.js based package management systems (e.g. such as
+    ``package.json`` for ``npm``).  In the typical use case, this means
+    the declaration of ``dependencies`` or ``devDependencies`` for the
+    JavaScript packages needed by a given Python package can be tracked,
+    all within the ``setuptools`` framework.
 
-    The command hooks also have the ability to follow through the list
-    of Python package requirements to generate a comprehensive
-    ``package.json`` for a current project.  This means all upstream
-    dependencies on JavaScript packages will also be used when
-    generating the final ``package.json`` needed by any given project.
+    The other part of this infrastructure is that these declarations
+    follow the Python package dependency graph.  Developers and users
+    can make use of the ``calmjs`` console command entry point, or
+    through ``setuptools``, to generate a manifest file to faciliate the
+    installation of Node.js packages required by the Python packages
+    within the completed application stack, tailored for all the
+    packages at hand.
 
-    In other words, subsequent Python packages can readily generate and
-    reuse its parent(s) ``package.json`` file with ease.
-
-Expose JavaScript code in Python packages, while using their namespaces
-    A given Python package that may have included JavaScript code
-    associated for that project will be able to declare those code as
-    JavaScript modules with the exact same namespace through
+Export JavaScript code out of Python packages with the same namespace
+    A given Python package that included associated JavaScript code
+    within the same module and namespace structure alongside with Python
+    modules within the source tree, will be able to declare those code
+    as JavaScript modules under the exact same namespace through
     ``setuptools`` entry points.
 
     These declarations will be available through registries exposed by
@@ -79,14 +81,21 @@ Expose JavaScript code in Python packages, while using their namespaces
     the names due to established naming conventions in JavaScript (and
     in ES6 towards the future).
 
+    Other tools that works with the ``calmjs`` framework can then make
+    use of these raw JavaScript source files, turning them into actual
+    usable Node.js modules for local consumption, or AMD modules for
+    consumption over the web.  This leads to...
+
 Better integration of JavaScript toolchains into Python environments
-    Rather, providing a framework for building toolchains for working
-    with tools written in JavaScript for JavaScript that integrates well
-    with existing Python packages and environment.
+    This is achieved by providing a framework for building toolchains
+    for working with tools written in JavaScript for JavaScript that
+    integrates properly with existing Python packages and environment.
 
     There are no limitations as to how or what this can be done, as this
     is left as an implementation detail.  For an example (when this is
-    done) please refer to the ``calmjs.rjs`` package.
+    done) please refer to the ``calmjs.rjs`` package, which allows the
+    production of AMD modules from JavaScript packages embedded inside
+    Python packages.
 
     Generally, toolchains can be built to find and load all Python
     packages that have any JavaScript source files, and those will be
@@ -95,6 +104,19 @@ Better integration of JavaScript toolchains into Python environments
     set up to aid with running of unit tests, functional testing and
     naturally the final integration tests needed for a successful
     deployment.
+
+Well-defined modular architecture to ensure code reuse and extensibility
+    The features described so far are built upon a foundation of generic
+    classes and modules, so that the support for additional JavaScript
+    tools or custom process for handling transpilation can be as simple
+    as creating a new module for a couple classes with additional
+    parameters with the relevant ``setuptools`` entry points.
+
+    In fact, ``calmjs`` out of the box only ships with just the core
+    framework plus the ``npm`` interfacing part, with the support for
+    tools like ``bower`` or ``r.js`` as completely separate packages
+    such that projects or sites that do not need those functionality can
+    simply not have them installed.
 
 
 Installation
@@ -285,6 +307,60 @@ resulting in somewhat more Python-like feel when dealing with imports
 while using JavaScript, though at a slight cost of whatever standards
 compliance with it.
 
+Command line utility
+~~~~~~~~~~~~~~~~~~~~
+
+It is possible to make use of the ``package.json`` generation
+capabilities from outside of the ``setuptools`` extensions.  Users can
+easily do the same through the built-in ``calmjs`` utility, like so:
+
+.. code:: sh
+
+    $ calmjs --help
+    usage: calmjs [-h] [-v] [-q] <command> ...
+
+    calmjs runtime collection
+
+    positional arguments:
+      <command>
+        npm          npm compatibility helper
+
+    optional arguments:
+      -h, --help     show this help message and exit
+      -v, --verbose  be more verbose
+      -q, --quiet    be more quiet
+
+The above lists the output of a default ``calmjs`` installation.
+Packages that registers the appropriate entry points will be able to
+provide additional commands to that list for usage within the framework.
+
+Naturally, the same ``--init`` functionality shown above with the
+``setuptools`` framework is available, however package names can be
+supplied for generating the target ``package.json`` file from anywhere
+on the filesystem, provided that the Python environment has all the
+required packages installed.  For instance, if ``calmjs.rjs`` is
+installed, this can be invoked to view the ``package.json`` that would
+be generated:
+
+.. code:: sh
+
+    $ calmjs -v npm --view calmjs.rjs
+    2016-08-24 19:08:23,097 INFO calmjs.cli generating a flattened 'package.json' for 'calmjs.rjs'
+    {
+        "dependencies": {
+            "requirejs": "~2.1.17"
+        },
+        "devDependencies": {
+            "grunt-contrib-requirejs": "~0.4.4",
+            "karma-requirejs": "~0.2.2"
+        },
+        "name": "calmjs.rjs"
+    }
+
+For detailed usage, please refer to the inline help, accessible via
+``--help``.  Do note, if help is needed for the specific command, the
+command must be supplied before the ``--help`` argument.  For instance,
+try ``calmjs npm --help``.
 
 Toolchain
 ~~~~~~~~~
