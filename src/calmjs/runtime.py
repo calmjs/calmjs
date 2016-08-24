@@ -9,31 +9,6 @@ from calmjs.utils import pretty_logging
 
 CALMJS_RUNTIME = 'calmjs.runtime'
 logger = logging.getLogger(__name__)
-pkg_manager_options = (
-    ('init', None,
-     "generate and write '%(pkgdef_filename)s' to the "
-     "current directory for this Python package"),
-    # this required implicit step is done, otherwise there are no
-    # difference to running ``npm init`` directly from the shell.
-    ('install', None,
-     "run '%(pkg_manager_bin)s install' with generated "
-     "'%(pkgdef_filename)s'; implies init; will abort if init fails "
-     "to write the generated file"),
-    # as far as I know typically setuptools setup.py are not
-    # interactive, so we keep it that way unless user explicitly
-    # want this.
-    ('interactive', 'i',
-     "enable interactive prompt; if an action requires an explicit "
-     "response but none were specified through flags "
-     "(i.e. overwrite), prompt for response; disabled by default"),
-    ('merge', 'm',
-     "merge generated 'package.json' with the one in current "
-     "directory; if interactive mode is not enabled, implies "
-     "overwrite, else the difference will be displayed"),
-    ('overwrite', 'w',
-     "automatically overwrite any file changes to current directory "
-     "without prompting"),
-)
 DEST_ACTION = 'action'
 DEST_RUNTIME = 'runtime'
 
@@ -44,21 +19,28 @@ levels = {
 }
 
 
-def make_cli_options(cli_driver):
-    return [
-        (full, s, desc % {
-            'pkgdef_filename': cli_driver.pkgdef_filename,
-            'pkg_manager_bin': cli_driver.pkg_manager_bin,
-        }) for full, s, desc in pkg_manager_options
-    ]
-
-
 class Runtime(object):
     """
     calmjs runtime collection
     """
 
-    def __init__(self, working_set=default_working_set):
+    def __init__(
+            self, action_key=DEST_RUNTIME, working_set=default_working_set):
+        """
+        Arguments:
+
+        action_key
+            The destination key where the command will be stored.  Under
+            this key the target driver runtime will be stored, and it
+            will be popped off first before passing rest of kwargs to
+            it.
+        working_set
+            The working_set to use for this instance.
+
+            Default: pkg_resources.working_set
+        """
+
+        self.action_key = action_key
         self.working_set = working_set
         self.argparser = None
         self.runtimes = {}
@@ -71,7 +53,7 @@ class Runtime(object):
 
     def init_argparser(self, argparser):
         commands = argparser.add_subparsers(
-            dest=DEST_RUNTIME, metavar='<command>')
+            dest=self.action_key, metavar='<command>')
 
         argparser.add_argument(
             '-v', '--verbosity', action='count', default=0,
@@ -104,7 +86,7 @@ class Runtime(object):
             inst.init_argparser(subparser)
 
     def run(self, **kwargs):
-        runtime = self.runtimes.get(kwargs.pop(DEST_RUNTIME))
+        runtime = self.runtimes.get(kwargs.pop(self.action_key))
         if runtime:
             runtime.run(**kwargs)
         # nothing is going to happen otherwise?
@@ -122,9 +104,9 @@ class DriverRuntime(Runtime):
     runtime for driver
     """
 
-    def __init__(self, cli_driver, *a, **kw):
+    def __init__(self, cli_driver, action_key=DEST_ACTION, *a, **kw):
         self.cli_driver = cli_driver
-        super(DriverRuntime, self).__init__(*a, **kw)
+        super(DriverRuntime, self).__init__(action_key=action_key, *a, **kw)
 
     def init_argparser(self, argparser=None):
         """
@@ -147,8 +129,43 @@ class PackageManagerRuntime(DriverRuntime):
     $ calmjs npm --install example.package
     """
 
+    _pkg_manager_options = (
+        ('init', None,
+         "generate and write '%(pkgdef_filename)s' to the "
+         "current directory for this Python package"),
+        # This required implicit step is done, otherwise there are no
+        # difference to running ``npm init`` directly from the shell.
+        ('install', None,
+         "run '%(pkg_manager_bin)s install' with generated "
+         "'%(pkgdef_filename)s'; implies init; will abort if init fails "
+         "to write the generated file"),
+        # As far as I know typically setuptools setup.py are not
+        # interactive, so we keep it that way unless user explicitly
+        # want this.  Consequence is that the generic tool will do the
+        # same.
+        ('interactive', 'i',
+         "enable interactive prompt; if an action requires an explicit "
+         "response but none were specified through flags "
+         "(i.e. overwrite), prompt for response; disabled by default"),
+        ('merge', 'm',
+         "merge generated '%(pkgdef_filename)s' with the one in current "
+         "directory; if interactive mode is not enabled, implies "
+         "overwrite, else the difference will be displayed"),
+        ('overwrite', 'w',
+         "automatically overwrite any file changes to current directory "
+         "without prompting"),
+    )
+
+    def make_cli_options(self):
+        return [
+            (full, s, desc % {
+                'pkgdef_filename': self.cli_driver.pkgdef_filename,
+                'pkg_manager_bin': self.cli_driver.pkg_manager_bin,
+            }) for full, s, desc in self._pkg_manager_options
+        ]
+
     def init(self):
-        self.pkg_manager_options = make_cli_options(self.cli_driver)
+        self.pkg_manager_options = self.make_cli_options()
         super(PackageManagerRuntime, self).init()
 
     def init_argparser(self, argparser):
@@ -173,7 +190,7 @@ class PackageManagerRuntime(DriverRuntime):
                 if callable(f):
                     actions.add_argument(
                         *args, help=desc, action='store_const',
-                        dest=DEST_ACTION, const=f
+                        dest=self.action_key, const=f
                     )
                     continue
             argparser.add_argument(*args, help=desc, action='store_true')
