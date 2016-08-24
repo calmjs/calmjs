@@ -9,7 +9,6 @@ from logging import getLogger
 from os.path import join
 from os.path import exists
 
-from distutils.errors import DistutilsOptionError
 from setuptools.dist import Distribution
 from pkg_resources import WorkingSet
 
@@ -547,8 +546,8 @@ class DistCommandTestCase(unittest.TestCase):
             name='foo',
         ))
         dist.parse_command_line()
-        with self.assertRaises(DistutilsOptionError):
-            dist.run_commands()
+        dist.run_commands()
+        self.assertIn('\n        "jquery": "~1.11.0"', sys.stdout.getvalue())
 
     def test_interactive_only(self):
         tmpdir = mkdtemp(self)
@@ -559,8 +558,26 @@ class DistCommandTestCase(unittest.TestCase):
             name='foo',
         ))
         dist.parse_command_line()
-        with self.assertRaises(DistutilsOptionError):
-            dist.run_commands()
+        dist.run_commands()
+        self.assertIn('\n        "jquery": "~1.11.0"', sys.stdout.getvalue())
+
+    def test_view(self):
+        stub_mod_call(self, cli)
+        tmpdir = mkdtemp(self)
+        os.chdir(tmpdir)
+        dist = Distribution(dict(
+            script_name='setup.py',
+            script_args=['npm', '--view'],
+            name='foo',
+        ))
+        dist.parse_command_line()
+        dist.run_commands()
+
+        self.assertFalse(exists(join(tmpdir, 'package.json')))
+        # also log handlers removed.
+        self.assertEqual(len(getLogger('calmjs.cli').handlers), 0)
+        # written to stdout with the correct indentation level.
+        self.assertIn('\n        "jquery": "~1.11.0"', sys.stdout.getvalue())
 
     def test_init_no_overwrite_default_input_interactive(self):
         tmpdir = mkdtemp(self)
@@ -781,7 +798,7 @@ class DistCommandTestCase(unittest.TestCase):
         # Ensure that install is NOT called.
         self.assertIsNone(self.call_args)
 
-    def test_install_false(self):
+    def test_install_dryrun(self):
         stub_mod_call(self, cli)
         tmpdir = mkdtemp(self)
         os.chdir(tmpdir)
@@ -798,6 +815,31 @@ class DistCommandTestCase(unittest.TestCase):
         self.assertIsNone(self.call_args)
         # also log handlers removed.
         self.assertEqual(len(getLogger('calmjs.cli').handlers), 0)
+        # However, default action is view, the package.json should be
+        # written to stdout with the correct indentation level.
+        self.assertIn('\n        "jquery": "~1.11.0"', sys.stdout.getvalue())
+
+    def test_install_view(self):
+        stub_mod_call(self, cli)
+        tmpdir = mkdtemp(self)
+        os.chdir(tmpdir)
+        dist = Distribution(dict(
+            script_name='setup.py',
+            script_args=['npm', '--install', '--view'],
+            name='foo',
+        ))
+        dist.parse_command_line()
+        dist.run_commands()
+
+        with open(os.path.join(tmpdir, 'package.json')) as fd:
+            result = json.load(fd)
+
+        self.assertEqual(result, {
+            'dependencies': {'jquery': '~1.11.0'},
+            'devDependencies': {},
+            'name': 'foo',
+        })
+        self.assertEqual(self.call_args, ((['npm', 'install'],), {}))
 
     @unittest.skipIf(npm.get_npm_version() is None, 'npm not found.')
     def test_npm_bin_get(self):

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 import sys
+from argparse import Action
 from argparse import ArgumentParser
 
 from pkg_resources import working_set as default_working_set
@@ -119,6 +120,26 @@ class DriverRuntime(Runtime):
         """
 
 
+class PackageManagerAction(Action):
+    """
+    Package manager specific action
+    """
+
+    def __init__(self, option_strings, dest, *a, **kw):
+        super(PackageManagerAction, self).__init__(
+            option_strings=option_strings, dest=dest, nargs=0, *a, **kw)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        priority, f = getattr(namespace, self.dest) or (0, None)
+        new_priority, f = self.const
+        if new_priority > priority:
+            setattr(namespace, self.dest, self.const)
+        if new_priority == 1:
+            # Yes this is _really_ magical, however this is the way to
+            # set attributes the cli later needs through the argparser.
+            setattr(namespace, 'stream', sys.stdout)
+
+
 class PackageManagerRuntime(DriverRuntime):
     """
     A calmjs runtime
@@ -130,6 +151,9 @@ class PackageManagerRuntime(DriverRuntime):
     """
 
     _pkg_manager_options = (
+        ('view', None,
+         "generate '%(pkgdef_filename)s' for the Python package and "
+         "write to stdout for viewing [default]"),
         ('init', None,
          "generate and write '%(pkgdef_filename)s' to the "
          "current directory for this Python package"),
@@ -165,6 +189,7 @@ class PackageManagerRuntime(DriverRuntime):
         ]
 
     def init(self):
+        self.default_action = None
         self.pkg_manager_options = self.make_cli_options()
         super(PackageManagerRuntime, self).init()
 
@@ -173,10 +198,12 @@ class PackageManagerRuntime(DriverRuntime):
         # init and install).  However, this is complicated by the fact
         # that setuptools has its own calling conventions through the
         # setup.py file, and to present a consistent cli to end-users
-        # there are bits of work that needs to be set up.
+        # from both calmjs entry point and setuptools using effectively
+        # the same codebase will require a bit of creative handling.
 
         # provide this for the setuptools command class.
         actions = argparser.add_argument_group('action arguments')
+        count = 0
 
         for full, short, desc in self.pkg_manager_options:
             args = [
@@ -188,15 +215,18 @@ class PackageManagerRuntime(DriverRuntime):
                 f = getattr(self.cli_driver, '%s_%s' % (
                     self.cli_driver.binary, full), None)
                 if callable(f):
+                    count += 1
                     actions.add_argument(
-                        *args, help=desc, action='store_const',
-                        dest=self.action_key, const=f
+                        *args, help=desc, action=PackageManagerAction,
+                        dest=self.action_key, const=(count, f)
                     )
-                    continue
+                    if self.default_action is None:
+                        self.default_action = f
+                    continue  # pragma: no cover
             argparser.add_argument(*args, help=desc, action='store_true')
 
         argparser.add_argument(
-            'package_names', help='Names of the python package to use',
+            'package_names', help='names of the python package to use',
             metavar='package_names', nargs='+',
         )
 
@@ -204,7 +234,12 @@ class PackageManagerRuntime(DriverRuntime):
         # Run the underlying package manager.  As the arguments in this
         # subparser is constructed in a way that maps directly with the
         # underlying actions, it can be invoked directly.
-        action = kwargs.pop(DEST_ACTION)
+        raw = kwargs.pop(self.action_key)
+        if raw:
+            count, action = raw
+        else:
+            action = self.default_action
+            kwargs['stream'] = sys.stdout
         action(**kwargs)
 
 

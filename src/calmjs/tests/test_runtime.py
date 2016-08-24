@@ -126,3 +126,44 @@ class IntegrationTestCase(unittest.TestCase):
         # not foo install, but npm install since entry point specified
         # the actual runtime instance.
         self.assertEqual(self.call_args, ((['npm', 'install'],), {}))
+
+    def test_npm_view(self):
+        remember_cwd(self)
+        tmpdir = mkdtemp(self)
+        os.chdir(tmpdir)
+        stub_stdouts(self)
+        rt = self.setup_runtime()
+        rt(['foo', '--view', 'example.package1', 'example.package2'])
+        result = json.loads(sys.stdout.getvalue())
+        self.assertEqual(result['dependencies']['jquery'], '~3.1.0')
+        self.assertEqual(result['dependencies']['underscore'], '~1.8.3')
+
+        stub_stdouts(self)
+        rt(['foo', 'example.package1', 'example.package2'])
+        result = json.loads(sys.stdout.getvalue())
+        self.assertEqual(result['dependencies']['jquery'], '~3.1.0')
+        self.assertEqual(result['dependencies']['underscore'], '~1.8.3')
+
+    def test_npm_all_the_actions(self):
+        remember_cwd(self)
+        tmpdir = mkdtemp(self)
+        os.chdir(tmpdir)
+        stub_stdouts(self)
+        stub_mod_call(self, cli)
+        rt = self.setup_runtime()
+        rt(['foo', '--install', '--view', '--init',
+            'example.package1', 'example.package2'])
+
+        # inside stdout
+        result = json.loads(sys.stdout.getvalue())
+        self.assertEqual(result['dependencies']['jquery'], '~3.1.0')
+        self.assertEqual(result['dependencies']['underscore'], '~1.8.3')
+
+        with open(join(tmpdir, 'package.json')) as fd:
+            result = json.load(fd)
+
+        self.assertEqual(result['dependencies']['jquery'], '~3.1.0')
+        self.assertEqual(result['dependencies']['underscore'], '~1.8.3')
+        # not foo install, but npm install since entry point specified
+        # the actual runtime instance.
+        self.assertEqual(self.call_args, ((['npm', 'install'],), {}))

@@ -4,10 +4,11 @@ Module providing npm distutil command that ultimately integrates with
 setuptools
 """
 
+import sys
 import logging
 
+# from distutils.errors import DistutilsOptionError
 from distutils.core import Command
-from distutils.errors import DistutilsOptionError
 from distutils import log
 
 
@@ -68,7 +69,8 @@ class PackageManagerCommand(Command):
                 cls.user_options.append((full, short, desc))
 
     # keywords that are actions that result in effects that we support
-    actions = ('init', 'install')
+    # TODO derive this like how the runtime does.
+    actions = ('view', 'init', 'install')
 
     def _opt_keys(self):
         for opt in self.user_options:
@@ -77,6 +79,11 @@ class PackageManagerCommand(Command):
     def initialize_options(self):
         for key in self._opt_keys():
             setattr(self, key, False)
+        self.stream = None  # extra output
+
+    def do_view(self):
+        pkg_name = self.distribution.get_name()
+        self.cli_driver.pkg_manager_view(pkg_name, stream=self.stream)
 
     def do_init(self):
         pkg_name = self.distribution.get_name()
@@ -84,6 +91,7 @@ class PackageManagerCommand(Command):
             pkg_name,
             overwrite=self.overwrite, merge=self.merge,
             interactive=self.interactive,
+            stream=self.stream,
         )
 
     def do_install(self):
@@ -92,18 +100,22 @@ class PackageManagerCommand(Command):
             pkg_name,
             overwrite=self.overwrite, merge=self.merge,
             interactive=self.interactive,
+            stream=self.stream,
         )
 
     def finalize_options(self):
         opts = [i for i in (getattr(self, k) for k in self.actions) if i]
         if not opts:
-            name = self.get_command_name()
-            raise DistutilsOptionError(
-                'must specify an action flag; see %s --help' % name)
+            # default to view
+            self.view = True
+        if self.view or self.dry_run:
+            self.stream = sys.stdout
 
     def run(self):
         if self.dry_run:
-            # Everything else will do a lot of naughty things so...
+            # Do the default action and finish, as everything else may
+            # cause permanent changes.
+            self.do_view()
             return
 
         root_logger = logging.getLogger()
@@ -120,6 +132,8 @@ class PackageManagerCommand(Command):
                 self.do_install()
             elif self.init:
                 self.do_init()
+            elif self.view:
+                self.do_view()
         finally:
             # Remove the logging handlers and restore the level.
             for logger_id in self.handle_logger_ids:

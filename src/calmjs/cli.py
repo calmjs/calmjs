@@ -352,7 +352,7 @@ class PackageManagerDriver(NodeDriver):
         kw = self._gen_call_kws()
         return _get_bin_version(self.pkg_manager_bin, kw=kw)
 
-    def pkg_manager_view(self, package_names):
+    def pkg_manager_view(self, package_names, stream=None, **kw):
         """
         Returns the manifest JSON for the Python package name.  Default
         npm implementation calls for package.json.
@@ -366,6 +366,9 @@ class PackageManagerDriver(NodeDriver):
         package_names
             The names of the python packages with their requirements to
             source the package.json from.
+        stream
+            If specified, the generated package.json will be written to
+            there.
 
         Returns the manifest json as a dict.
         """
@@ -399,12 +402,16 @@ class PackageManagerDriver(NodeDriver):
             # use the last item.
             pkgdef_json[self.pkg_name_field] = package_names[-1]
 
+        if stream:
+            self.dump(pkgdef_json, stream)
+            stream.write('\n')
+
         return pkgdef_json
 
     def pkg_manager_init(
             self, package_names,
             interactive=None,
-            overwrite=False, merge=False):
+            overwrite=False, merge=False, **kw):
         """
         Note: default implementation calls for npm and package.json,
         please note that it may not be the case for this instance of
@@ -456,7 +463,7 @@ class PackageManagerDriver(NodeDriver):
         # this will be modified in place
         original_json = {}
 
-        pkgdef_json = self.pkg_manager_view(package_names)
+        pkgdef_json = self.pkg_manager_view(package_names, **kw)
 
         # Now we figure out the actual file we want to work with.
         pkgdef_path = self.join_cwd(self.pkgdef_filename)
@@ -549,8 +556,7 @@ class PackageManagerDriver(NodeDriver):
 
         return True
 
-    def pkg_manager_install(self, package_names=None, args=(), env={},
-                            *a, **kw):
+    def pkg_manager_install(self, package_names=None, args=(), env={}, **kw):
         """
         This will install all dependencies into the current working
         directory for the specific Python package from the selected
@@ -588,7 +594,7 @@ class PackageManagerDriver(NodeDriver):
         """
 
         if package_names:
-            result = self.pkg_manager_init(package_names, *a, **kw)
+            result = self.pkg_manager_init(package_names, **kw)
             if not result:
                 logger.warn(
                     "not continuing with '%s %s' as the generation of "
