@@ -167,3 +167,32 @@ class IntegrationTestCase(unittest.TestCase):
         # not foo install, but npm install since entry point specified
         # the actual runtime instance.
         self.assertEqual(self.call_args, ((['npm', 'install'],), {}))
+
+    def test_npm_verbose_quiet(self):
+        remember_cwd(self)
+        tmpdir = mkdtemp(self)
+        os.chdir(tmpdir)
+        rt = self.setup_runtime()
+
+        stub_stdouts(self)
+        rt(['-v', 'foo', '--init', 'example.package1'])
+        self.assertIn("generating a flattened", sys.stderr.getvalue())
+        self.assertNotIn("found 'package.json'", sys.stderr.getvalue())
+
+        # extra verbosity shouldn't blow up
+        stub_stdouts(self)
+        rt(['-vvvv', 'foo', '--init', 'example.package1'])
+        self.assertIn("generating a flattened", sys.stderr.getvalue())
+        self.assertIn("found 'package.json'", sys.stderr.getvalue())
+
+        # q and v negates each other
+        stub_stdouts(self)
+        rt(['-v', '-q', 'foo', '--init', 'example.package2'])
+        self.assertNotIn("generating a flattened", sys.stderr.getvalue())
+        self.assertNotIn("found 'package.json'", sys.stderr.getvalue())
+        self.assertIn("WARNING", sys.stderr.getvalue())
+
+        # extra quietness shouldn't blow up
+        stub_stdouts(self)
+        rt(['-qqqqq', 'foo', '--install', 'example.package2'])
+        self.assertNotIn("WARNING", sys.stderr.getvalue())

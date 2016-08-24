@@ -14,6 +14,8 @@ DEST_ACTION = 'action'
 DEST_RUNTIME = 'runtime'
 
 levels = {
+    -2: logging.CRITICAL,
+    -1: logging.ERROR,
     0: logging.WARNING,
     1: logging.INFO,
     2: logging.DEBUG,
@@ -41,6 +43,8 @@ class Runtime(object):
             Default: pkg_resources.working_set
         """
 
+        self.verbosity = 0
+        self.log_level = logging.WARNING
         self.action_key = action_key
         self.working_set = working_set
         self.argparser = None
@@ -57,8 +61,12 @@ class Runtime(object):
             dest=self.action_key, metavar='<command>')
 
         argparser.add_argument(
-            '-v', '--verbosity', action='count', default=0,
-            help="enable debug logging")
+            '-v', '--verbose', action='count', default=0,
+            help="be more verbose")
+
+        argparser.add_argument(
+            '-q', '--quiet', action='count', default=0,
+            help="be more quiet")
 
         for entry_point in self.working_set.iter_entry_points(CALMJS_RUNTIME):
             try:
@@ -92,11 +100,17 @@ class Runtime(object):
             runtime.run(**kwargs)
         # nothing is going to happen otherwise?
 
+    def prepare_keywords(self, kwargs):
+        v = min(max(
+            self.verbosity + kwargs.pop('verbose') - kwargs.pop('quiet'),
+            -2), 2)
+        self.log_level = levels.get(v)
+
     def __call__(self, args):
         kwargs = vars(self.argparser.parse_args(args))
-        # should have own api to add this to aid with popping root flags
-        level = levels.get(kwargs.pop('verbosity'), logging.DEBUG)
-        with pretty_logging(logger='calmjs', level=level, stream=sys.stderr):
+        self.prepare_keywords(kwargs)
+        with pretty_logging(
+                logger='calmjs', level=self.log_level, stream=sys.stderr):
             self.run(**kwargs)
 
 
@@ -117,6 +131,11 @@ class DriverRuntime(Runtime):
     def run(self, **kwargs):
         """
         DriverRuntime should have their own running method.
+        """
+
+    def prepare_keywords(self, kwargs):
+        """
+        DriverRuntime subclasses should have their own handling.
         """
 
 
