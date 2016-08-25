@@ -381,13 +381,17 @@ class PackageManagerRuntime(DriverRuntime):
 
 
 def main(args=None):
+    import warnings
     bootstrap = BootstrapRuntime()
     args = sys.argv[1:] if args is None else args
     args = args or []  # ensure that it is a list.
     extras = bootstrap(args)
     if not extras:
         args = args + ['-h']
-    with pretty_logging(
-            logger=logger, level=bootstrap.log_level, stream=sys.stderr):
-        runtime = Runtime()
-    runtime(args)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        with pretty_logging(
+                logger='', level=bootstrap.log_level, stream=sys.stderr):
+            runtime = Runtime()
+        runtime(args)

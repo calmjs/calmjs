@@ -13,6 +13,7 @@ import pkg_resources
 import warnings
 
 from calmjs import cli
+from calmjs.utils import pretty_logging
 from calmjs.testing.mocks import MockProvider
 from calmjs.testing.utils import fake_error
 from calmjs.testing.utils import mkdtemp
@@ -295,6 +296,16 @@ class CliDriverTestCase(unittest.TestCase):
         self.assertIsNot(driver.get_mgr_version, None)
         driver.mgr_install()
         self.assertEqual(self.call_args, ((['mgr', 'install'],), {}))
+
+    def test_install_failure(self):
+        stub_mod_call(self, cli, fake_error(IOError))
+        driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
+        stderr = StringIO()
+        with pretty_logging(stream=stderr):
+            with self.assertRaises(IOError):
+                driver.mgr_install()
+        val = stderr.getvalue()
+        self.assertIn("invocation of the 'mgr' binary failed", val)
 
     def test_install_arguments(self):
         stub_mod_call(self, cli)

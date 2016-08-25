@@ -347,7 +347,7 @@ class BaseDriver(object):
             warnings.warn(msg, RuntimeWarning)
             # Yes there may be duplicates, but warnings are governed
             # differently.
-            logger.debug(msg)
+            logger.warning(msg)
         else:
             logger.debug(
                 "Unable to locate '%s'; not modifying PATH environment "

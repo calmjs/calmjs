@@ -289,7 +289,7 @@ class PackageManagerDriver(NodeDriver):
         """
 
         super(PackageManagerDriver, self).__init__(*a, **kw)
-        self.binary = self.pkg_manager_bin = pkg_manager_bin
+        self.binary = pkg_manager_bin
         self.pkgdef_filename = pkgdef_filename
         self.prompt = prompt
         self.install_cmd = install_cmd
@@ -299,6 +299,10 @@ class PackageManagerDriver(NodeDriver):
         self.interactive = interactive
         if self.interactive is None:
             self.interactive = check_interactive()
+
+    @property
+    def pkg_manager_bin(self):
+        return self.binary
 
     @property
     def _aliases(self):
@@ -584,6 +588,9 @@ class PackageManagerDriver(NodeDriver):
         If no package_name was supplied then just continue with the
         process anyway, to still enable the shorthand calling.
 
+        If the package manager could not be invoked, it will simply not
+        be.
+
         Arguments:
 
         package_names
@@ -619,7 +626,15 @@ class PackageManagerDriver(NodeDriver):
                 "invoked from working directory '%s'", self.working_dir)
         cmd = [self.pkg_manager_bin, self.install_cmd]
         cmd.extend(args)
-        call(cmd, **call_kw)
+        try:
+            call(cmd, **call_kw)
+        except IOError:
+            logger.error(
+                "invocation of the '%s' binary failed; please ensure it and "
+                "its dependencies are installed and available.", self.binary
+            )
+            # Still raise the exception as this is a lower level API.
+            raise
 
     def run(self, args=(), env={}):
         """

@@ -457,8 +457,8 @@ def stub_mod_call(testcase_inst, mod, f=None):
     def fake_call(*a, **kw):
         testcase_inst.call_args = (a, kw)
 
-    # if f:
-    #     fake_call = f
+    if f:
+        fake_call = f  # noqa: F811
 
     def cleanup():
         # Restore original module level functions
