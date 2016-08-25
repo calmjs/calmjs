@@ -102,6 +102,16 @@ class Runtime(BootstrapRuntime):
                 'ArgumentParsers'
             )
 
+        def to_module_attr(ep):
+            return '%s:%s' % (ep.module_name, '.'.join(ep.attrs))
+
+        def register(name, runtime, entry_point):
+            subparser = commands.add_parser(
+                name, help=inst.cli_driver.description)
+            self.runtimes[name] = runtime
+            self.entry_points[name] = entry_point
+            runtime.init_argparser(subparser)
+
         super(Runtime, self).init_argparser(argparser)
 
         commands = argparser.add_subparsers(
@@ -137,15 +147,16 @@ class Runtime(BootstrapRuntime):
                 continue
 
             if entry_point.name in self.runtimes:
-                registered = self.entry_points[entry_point.name]
+                reg_ep = self.entry_points[entry_point.name]
+                reg_rt = self.runtimes[entry_point.name]
 
-                if self.runtimes[entry_point.name] is inst:
+                if reg_rt is inst:
                     # this is fine, multiple packages declared the same
                     # thing with the same name.
                     logger.debug(
                         "duplicated registration of command '%s' via entry "
                         "point '%s' ignored; registered '%s', confict '%s'",
-                        entry_point.name, entry_point, registered.dist,
+                        entry_point.name, entry_point, reg_ep.dist,
                         entry_point.dist,
                     )
                     continue
@@ -156,13 +167,12 @@ class Runtime(BootstrapRuntime):
                 )
                 logger.info("conflicting entry points are:")
                 logger.info(
-                    "'%s' from '%s' (registered)", registered, registered.dist)
+                    "'%s' from '%s' (registered)", reg_ep, reg_ep.dist)
                 logger.info(
                     "'%s' from '%s' (conflict)", entry_point, entry_point.dist)
                 # Fall back name should work if the class/instances are
                 # stable.
-                name = '%s:%s' % (
-                    entry_point.module_name, '.'.join(entry_point.attrs))
+                name = to_module_attr(entry_point)
 
                 if name in self.runtimes:
                     # Maybe this is the third time this module is
@@ -172,7 +182,6 @@ class Runtime(BootstrapRuntime):
                         # with data structures internal to here, likely
                         # (read hopefully) due to testing or random
                         # monkey patching (or module level reload).
-                        registered = self.entry_points[name]
                         logger.critical(
                             "'%s' is already registered but points to a "
                             "completely different instance; please try again "
@@ -183,21 +192,21 @@ class Runtime(BootstrapRuntime):
                             name
                         )
                     else:
-                        logger.debug('fallback entry point is already added.')
+                        logger.debug(
+                            "fallback command '%s' is already registered.",
+                            name
+                        )
                     continue
 
                 logger.error(
                     "falling back to using full instance path '%s' as command "
-                    "name", name
+                    "name, also registering alias for registered command", name
                 )
+                register(to_module_attr(reg_ep), reg_rt, reg_ep)
             else:
                 name = entry_point.name
 
-            subparser = commands.add_parser(
-                name, help=inst.cli_driver.description)
-            self.runtimes[name] = inst
-            self.entry_points[name] = entry_point
-            inst.init_argparser(subparser)
+            register(name, inst, entry_point)
 
     def run(self, **kwargs):
         runtime = self.runtimes.get(kwargs.pop(self.action_key))

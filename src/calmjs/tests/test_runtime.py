@@ -74,9 +74,12 @@ class PackageManagerDriverTestCase(unittest.TestCase):
         with self.assertRaises(SystemExit):
             rt(['-h'])
         out = sys.stdout.getvalue()
+        # this results in unnatural argparsing situation
         self.assertNotIn('bad name', out)
+        # reserved for disambiguation
         self.assertNotIn('bad.name', out)
         self.assertNotIn('badname:likethis', out)
+        # command listing naturally not available.
         self.assertNotIn('npm', out)
 
     def setup_dupe_runtime(self):
@@ -146,8 +149,9 @@ class PackageManagerDriverTestCase(unittest.TestCase):
             "'bar = calmjs.testing.utils:foo_runtime' from 'example", msg)
         self.assertIn(
             "'bar = calmjs.testing.utils:runtime_foo' from 'example", msg)
-        self.assertIn(
-            "fallback entry point is already added.", msg)
+        # Registration order is non-deterministic, so fallback is too
+        self.assertIn("fallback command 'calmjs.testing.utils:", msg)
+        self.assertIn("is already registered.", msg)
 
         # Try to use it
         stub_stdouts(self)
@@ -156,22 +160,29 @@ class PackageManagerDriverTestCase(unittest.TestCase):
         out = sys.stdout.getvalue()
         self.assertIn('bar', out)
         self.assertIn('baz', out)
-        # The full import names are available for the one that had a
-        # fallback naming triggered - order determined by filesystem.
+
+        # Both fallbacks should be registered, to ensure disambiguation,
+        # as the load order can be influenced randomly by dict ordering
+        # or even the filesystem file load order.
         foo_runtime = 'calmjs.testing.utils:foo_runtime'
-        fr_check = foo_runtime, (foo_runtime in out)
         runtime_foo = 'calmjs.testing.utils:runtime_foo'
-        rf_check = runtime_foo, (runtime_foo in out)
-        self.assertNotEqual(fr_check[1], rf_check[1])
-        cmd = [c for c, check in [rf_check, fr_check] if check][0]
+        self.assertIn(runtime_foo, out)
+        self.assertIn(foo_runtime, out)
 
         # see that the full one can be invoked and actually invoke the
         # underlying runtime
         stub_stdouts(self)
         with self.assertRaises(SystemExit):
-            rt([cmd, '-h'])
+            rt([foo_runtime, '-h'])
         out = sys.stdout.getvalue()
-        self.assertIn(cmd, out)
+        self.assertIn(foo_runtime, out)
+        self.assertIn("run 'npm install' with generated 'package.json';", out)
+
+        stub_stdouts(self)
+        with self.assertRaises(SystemExit):
+            rt([runtime_foo, '-h'])
+        out = sys.stdout.getvalue()
+        self.assertIn(runtime_foo, out)
         self.assertIn("run 'npm install' with generated 'package.json';", out)
 
         # Time to escalate the problems one can cause...
