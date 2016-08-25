@@ -240,6 +240,13 @@ class IntegrationTestCase(unittest.TestCase):
     def test_calmjs_main_console_entry_point(self):
         stub_stdouts(self)
         with self.assertRaises(SystemExit):
+            runtime.main([])
+        # ensure the help is printed by default
+        self.assertIn('usage', sys.stdout.getvalue())
+
+    def test_calmjs_main_console_entry_point_help(self):
+        stub_stdouts(self)
+        with self.assertRaises(SystemExit):
             runtime.main(['-h'])
         # ensure our base action module/class is registered.
         self.assertIn('npm', sys.stdout.getvalue())

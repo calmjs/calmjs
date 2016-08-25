@@ -51,8 +51,10 @@ class BootstrapRuntime(object):
         self.log_level = levels.get(v)
 
     def __call__(self, args):
-        kwargs = vars(self.argparser.parse_known_args(args)[0])
+        parsed, extras = self.argparser.parse_known_args(args)
+        kwargs = vars(parsed)
         self.prepare_keywords(kwargs)
+        return extras
 
 
 class Runtime(BootstrapRuntime):
@@ -380,8 +382,12 @@ class PackageManagerRuntime(DriverRuntime):
 
 def main(args=None):
     bootstrap = BootstrapRuntime()
-    bootstrap(args or sys.argv[1:])
+    args = sys.argv[1:] if args is None else args
+    args = args or []  # ensure that it is a list.
+    extras = bootstrap(args)
+    if not extras:
+        args = args + ['-h']
     with pretty_logging(
             logger=logger, level=bootstrap.log_level, stream=sys.stderr):
         runtime = Runtime()
-    runtime(args or sys.argv[1:])
+    runtime(args)
