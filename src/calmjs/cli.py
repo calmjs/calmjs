@@ -596,14 +596,14 @@ class PackageManagerDriver(NodeDriver):
         if package_names:
             result = self.pkg_manager_init(package_names, **kw)
             if not result:
-                logger.warn(
+                logger.warning(
                     "not continuing with '%s %s' as the generation of "
                     "'%s' failed", self.pkg_manager_bin, self.install_cmd,
                     self.pkgdef_filename
                 )
                 return
         else:
-            logger.warn(
+            logger.warning(
                 "no package name supplied, but continuing with '%s %s'",
                 self.pkg_manager_bin, self.install_cmd,
             )

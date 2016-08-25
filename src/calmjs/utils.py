@@ -20,10 +20,12 @@ def enable_pretty_logging(logger='calmjs', level=logging.DEBUG, stream=None):
 
     def cleanup():
         logger.removeHandler(handler)
+        logger.level = old_level
 
     if not isinstance(logger, logging.Logger):
         logger = logging.getLogger(logger)
 
+    old_level = logger.level
     handler = logging.StreamHandler(stream)
     handler.setFormatter(logging.Formatter(
         '%(asctime)s %(levelname)s %(name)s %(message)s'))

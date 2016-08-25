@@ -14,7 +14,9 @@ from pkg_resources import WorkingSet
 
 from calmjs import npm
 from calmjs import cli
+from calmjs.utils import pretty_logging
 
+from calmjs.testing.mocks import StringIO
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import make_dummy_dist
 from calmjs.testing.utils import remember_cwd
@@ -89,15 +91,21 @@ class NpmTestCase(unittest.TestCase):
         with open(join(tmpdir, 'package.json'), 'w') as fd:
             json.dump({}, fd)
 
-        # This is faked.
-        npm.npm_install('foo')
+        stderr = StringIO()
+        # capture the logging explicitly as the conditions which
+        # determines how the errors are outputted differs from different
+        # test harnesses.  Verify that later.
+        with pretty_logging(stream=stderr):
+            # This is faked.
+            npm.npm_install('foo')
 
         self.assertIn(
             "Overwrite '%s'? (Yes/No) [No] " % join(tmpdir, 'package.json'),
             sys.stdout.getvalue())
-        # No log level set, otherwise it will complain that npm install
-        # cannot be continued
-        self.assertEqual(sys.stderr.getvalue(), '')
+        # Ensure the error message.  Normally this is printed through
+        # stderr via distutils custom logger and our handler bridge for
+        # that which is tested elsewhere.
+        self.assertIn("not continuing with 'npm install'", stderr.getvalue())
 
         with open(join(tmpdir, 'package.json')) as fd:
             result = fd.read()
