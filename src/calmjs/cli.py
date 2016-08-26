@@ -473,14 +473,6 @@ class PackageManagerDriver(NodeDriver):
         pkgdef_path = self.join_cwd(self.pkgdef_filename)
         existed = exists(pkgdef_path)
 
-        # I really don't like all these if statements that follow,
-        # however this is still relatively easy to reason over.  Should
-        # consider this more of a shell and have the heavy lifting be
-        # arranged in a more functional approach.
-
-        # Also, do we want to support the initialization of multiple
-        # packages?  For instance, [dev] extras?
-
         if existed:
             try:
                 with open(pkgdef_path, 'r') as fd:

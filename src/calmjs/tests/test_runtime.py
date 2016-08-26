@@ -287,6 +287,13 @@ class ArgumentHandlingTestCase(unittest.TestCase):
         # former has priority
         self.assertEqual("calmjs: error: unrecognized arguments: -u", err)
 
+    def test_before_known_and_after_unknown(self):
+        rt = self.setup_runtime()
+        with self.assertRaises(SystemExit):
+            rt(['-v', 'cmd', 'pkg', '-u'])
+        err = sys.stderr.getvalue().splitlines()[-1].strip()
+        self.assertEqual("calmjs cmd: error: unrecognized arguments: -u", err)
+
     def test_before_and_after_extras_scattered(self):
         # previously test_before_and_after_extras_known_before, as
         # scattering the -v after will not work.  Since the bootstrap
