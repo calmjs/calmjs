@@ -18,8 +18,8 @@ registry
     anything else.
 
 indexer
-    Constains a microregistry and a number of functions for generation
-    of mappings of files within modules in Python packages for theu
+    Contains a microregistry and a number of functions for generation
+    of mappings of files within modules in Python packages for the
     purpose of exporting the paths of the JavaScript sources they hold.
     Shouldn't really need expanding or shouldn't need to inherit from
     calmjs.
@@ -37,7 +37,7 @@ dist
     setuptools provide.
 
 toolchain
-    The exported primative of this project.  Provides the skeleton
+    The exported primitive of this project.  Provides the skeleton
     Toolchain class for other packages to extend upon.  While some
     toolchain modules might provide cli interfacing functionalities,
     they should not inherit from cli as this is not the module that will
@@ -47,7 +47,7 @@ cli
     Module that provides the functions that call out to cli tools that
     will support the functionality needed by the calmjs framework.
     Provides the expanded driver classes for interfacing with Node.js
-    and its tools, and also the primative exposed functions that provide
+    and its tools, and also the primitive exposed functions that provide
     its own shell.  This latter part could be exposed as the runtime
     library.
 
@@ -57,7 +57,7 @@ runtime
     Supports the generation of the texts for users from the shell.
 
 command
-    Provides the primative package manager command.  While it doesn't
+    Provides the primitive package manager command.  While it doesn't
     really inherit from anything here, implementations will likely
     inherit from dist for helpers, cli for the actual cli interfacing
     part for the underlying binary for the command, and runtime for the

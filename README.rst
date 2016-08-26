@@ -61,8 +61,8 @@ Integration with Node.js based package managers (default: ``npm``)
     The other part of this infrastructure is that these declarations
     follow the Python package dependency graph.  Developers and users
     can make use of the ``calmjs`` console command entry point, or
-    through ``setuptools``, to generate a manifest file to faciliate the
-    installation of Node.js packages required by the Python packages
+    through ``setuptools``, to generate a manifest file to facilitate
+    the installation of Node.js packages required by the Python packages
     within the completed application stack, tailored for all the
     packages at hand.
 
@@ -362,6 +362,11 @@ For detailed usage, please refer to the inline help, accessible via
 command must be supplied before the ``--help`` argument.  For instance,
 try ``calmjs npm --help``.
 
+Developers who wish to provide JavaScript based tools through this
+infrastructure can simply extend the ``calmjs.runtime.DriverRuntime``
+class, and the exact instructions will be available in the developer
+guide (when it is written).
+
 Toolchain
 ~~~~~~~~~
 
@@ -393,6 +398,51 @@ split their packages up to Python and JavaScript bits and have them be
 deployed and hosted both pypi (for pip) and npm (respectively) and then
 figure out how to bring them back together in a coherent manner.  Don't
 ask the author how this option is easier or better.
+
+
+Troubleshooting
+---------------
+
+Here may be some common issues with usage of ``calmjs``
+
+Runtime reporting 'unrecognized arguments:' on recognized ones
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For instance, if the ``calmjs`` binary was executed like so resulting in
+error message may look like this:
+
+.. code:: sh
+
+    $ calmjs npm --install calmjs.dev -v
+    usage: calmjs [-h] [-v] [-q] [-d] <command> ...
+    calmjs: error: unrecognized arguments: -v
+
+This means that the ``-v`` is unrecognized by the subcommand (i.e. the
+``calmjs npm`` command) as it was placed after.  Unfortunately there are
+a number of bugs in ``argparse`` module that behaves differently across
+different python versions that made it very difficult to consistently
+provide this information.  There are workarounds made in the
+``calmjs.runtime`` module so this situation should not arise, however if
+it does, please file an issue on the tracker.
+
+calmjs.runtime terminating due to a critical error
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If no useful ERROR message is listed before, please try running again
+using a debug flag (either ``-d`` or ``--debug``).
+
+.. code:: sh
+
+    $ calmjs npm --install calmjs.dev
+    CRITICAL calmjs.runtime terminating due to a critical error
+
+    $ calmjs -d npm --install calmjs.dev
+    CRITICAL calmjs.runtime terminating due to exception
+    Traceback (most recent call last):
+    ...
+
+Specifying the debug flag twice will enable the post_mortem mode, where
+a debugger will be fired at the point of failure.
 
 
 Contribute
