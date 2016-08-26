@@ -31,11 +31,20 @@ class BootstrapRuntime(object):
     calmjs bootstrap runtime.
     """
 
-    def __init__(self):
+    argparser = None
+
+    def __init__(self, prog=None, debug=0, log_level=0):
+        self.prog = prog
+        self.debug = debug
+        self.log_level = log_level
         self.verbosity = 0
-        self.argparser = ArgumentParser(add_help=False)
-        self.init_argparser(self.argparser)
-        self.debug = 0
+        self.init()
+
+    def init(self):
+        if self.argparser is None:
+            self.argparser = ArgumentParser(
+                prog=self.prog, description=self.__doc__, add_help=False)
+            self.init_argparser(self.argparser)
 
     def init_argparser(self, argparser):
         argparser.add_argument(
@@ -64,15 +73,14 @@ class BootstrapRuntime(object):
         return extras
 
 
-
-class Runtime(BootstrapRuntime):
+class BaseRuntime(BootstrapRuntime):
     """
     calmjs runtime collection
     """
 
     def __init__(
             self, logger='calmjs', action_key=DEST_RUNTIME,
-            working_set=default_working_set, prog=None):
+            working_set=default_working_set, *a, **kw):
         """
         Arguments:
 
@@ -87,23 +95,28 @@ class Runtime(BootstrapRuntime):
             Default: pkg_resources.working_set
         """
 
-        self.verbosity = 0
         self.logger = logger
-        self.log_level = logging.WARNING
         self.action_key = action_key
         self.working_set = working_set
-        self.prog = prog
         self.runtimes = {}
         self.entry_points = {}
         self.argparser = None
         self.subparsers = {}
-        self.init()
+        super(BaseRuntime, self).__init__(*a, **kw)
 
     def init(self):
         if self.argparser is None:
             self.argparser = ArgumentParser(
                 prog=self.prog, description=self.__doc__)
             self.init_argparser(self.argparser)
+
+    def run(self, **kwargs):
+        """
+        Subclasses should have their own running method.
+        """
+
+
+class Runtime(BaseRuntime):
 
     def init_argparser(self, argparser):
         """
@@ -231,6 +244,20 @@ class Runtime(BootstrapRuntime):
         # nothing is going to happen otherwise?
 
     def __call__(self, args):
+        # MUST use the bootstrap runtime class to process all the common
+        # flags as inconsistent handling of these between different
+        # versions of Python make this extremely annoying.
+        #
+        # For a simple minimum demonstration, see:
+        # https://gist.github.com/metatoaster/16bb6046d6363682b4c4497518436fc5
+
+        # Also, remember that we need to strip off all the args that
+        # the bootstrap knows, only process any leftovers.
+        bootstrap = BootstrapRuntime()
+        args = bootstrap(args)
+        self.log_level = bootstrap.log_level
+        self.debug = bootstrap.debug
+
         # NOT using parse_args directly because argparser is dumb when
         # it comes to bad keywords in a subparser - it doesn't invoke
         # its help text.  Nor does it keep track of what or where the
@@ -258,7 +285,6 @@ class Runtime(BootstrapRuntime):
                 msg = 'unrecognized arguments: %s' % ' '.join(extras)
                 ArgumentParser.error(self.subparsers[target], msg)
 
-        self.prepare_keywords(kwargs)
         with pretty_logging(
                 logger=self.logger, level=self.log_level, stream=sys.stderr):
             try:
@@ -281,7 +307,7 @@ class Runtime(BootstrapRuntime):
             return False
 
 
-class DriverRuntime(Runtime):
+class DriverRuntime(BaseRuntime):
     """
     runtime for driver
     """
@@ -289,21 +315,6 @@ class DriverRuntime(Runtime):
     def __init__(self, cli_driver, action_key=DEST_ACTION, *a, **kw):
         self.cli_driver = cli_driver
         super(DriverRuntime, self).__init__(action_key=action_key, *a, **kw)
-
-    def init_argparser(self, argparser=None):
-        """
-        DriverRuntime should have their own init_argparer method.
-        """
-
-    def run(self, **kwargs):
-        """
-        DriverRuntime should have their own running method.
-        """
-
-    def prepare_keywords(self, kwargs):
-        """
-        DriverRuntime subclasses should have their own handling.
-        """
 
 
 class PackageManagerAction(Action):
@@ -388,6 +399,8 @@ class PackageManagerRuntime(DriverRuntime):
         subcommand.
         """
 
+        super(PackageManagerRuntime, self).init_argparser(argparser)
+
         # Ideally, we could use more subparsers for each action (i.e.
         # init and install).  However, this is complicated by the fact
         # that setuptools has its own calling conventions through the
@@ -451,6 +464,7 @@ def main(args=None):
         warnings.simplefilter('ignore')
         with pretty_logging(
                 logger='', level=bootstrap.log_level, stream=sys.stderr):
+            # pass in the extra arguments that bootstrap cannot handle.
             runtime = Runtime()
         if runtime(args):
             sys.exit(0)

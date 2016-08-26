@@ -287,13 +287,16 @@ class ArgumentHandlingTestCase(unittest.TestCase):
         # former has priority
         self.assertEqual("calmjs: error: unrecognized arguments: -u", err)
 
-    def test_before_and_after_extras_known_before(self):
+    def test_before_and_after_extras_scattered(self):
+        # previously test_before_and_after_extras_known_before, as
+        # scattering the -v after will not work.  Since the bootstrap
+        # picks up that anyway, might as well force global enablement of
+        # this flag.
         rt = self.setup_runtime()
-        with self.assertRaises(SystemExit):
-            rt(['-v', 'cmd', 'pkg', '-v'])
+        rt(['-v', 'cmd', 'pkg', '-v'])
+        self.assertEqual(rt.log_level, DEBUG)
         err = sys.stderr.getvalue().splitlines()[-1].strip()
-        # Note that this is 'calmjs cmd', because the first one is known
-        self.assertEqual("calmjs cmd: error: unrecognized arguments: -v", err)
+        self.assertIn("generating a flattened 'package.json' for 'pkg'", err)
 
     def test_before_and_after_extras_known_after(self):
         rt = self.setup_runtime()
