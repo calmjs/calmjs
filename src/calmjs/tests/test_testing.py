@@ -194,6 +194,17 @@ class TestingUtilsTestCase(unittest.TestCase):
         self.doCleanups()
         self.assertIs(dist.flatten_egginfo_json, original)
 
+    def test_stub_item_attr_value(self):
+        marker = object()
+
+        class Dummy(object):
+            foo = marker
+
+        utils.stub_item_attr_value(self, Dummy, 'foo', None)
+        self.assertIsNone(Dummy.foo)
+        self.doCleanups()
+        self.assertIs(Dummy.foo, marker)
+
     def test_stub_mod_check_interactive(self):
         from calmjs import cli
         original = cli.check_interactive

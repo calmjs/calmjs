@@ -3,14 +3,15 @@
 Assortment of utility functions.
 """
 
-import os
 import logging
+import os
+import sys
 from contextlib import contextmanager
 from os.path import curdir
 from os.path import defpath
 from os.path import normcase
 from os.path import pathsep
-import sys
+from pdb import post_mortem
 
 
 def enable_pretty_logging(logger='calmjs', level=logging.DEBUG, stream=None):
@@ -85,3 +86,7 @@ def which(cmd, mode=os.F_OK | os.X_OK, path=None):
                 return fn
 
     return None
+
+
+def pdb_post_mortem(*a, **kw):
+    post_mortem(*a, **kw)

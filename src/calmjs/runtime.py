@@ -8,6 +8,7 @@ from argparse import ArgumentParser
 from pkg_resources import working_set as default_working_set
 
 from calmjs.utils import pretty_logging
+from calmjs.utils import pdb_post_mortem
 
 CALMJS_RUNTIME = 'calmjs.runtime'
 logger = logging.getLogger(__name__)
@@ -34,6 +35,7 @@ class BootstrapRuntime(object):
         self.verbosity = 0
         self.argparser = ArgumentParser(add_help=False)
         self.init_argparser(self.argparser)
+        self.debug = 0
 
     def init_argparser(self, argparser):
         argparser.add_argument(
@@ -44,7 +46,12 @@ class BootstrapRuntime(object):
             '-q', '--quiet', action='count', default=0,
             help="be more quiet")
 
+        argparser.add_argument(
+            '-d', '--debug', action='count', default=0,
+            help="enable debugging features")
+
     def prepare_keywords(self, kwargs):
+        self.debug = kwargs.pop('debug')
         v = min(max(
             self.verbosity + kwargs.pop('verbose') - kwargs.pop('quiet'),
             -2), 2)
@@ -63,7 +70,8 @@ class Runtime(BootstrapRuntime):
     """
 
     def __init__(
-            self, action_key=DEST_RUNTIME, working_set=default_working_set):
+            self, logger='calmjs', action_key=DEST_RUNTIME,
+            working_set=default_working_set):
         """
         Arguments:
 
@@ -79,6 +87,7 @@ class Runtime(BootstrapRuntime):
         """
 
         self.verbosity = 0
+        self.logger = logger
         self.log_level = logging.WARNING
         self.action_key = action_key
         self.working_set = working_set
@@ -213,15 +222,32 @@ class Runtime(BootstrapRuntime):
     def run(self, **kwargs):
         runtime = self.runtimes.get(kwargs.pop(self.action_key))
         if runtime:
-            runtime.run(**kwargs)
+            return runtime.run(**kwargs)
         # nothing is going to happen otherwise?
 
     def __call__(self, args):
         kwargs = vars(self.argparser.parse_args(args))
         self.prepare_keywords(kwargs)
         with pretty_logging(
-                logger='calmjs', level=self.log_level, stream=sys.stderr):
-            self.run(**kwargs)
+                logger=self.logger, level=self.log_level, stream=sys.stderr):
+            try:
+                return self.run(**kwargs)
+            except KeyboardInterrupt:
+                logger.critical('termination requested; aborted.')
+            except Exception:
+                if not self.debug:
+                    logger.critical(
+                        'terminating due to a critical error; please refer to '
+                        'previous error log entries, alternatively retry with '
+                        '--debug to get the traceback information to aid with '
+                        'debugging.'
+                    )
+                else:
+                    logger.critical(
+                        'terminating due to exception', exc_info=1)
+                    if self.debug > 1:
+                        pdb_post_mortem(sys.exc_info()[2])
+            return False
 
 
 class DriverRuntime(Runtime):
@@ -377,14 +403,15 @@ class PackageManagerRuntime(DriverRuntime):
         else:
             action = self.default_action
             kwargs['stream'] = sys.stdout
-        action(**kwargs)
+        return action(**kwargs)
 
 
 def main(args=None):
     import warnings
     bootstrap = BootstrapRuntime()
-    args = sys.argv[1:] if args is None else args
-    args = args or []  # ensure that it is a list.
+    # None to distinguish args from unspecified or specified as [], but
+    # ultimately the value must be a list.
+    args = sys.argv[1:] if args is None else (args or [])
     extras = bootstrap(args)
     if not extras:
         args = args + ['-h']
@@ -394,4 +421,7 @@ def main(args=None):
         with pretty_logging(
                 logger='', level=bootstrap.log_level, stream=sys.stderr):
             runtime = Runtime()
-        runtime(args)
+        if runtime(args):
+            sys.exit(0)
+        else:
+            sys.exit(1)

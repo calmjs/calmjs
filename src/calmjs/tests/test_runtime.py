@@ -14,10 +14,12 @@ from calmjs import runtime
 from calmjs.utils import pretty_logging
 
 from calmjs.testing import mocks
+from calmjs.testing.utils import fake_error
 from calmjs.testing.utils import make_dummy_dist
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import remember_cwd
 from calmjs.testing.utils import stub_dist_flatten_egginfo_json
+from calmjs.testing.utils import stub_item_attr_value
 from calmjs.testing.utils import stub_mod_call
 from calmjs.testing.utils import stub_mod_check_interactive
 from calmjs.testing.utils import stub_stdouts
@@ -235,21 +237,7 @@ class PackageManagerDriverTestCase(unittest.TestCase):
         # Naisu Bakuretsu - Megumin.
 
 
-class IntegrationTestCase(unittest.TestCase):
-
-    def test_calmjs_main_console_entry_point(self):
-        stub_stdouts(self)
-        with self.assertRaises(SystemExit):
-            runtime.main([])
-        # ensure the help is printed by default
-        self.assertIn('usage', sys.stdout.getvalue())
-
-    def test_calmjs_main_console_entry_point_help(self):
-        stub_stdouts(self)
-        with self.assertRaises(SystemExit):
-            runtime.main(['-h'])
-        # ensure our base action module/class is registered.
-        self.assertIn('npm', sys.stdout.getvalue())
+class RuntimeIntegrationTestCase(unittest.TestCase):
 
     def setup_runtime(self):
         make_dummy_dist(self, (
@@ -386,3 +374,124 @@ class IntegrationTestCase(unittest.TestCase):
         stub_stdouts(self)
         rt(['-qqqqq', 'foo', '--install', 'example.package2'])
         self.assertNotIn("WARNING", sys.stderr.getvalue())
+
+    def test_npm_init_existing_malform(self):
+        remember_cwd(self)
+        tmpdir = mkdtemp(self)
+        os.chdir(tmpdir)
+        rt = self.setup_runtime()
+
+        # create an existing malformed file
+        with open(join(tmpdir, 'package.json'), 'w') as fd:
+            fd.write('not a json')
+        stub_stdouts(self)
+        rt(['foo', '--init', 'example.package2'])
+        self.assertIn("Ignoring existing malformed", sys.stderr.getvalue())
+
+    def test_npm_interrupted(self):
+        remember_cwd(self)
+        tmpdir = mkdtemp(self)
+        os.chdir(tmpdir)
+        rt = self.setup_runtime()
+
+        stub_stdouts(self)
+        # ensure the binary is not found.
+        stub_mod_call(self, cli, fake_error(KeyboardInterrupt))
+        rt(['foo', '--install', 'example.package2'])
+        self.assertIn("CRITICAL", sys.stderr.getvalue())
+        self.assertIn(
+            "termination requested; aborted.", sys.stderr.getvalue())
+
+    def test_npm_binary_not_found(self):
+        remember_cwd(self)
+        tmpdir = mkdtemp(self)
+        os.chdir(tmpdir)
+        rt = self.setup_runtime()
+
+        stub_stdouts(self)
+        # ensure the binary is not found.
+        stub_mod_call(self, cli, fake_error(IOError))
+        rt(['foo', '--install', 'example.package2'])
+        self.assertIn("ERROR", sys.stderr.getvalue())
+        self.assertIn(
+            "invocation of the 'npm' binary failed;", sys.stderr.getvalue())
+
+    def test_npm_binary_not_found_debug(self):
+        remember_cwd(self)
+        tmpdir = mkdtemp(self)
+        os.chdir(tmpdir)
+        rt = self.setup_runtime()
+        stub_stdouts(self)
+
+        # ensure the binary is not found.
+        stub_mod_call(self, cli, fake_error(IOError))
+        rt(['-d', 'foo', '--install', 'example.package2'])
+        self.assertIn("ERROR", sys.stderr.getvalue())
+        self.assertIn(
+            "invocation of the 'npm' binary failed;", sys.stderr.getvalue())
+        self.assertIn("terminating due to exception", sys.stderr.getvalue())
+        self.assertIn("Traceback ", sys.stderr.getvalue())
+        self.assertNotIn("(Pdb)", sys.stdout.getvalue())
+
+    def test_npm_binary_not_found_debugger(self):
+        from calmjs import utils
+
+        def fake_post_mortem(*a, **kw):
+            sys.stdout.write('(Pdb) ')
+
+        remember_cwd(self)
+        tmpdir = mkdtemp(self)
+        os.chdir(tmpdir)
+        rt = self.setup_runtime()
+        # stub_stdin(self, u'quit\n')
+        stub_stdouts(self)
+
+        # ensure the binary is not found.
+        stub_mod_call(self, cli, fake_error(IOError))
+        stub_item_attr_value(self, utils, 'post_mortem', fake_post_mortem)
+        rt(['-dd', 'foo', '--install', 'example.package2'])
+
+        self.assertIn("ERROR", sys.stderr.getvalue())
+        self.assertIn(
+            "invocation of the 'npm' binary failed;", sys.stderr.getvalue())
+        self.assertIn("terminating due to exception", sys.stderr.getvalue())
+        self.assertIn("Traceback ", sys.stderr.getvalue())
+        self.assertIn("(Pdb)", sys.stdout.getvalue())
+
+
+class MainIntegrationTestCase(unittest.TestCase):
+    """
+    For testing the main method
+    """
+
+    def test_calmjs_main_console_entry_point(self):
+        stub_stdouts(self)
+        with self.assertRaises(SystemExit) as e:
+            runtime.main([])
+        self.assertIn('usage', sys.stdout.getvalue())
+        self.assertEqual(e.exception.args[0], 0)
+
+    def test_calmjs_main_console_entry_point_help(self):
+        stub_stdouts(self)
+        with self.assertRaises(SystemExit) as e:
+            runtime.main(['-h'])
+        self.assertIn('npm', sys.stdout.getvalue())
+        self.assertEqual(e.exception.args[0], 0)
+
+    def test_calmjs_main_console_entry_point_install(self):
+        remember_cwd(self)
+        tmpdir = mkdtemp(self)
+        os.chdir(tmpdir)
+        stub_stdouts(self)
+        stub_mod_call(self, cli, fake_error(IOError))
+
+        with self.assertRaises(SystemExit) as e:
+            runtime.main(['npm', '--init', 'calmjs'])
+        # this should be fine, exit code 0
+        self.assertEqual(e.exception.args[0], 0)
+
+        with self.assertRaises(SystemExit) as e:
+            runtime.main(['npm', '--install', 'calmjs'])
+        self.assertIn(
+            "invocation of the 'npm' binary failed;", sys.stderr.getvalue())
+        self.assertEqual(e.exception.args[0], 1)

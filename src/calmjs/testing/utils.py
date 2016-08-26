@@ -453,12 +453,25 @@ def stub_dist_flatten_egginfo_json(testcase_inst, modules, working_set):
         module.flatten_egginfo_json = flatten_egginfo_json
 
 
+def stub_item_attr_value(testcase_inst, item, attr, value):
+    """
+    Stub item.attr with value
+    """
+
+    def cleanup():
+        setattr(item, attr, original)
+
+    original = getattr(item, attr)
+    testcase_inst.addCleanup(cleanup)
+    setattr(item, attr, value)
+
+
 def stub_mod_call(testcase_inst, mod, f=None):
     def fake_call(*a, **kw):
         testcase_inst.call_args = (a, kw)
 
-    if f:
-        fake_call = f  # noqa: F811
+    if f is None:
+        f = fake_call
 
     def cleanup():
         # Restore original module level functions
@@ -468,7 +481,7 @@ def stub_mod_call(testcase_inst, mod, f=None):
 
     testcase_inst.addCleanup(cleanup)
     testcase_inst.call_args = None
-    call, mod.call = mod.call, fake_call
+    call, mod.call = mod.call, f
 
 
 def stub_mod_check_output(testcase_inst, mod, f=None):
@@ -476,8 +489,8 @@ def stub_mod_check_output(testcase_inst, mod, f=None):
         testcase_inst.check_output_args = (a, kw)
         return testcase_inst.check_output_answer
 
-    if f:
-        fake_check_output = f   # noqa: F811
+    if f is None:
+        f = fake_check_output
 
     def cleanup():
         mod.check_output = check_output
@@ -486,7 +499,7 @@ def stub_mod_check_output(testcase_inst, mod, f=None):
 
     testcase_inst.addCleanup(cleanup)
     testcase_inst.check_output_answer = None
-    check_output, mod.check_output = mod.check_output, fake_check_output
+    check_output, mod.check_output = mod.check_output, f
 
 
 def stub_mod_check_interactive(testcase_inst, modules, result):
