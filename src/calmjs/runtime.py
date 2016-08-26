@@ -64,6 +64,7 @@ class BootstrapRuntime(object):
         return extras
 
 
+
 class Runtime(BootstrapRuntime):
     """
     calmjs runtime collection
@@ -71,7 +72,7 @@ class Runtime(BootstrapRuntime):
 
     def __init__(
             self, logger='calmjs', action_key=DEST_RUNTIME,
-            working_set=default_working_set):
+            working_set=default_working_set, prog=None):
         """
         Arguments:
 
@@ -91,14 +92,17 @@ class Runtime(BootstrapRuntime):
         self.log_level = logging.WARNING
         self.action_key = action_key
         self.working_set = working_set
+        self.prog = prog
         self.runtimes = {}
         self.entry_points = {}
         self.argparser = None
+        self.subparsers = {}
         self.init()
 
     def init(self):
         if self.argparser is None:
-            self.argparser = ArgumentParser(description=self.__doc__)
+            self.argparser = ArgumentParser(
+                prog=self.prog, description=self.__doc__)
             self.init_argparser(self.argparser)
 
     def init_argparser(self, argparser):
@@ -119,6 +123,7 @@ class Runtime(BootstrapRuntime):
         def register(name, runtime, entry_point):
             subparser = commands.add_parser(
                 name, help=inst.cli_driver.description)
+            self.subparsers[name] = subparser
             self.runtimes[name] = runtime
             self.entry_points[name] = entry_point
             runtime.init_argparser(subparser)
@@ -226,7 +231,33 @@ class Runtime(BootstrapRuntime):
         # nothing is going to happen otherwise?
 
     def __call__(self, args):
-        kwargs = vars(self.argparser.parse_args(args))
+        # NOT using parse_args directly because argparser is dumb when
+        # it comes to bad keywords in a subparser - it doesn't invoke
+        # its help text.  Nor does it keep track of what or where the
+        # extra arguments actually came from.  So we are going to do
+        # this manually so the users don't get confused.
+        parsed, extras = self.argparser.parse_known_args(args)
+        kwargs = vars(parsed)
+        target = kwargs.get(self.action_key)
+
+        if extras:
+            # first step, figure out where exactly the problem is
+            before = args[:args.index(target)] if target in args else args
+            # Now, take everything before the target and see that it
+            # got consumed
+            bootstrap = BootstrapRuntime()
+            check = bootstrap(before)
+
+            # XXX msg generated has no gettext like the default one.
+            if check:
+                # So there exists some issues before the target, we can
+                # fail by default.
+                msg = 'unrecognized arguments: %s' % ' '.join(check)
+                self.argparser.error(msg)
+            if target:
+                msg = 'unrecognized arguments: %s' % ' '.join(extras)
+                ArgumentParser.error(self.subparsers[target], msg)
+
         self.prepare_keywords(kwargs)
         with pretty_logging(
                 logger=self.logger, level=self.log_level, stream=sys.stderr):

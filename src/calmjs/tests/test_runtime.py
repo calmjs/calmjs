@@ -237,6 +237,82 @@ class PackageManagerDriverTestCase(unittest.TestCase):
         # Naisu Bakuretsu - Megumin.
 
 
+class ArgumentHandlingTestCase(unittest.TestCase):
+    """
+    The runtime uses argparser with subparsers underneath and argparser
+    does not generate useful error messages if it doesn't actually track
+    where the bad flags actually got raised.  Here are some of the cases
+    that need checking.
+    """
+
+    known_cmd = 'cmd'
+
+    def setUp(self):
+        stub_stdouts(self)
+
+    def setup_runtime(self):
+        # create a working set with our custom runtime entry point
+        # TODO should really improve the test case to provide custom
+        # runtime instances separate from actual data.
+        working_set = mocks.WorkingSet({
+            'calmjs.runtime': [
+                'cmd = calmjs.npm:npm.runtime',
+            ],
+        })
+        return runtime.Runtime(working_set=working_set, prog='calmjs')
+
+    # for the test, we use the -u flag for the unknown tests as it is
+    # unknown to bootstrap and target parser.  Next two are using known
+    # flag to before, then after.
+
+    def test_before_extras(self):
+        rt = self.setup_runtime()
+        with self.assertRaises(SystemExit):
+            rt(['-u', 'cmd', 'pkg'])
+        err = sys.stderr.getvalue().splitlines()[-1].strip()
+        self.assertEqual("calmjs: error: unrecognized arguments: -u", err)
+
+    def test_after_extras(self):
+        rt = self.setup_runtime()
+        with self.assertRaises(SystemExit):
+            rt(['cmd', 'pkg', '-u'])
+        err = sys.stderr.getvalue().splitlines()[-1].strip()
+        self.assertEqual("calmjs cmd: error: unrecognized arguments: -u", err)
+
+    def test_before_and_after_extras(self):
+        rt = self.setup_runtime()
+        with self.assertRaises(SystemExit):
+            rt(['-u', 'cmd', 'pkg', '-u'])
+        err = sys.stderr.getvalue().splitlines()[-1].strip()
+        # former has priority
+        self.assertEqual("calmjs: error: unrecognized arguments: -u", err)
+
+    def test_before_and_after_extras_known_before(self):
+        rt = self.setup_runtime()
+        with self.assertRaises(SystemExit):
+            rt(['-v', 'cmd', 'pkg', '-v'])
+        err = sys.stderr.getvalue().splitlines()[-1].strip()
+        # Note that this is 'calmjs cmd', because the first one is known
+        self.assertEqual("calmjs cmd: error: unrecognized arguments: -v", err)
+
+    def test_before_and_after_extras_known_after(self):
+        rt = self.setup_runtime()
+        with self.assertRaises(SystemExit):
+            rt(['-i', 'cmd', 'pkg', '-i'])
+        err = sys.stderr.getvalue().splitlines()[-1].strip()
+        self.assertEqual("calmjs: error: unrecognized arguments: -i", err)
+
+    # other sanity/behavior verification tests
+
+    def test_before_and_after_extras_known_after_missing_arg(self):
+        rt = self.setup_runtime()
+        with self.assertRaises(SystemExit):
+            rt(['-i', 'cmd', '-i'])
+        err = sys.stderr.getvalue().splitlines()[-1].strip()
+        # exact message differs between py2 and py3
+        self.assertIn("calmjs cmd: error: ", err)
+
+
 class RuntimeIntegrationTestCase(unittest.TestCase):
 
     def setup_runtime(self):
