@@ -39,7 +39,7 @@ def enable_pretty_logging(logger='calmjs', level=logging.DEBUG, stream=None):
 def pretty_logging(logger='calmjs', level=logging.DEBUG, stream=None):
     try:
         cleanup = enable_pretty_logging(logger, level, stream)
-        yield
+        yield stream
     finally:
         cleanup()
 

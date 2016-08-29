@@ -90,7 +90,9 @@ class LoggingTestCase(unittest.TestCase):
         logger_id = 'calmjs.testing.dummy_logger'
         logger = logging.getLogger(logger_id)
         stream = io.StringIO()
-        with pretty_logging(logger=logger_id, stream=stream):
+        with pretty_logging(logger=logger_id, stream=stream) as fd:
             logger.info(u'hello')
+
+        self.assertIs(fd, stream)
         self.assertIn(u'hello', stream.getvalue())
         self.assertEqual(len(logger.handlers), 0)
