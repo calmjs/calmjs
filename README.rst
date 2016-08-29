@@ -2,11 +2,16 @@ calmjs
 ======
 
 A Python framework for building toolchains and utilities for working
-with JavaScript packages.  The packages can be sourced from any Node.js
-based repositories or from Python packages, and the calmjs framework
-makes it possible to make use of all that from a well-integrated
-environment with minimal work to ensure reproducibility for usage within
-a continuous integration/deployment environment.
+with the JavaScript/Node.js ecosystem.  The JavaScript source files can
+be sourced from packages from any supported Node.js based repositories
+or embedded in Python packages.  This framework strives to make the
+usage of all these JavaScript source file in a consistent, well
+integrated manner within a Python environment.  Locations, dependencies
+and related metadata related to the JavaScript sources at hand will be
+defined within a common framework, resulting in the accessibility
+through a common set of tools.  This ensures the consistent
+reproducibility during usage within a continuous integration and/or
+deployment environment.
 
 .. image:: https://travis-ci.org/calmjs/calmjs.svg?branch=master
     :target: https://travis-ci.org/calmjs/calmjs
@@ -209,13 +214,18 @@ in JSON string much like ``package_json``, like so:
         ...
     )
 
-Since ``node_modules`` is declared to be an ``extras_key``, it will be
-merged much like how dependencies get dealt with.  Please do note that
-complete paths must be declared (note that the ``.js`` filename suffix
-is included in the example); directories can also be declared.  However,
-it is up to downstream integration packages to properly handle and/or
-convert this into the conventions that standard Node.js tools might
-expect.
+Since ``node_modules`` is declared to be an ``extras_key``, conflicts
+with existing declarations in other packages within the environment will
+be merged like how dependencies sections declared in ``package_json``
+(see below).
+
+Please do note that complete paths must be declared (note that the
+``.js`` filename suffix is included in the example); directories can
+also be declared.  However, as these declarations are done from within
+Python, explicit, full paths are required thus it is up to downstream
+integration packages to properly handle and/or convert this into the
+conventions that standard Node.js tools might expect (i.e. where the
+``.js`` filename suffix is omitted).
 
 Export JavaScript code from Python packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -330,7 +340,7 @@ easily do the same through the built-in ``calmjs`` utility, like so:
 .. code:: sh
 
     $ calmjs --help
-    usage: calmjs [-h] [-v] [-q] <command> ...
+    usage: calmjs [-h] [-v] [-q] [-d] <command> ...
 
     calmjs runtime collection
 
@@ -441,21 +451,25 @@ it does, please file an issue on the tracker.
 calmjs.runtime terminating due to a critical error
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If no useful ERROR message is listed before, please try running again
-using a debug flag (either ``-d`` or ``--debug``).
+If ``calmjs`` encounters any unexpected situation, it may abort like so:
 
 .. code:: sh
 
     $ calmjs npm --install calmjs.dev
     CRITICAL calmjs.runtime terminating due to a critical error
 
+If no useful ERROR message is listed before, please try running again
+using a debug flag (either ``-d`` or ``--debug``).
+
+.. code:: sh
+
     $ calmjs -d npm --install calmjs.dev
     CRITICAL calmjs.runtime terminating due to exception
     Traceback (most recent call last):
     ...
 
-Specifying the debug flag twice will enable the post_mortem mode, where
-a debugger will be fired at the point of failure.
+Specifying the debug flag twice will enable the ``post_mortem`` mode,
+where a debugger will be fired at the point of failure.
 
 
 Contribute
