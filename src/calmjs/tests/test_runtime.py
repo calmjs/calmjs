@@ -564,6 +564,32 @@ class MainIntegrationTestCase(unittest.TestCase):
         self.assertIn('npm', sys.stdout.getvalue())
         self.assertEqual(e.exception.args[0], 0)
 
+    def test_calmjs_main_console_version(self):
+        stub_stdouts(self)
+        with self.assertRaises(SystemExit) as e:
+            runtime.main(['-V'])
+        self.assertEqual(e.exception.args[0], 0)
+        self.assertIn('calmjs', sys.stdout.getvalue())
+
+    def test_calmjs_main_console_version_broken(self):
+        stub_stdouts(self)
+        stub_item_attr_value(
+            self, runtime, 'default_working_set',
+            pkg_resources.WorkingSet([mkdtemp(self)]))
+        # make sure the bad case doesn't just blow up...
+        with self.assertRaises(SystemExit) as e:
+            runtime.main(['-V'])
+        self.assertEqual(e.exception.args[0], 0)
+        self.assertIn('calmjs ? from ?', sys.stdout.getvalue())
+
+    def test_calmjs_main_runtime_console_version(self):
+        stub_stdouts(self)
+        with self.assertRaises(SystemExit) as e:
+            runtime.main(['npm', '-V'])
+        self.assertEqual(e.exception.args[0], 0)
+        # reports both versions.
+        self.assertEqual(2, len(sys.stdout.getvalue().strip().splitlines()))
+
     def test_calmjs_main_console_entry_point_install(self):
         remember_cwd(self)
         tmpdir = mkdtemp(self)

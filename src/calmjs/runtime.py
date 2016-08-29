@@ -1,15 +1,18 @@
 # -*- coding: utf-8 -*-
 import logging
 import re
+import os
 import sys
 from argparse import Action
 from argparse import ArgumentParser
 
+from pkg_resources import Requirement
 from pkg_resources import working_set as default_working_set
 
 from calmjs.utils import pretty_logging
 from calmjs.utils import pdb_post_mortem
 
+CALMJS = 'calmjs'
 CALMJS_RUNTIME = 'calmjs.runtime'
 logger = logging.getLogger(__name__)
 DEST_ACTION = 'action'
@@ -24,6 +27,45 @@ levels = {
 }
 
 valid_command_name = re.compile('^[0-9a-zA-Z]*$')
+
+
+class Version(Action):
+    """
+    Version reporting for a console_scripts entry_point
+    """
+
+    # I really didn't want to do this here, but Python 2.7 argparser is
+    # quite broken with subcommands and it quits with too few arguments
+    # too soon.
+
+    # Related issues:
+    # http://bugs.python.org/issue9253#msg186387
+    # http://bugs.python.org/issue10424
+
+    def __init__(self, *a, **kw):
+        kw['nargs'] = 0
+        super(Version, self).__init__(*a, **kw)
+
+    def get_dist_info(self, dist, default_name='?'):
+        name = getattr(dist, 'project_name', default_name)
+        version = getattr(dist, 'version', '?')
+        location = getattr(dist, 'location', '?')
+        return name, version, location
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        # We can use this directly as nothing else should be cached
+        # where this is typically invoked.
+        dist = default_working_set.find(Requirement.parse(CALMJS))
+        sys.stdout.write('%s %s from %s' % self.get_dist_info(dist, CALMJS))
+        sys.stdout.write(os.linesep)
+        rt_dist = getattr(parser, '_calmjs_runtime_dist', None)
+        if rt_dist:
+            sys.stdout.write('%s %s from %s' % self.get_dist_info(rt_dist))
+            sys.stdout.write(os.linesep)
+        # I'd rather assign some values than just exiting outright, but
+        # remember the bugs that will make an error happen otherwise...
+        # quit early so they don't bug.
+        sys.exit(0)
 
 
 class BootstrapRuntime(object):
@@ -48,16 +90,14 @@ class BootstrapRuntime(object):
 
     def init_argparser(self, argparser):
         argparser.add_argument(
-            '-v', '--verbose', action='count', default=0,
-            help="be more verbose")
-
+            '-d', '--debug', action='count', default=0,
+            help="enable debugging features")
         argparser.add_argument(
             '-q', '--quiet', action='count', default=0,
             help="be more quiet")
-
         argparser.add_argument(
-            '-d', '--debug', action='count', default=0,
-            help="enable debugging features")
+            '-v', '--verbose', action='count', default=0,
+            help="be more verbose")
 
     def prepare_keywords(self, kwargs):
         self.debug = kwargs.pop('debug')
@@ -110,6 +150,12 @@ class BaseRuntime(BootstrapRuntime):
                 prog=self.prog, description=self.__doc__)
             self.init_argparser(self.argparser)
 
+    def init_argparser(self, argparser):
+        super(BaseRuntime, self).init_argparser(argparser)
+        argparser.add_argument(
+            '-V', '--version', action=Version, default=0,
+            help="print version information")
+
     def run(self, **kwargs):
         """
         Subclasses should have their own running method.
@@ -136,6 +182,8 @@ class Runtime(BaseRuntime):
         def register(name, runtime, entry_point):
             subparser = commands.add_parser(
                 name, help=inst.cli_driver.description)
+            # for version reporting.
+            subparser._calmjs_runtime_dist = entry_point.dist
             self.subparsers[name] = subparser
             self.runtimes[name] = runtime
             self.entry_points[name] = entry_point
