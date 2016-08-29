@@ -34,7 +34,7 @@ class npm(PackageManagerCommand):
     """
 
     # modules globals will be populated with friendly exported names.
-    cli_driver = Driver.create(globals())
+    cli_driver = Driver.create_for_module_vars(globals())
     runtime = PackageManagerRuntime(cli_driver)
     description = cli_driver.description
 

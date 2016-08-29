@@ -432,21 +432,8 @@ class CliDriverTestCase(unittest.TestCase):
         tmpdir = mkdtemp(self)
         driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', working_dir=tmpdir)
-        driver._set_env_path_with_node_modules()
+        self.assertFalse(driver._set_env_path_with_node_modules())
         self.assertIsNone(driver.env_path)
-
-    def test_set_env_path_with_node_modules_warning(self):
-        stub_os_environ(self)
-        tmpdir = mkdtemp(self)
-        driver = cli.PackageManagerDriver(
-            pkg_manager_bin='mgr', working_dir=tmpdir)
-
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter('always')
-            driver._set_env_path_with_node_modules(warn=True)
-            self.assertTrue(issubclass(w[-1].category, RuntimeWarning))
-            self.assertIn(
-                "Unable to locate the 'mgr' binary;", str(w[-1].message))
 
     def fake_mgr_bin(self):
         tmpdir = mkdtemp(self)
@@ -465,10 +452,10 @@ class CliDriverTestCase(unittest.TestCase):
         driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', working_dir=tmpdir)
         self.assertIsNone(driver.env_path)
-        driver._set_env_path_with_node_modules()
+        self.assertTrue(driver._set_env_path_with_node_modules())
         self.assertEqual(driver.env_path, bin_dir)
         # should still result in the same thing.
-        driver._set_env_path_with_node_modules()
+        self.assertTrue(driver._set_env_path_with_node_modules())
         self.assertEqual(driver.env_path, bin_dir)
 
     def test_set_env_path_with_node_path_success(self):
@@ -478,10 +465,10 @@ class CliDriverTestCase(unittest.TestCase):
         self.assertIsNone(driver.env_path)
         # using NODE_PATH set to a valid node_modules
         driver.node_path = join(tmpdir, 'node_modules')
-        driver._set_env_path_with_node_modules()
+        self.assertTrue(driver._set_env_path_with_node_modules())
         self.assertEqual(driver.env_path, bin_dir)
         # should still result in the same thing.
-        driver._set_env_path_with_node_modules()
+        self.assertTrue(driver._set_env_path_with_node_modules())
         self.assertEqual(driver.env_path, bin_dir)
 
     def test_set_env_path_with_node_path_with_environ(self):
@@ -490,7 +477,7 @@ class CliDriverTestCase(unittest.TestCase):
         # define a NODE_PATH set to a valid node_modules
         os.environ['NODE_PATH'] = join(tmpdir, 'node_modules')
         driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
-        driver._set_env_path_with_node_modules()
+        self.assertTrue(driver._set_env_path_with_node_modules())
         self.assertEqual(driver.env_path, bin_dir)
 
     def test_set_env_path_with_node_path_multiple_with_environ(self):
@@ -501,7 +488,7 @@ class CliDriverTestCase(unittest.TestCase):
             join(d, 'node_modules') for d in (tmp, tmp1, tmp2))
         driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', node_path=node_path)
-        driver._set_env_path_with_node_modules()
+        self.assertTrue(driver._set_env_path_with_node_modules())
         # First one.  Whether the node modules loads correctly, that's
         # up to the nodejs circus.
         self.assertEqual(driver.env_path, bin_dir1)
@@ -538,7 +525,7 @@ class CliDriverTestCase(unittest.TestCase):
         inst = Driver.create()
         self.assertTrue(isinstance(inst, Driver))
 
-    def test_module_level_driver_create(self):
+    def test_module_level_driver_create_for_module_vars(self):
         class Driver(cli.PackageManagerDriver):
             def __init__(self, **kw):
                 kw['pkg_manager_bin'] = 'mgr'
@@ -549,12 +536,32 @@ class CliDriverTestCase(unittest.TestCase):
         with warnings.catch_warnings():
             # Don't spat out stderr
             warnings.simplefilter('ignore')
-            Driver.create(values)
+            Driver.create_for_module_vars(values)
 
         # Normally, these will be global names.
         self.assertIn('mgr_install', values)
         self.assertIn('mgr_init', values)
         self.assertIn('get_mgr_version', values)
+
+    def test_create_for_module_vars_warning(self):
+        stub_os_environ(self)
+        tmpdir = mkdtemp(self)
+        values = {}
+
+        class MgrDriver(cli.PackageManagerDriver):
+            def __init__(self, *a, **kw):
+                kw['pkg_manager_bin'] = 'mgr'
+                kw['working_dir'] = tmpdir
+                super(MgrDriver, self).__init__(*a, **kw)
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter('always')
+            driver = MgrDriver.create_for_module_vars(values)
+            self.assertTrue(issubclass(w[-1].category, RuntimeWarning))
+            self.assertIn(
+                "Unable to locate the 'mgr' binary;", str(w[-1].message))
+
+        self.assertTrue(isinstance(driver, MgrDriver))
 
     # Should really put more tests of these kind in here, but the more
     # concrete implementations have done so.  This weird version here

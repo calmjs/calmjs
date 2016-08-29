@@ -9,7 +9,6 @@ framework will inherit/extend from.
 import os
 
 import json
-import warnings
 from locale import getpreferredencoding
 from os import getcwd
 from os.path import dirname
@@ -270,7 +269,13 @@ class BaseDriver(object):
 
         return which(self.binary, path=self.env_path)
 
-    def _set_env_path_with_node_modules(self, warn=False):
+    @classmethod
+    def create(cls):
+        inst = cls()
+        inst._set_env_path_with_node_modules()
+        return inst
+
+    def _set_env_path_with_node_modules(self):
         """
         Attempt to locate and set the paths to the binary with the
         working directory defined for this instance.
@@ -294,7 +299,7 @@ class BaseDriver(object):
                 "found '%s'; "
                 "not modifying PATH environment variable in instance of '%s'.",
                 default, modcls_name)
-            return
+            return True
 
         node_path = self.node_path
         if node_path:
@@ -325,35 +330,14 @@ class BaseDriver(object):
                 "variable for '%s' instance.",
                 self.binary, self.env_path, modcls_name
             )
-        elif warn:
-            msg = (
-                "Unable to locate the '%(binary)s' binary; default module "
-                "level functions will not work. Please either provide "
-                "%(PATH)s and/or update %(PATH)s environment variable "
-                "with one that provides '%(binary)s'; or specify a "
-                "working %(NODE_PATH)s environment variable with "
-                "%(binary)s installed; or have install '%(binary)s' into "
-                "the current working directory (%(cwd)s) either through "
-                "npm or calmjs framework for this package. Restart or "
-                "reload this module once that is done. Alternatively, "
-                "create a manual Driver instance for '%(binary)s' with "
-                "explicitly defined arguments." % {
-                    'binary': self.binary,
-                    'PATH': 'PATH',
-                    'NODE_PATH': NODE_PATH,
-                    'cwd': self.join_cwd(),
-                }
-            )
-            warnings.warn(msg, RuntimeWarning)
-            # Yes there may be duplicates, but warnings are governed
-            # differently.
-            logger.warning(msg)
+            return True
         else:
             logger.debug(
                 "Unable to locate '%s'; not modifying PATH environment "
                 "variable for instance of '%s'.",
                 self.binary, modcls_name
             )
+            return False
 
     def _gen_call_kws(self, **env):
         kw = {}

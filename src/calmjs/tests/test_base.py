@@ -192,3 +192,21 @@ class BaseDriverClassTestCase(unittest.TestCase):
             str(e.exception),
             "binary undefined for 'calmjs.base:BaseDriver' instance"
         )
+
+    def test_base_create_fail(self):
+        with self.assertRaises(ValueError) as e:
+            base.BaseDriver.create()
+        self.assertEqual(
+            str(e.exception),
+            "binary undefined for 'calmjs.base:BaseDriver' instance"
+        )
+
+    def test_base_create_succeed(self):
+        class BinaryDriver(base.BaseDriver):
+            def __init__(self, **kw):
+                super(BinaryDriver, self).__init__(**kw)
+                self.binary = 'binary'
+
+        inst = BinaryDriver.create()
+        self.assertTrue(isinstance(inst, base.BaseDriver))
+        self.assertEqual(inst.binary, 'binary')

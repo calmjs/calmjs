@@ -337,7 +337,7 @@ class PackageManagerDriver(NodeDriver):
         return lookup[name]
 
     @classmethod
-    def create(cls, scope_vars=None):
+    def create_for_module_vars(cls, scope_vars):
         """
         This was originally designed to be invoked at the module level
         for packages that implement specific support, but this can be
@@ -347,9 +347,31 @@ class PackageManagerDriver(NodeDriver):
         """
 
         inst = cls()
-        inst._set_env_path_with_node_modules(warn=(scope_vars is not None))
-        if scope_vars is not None:
-            scope_vars.update(inst._aliases)
+        if not inst._set_env_path_with_node_modules():
+            import warnings
+            msg = (
+                "Unable to locate the '%(binary)s' binary; default module "
+                "level functions will not work. Please either provide "
+                "%(PATH)s and/or update %(PATH)s environment variable "
+                "with one that provides '%(binary)s'; or specify a "
+                "working %(NODE_PATH)s environment variable with "
+                "%(binary)s installed; or have install '%(binary)s' into "
+                "the current working directory (%(cwd)s) either through "
+                "npm or calmjs framework for this package. Restart or "
+                "reload this module once that is done. Alternatively, "
+                "create a manual Driver instance for '%(binary)s' with "
+                "explicitly defined arguments." % {
+                    'binary': inst.binary,
+                    'PATH': 'PATH',
+                    'NODE_PATH': inst.node_path,
+                    'cwd': inst.join_cwd(),
+                }
+            )
+            warnings.warn(msg, RuntimeWarning)
+            # Yes there may be duplicates, but warnings are governed
+            # differently.
+            logger.warning(msg)
+        scope_vars.update(inst._aliases)
         return inst
 
     def get_pkg_manager_version(self):
