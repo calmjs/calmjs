@@ -2,22 +2,17 @@
 import unittest
 
 from os.path import abspath
-from os.path import dirname
 from os.path import join
 from os.path import pardir
 from os.path import relpath
 
 from types import ModuleType
 
-import calmjs
 from calmjs import indexer
 from calmjs.utils import pretty_logging
 
 from calmjs.testing.utils import make_multipath_module3
 from calmjs.testing.mocks import StringIO
-
-# XXX should avoid usage of module.__file__
-calmjs_base_dir = abspath(join(dirname(calmjs.__file__), pardir))
 
 
 class IndexerTestCase(unittest.TestCase):
@@ -82,6 +77,8 @@ class IndexerTestCase(unittest.TestCase):
 
     def test_module1_loader_es6(self):
         from calmjs.testing import module1
+        calmjs_base_dir = abspath(join(
+            indexer.modpath_pkg_resources(indexer)[0], pardir))
         results = {
             k: relpath(v, calmjs_base_dir)
             for k, v in indexer.mapper_es6(module1).items()
@@ -92,6 +89,8 @@ class IndexerTestCase(unittest.TestCase):
 
     def test_module1_loader_python(self):
         from calmjs.testing import module1
+        calmjs_base_dir = abspath(join(
+            indexer.modpath_pkg_resources(indexer)[0], pardir))
         results = {
             k: relpath(v, calmjs_base_dir)
             for k, v in indexer.mapper_python(module1).items()
@@ -102,6 +101,8 @@ class IndexerTestCase(unittest.TestCase):
 
     def test_module2_recursive_es6(self):
         from calmjs.testing import module2
+        calmjs_base_dir = abspath(join(
+            indexer.modpath_pkg_resources(indexer)[0], pardir))
         results = {
             k: relpath(v, calmjs_base_dir)
             for k, v in indexer.mapper(module2, globber='recursive').items()
@@ -125,6 +126,8 @@ class IndexerTestCase(unittest.TestCase):
         """
 
         # See setup method for how it's built.
+        calmjs_base_dir = abspath(join(
+            indexer.modpath_pkg_resources(indexer)[0], pardir))
         module, index_js = make_multipath_module3(self)
 
         def join_mod3(*a):

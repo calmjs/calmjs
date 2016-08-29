@@ -105,6 +105,8 @@ def modpath_all(module):
     """
     Provides the raw __path__.  Incompatible with PEP 302-based import
     hooks and incompatible with zip_safe packages.
+
+    Deprecated.  Will be removed by calmjs-2.0.
     """
 
     module_paths = getattr(module, '__path__', [])
@@ -122,6 +124,8 @@ def modpath_last(module):
     """
     Provides the raw __path__.  Incompatible with PEP 302-based import
     hooks and incompatible with zip_safe packages.
+
+    Deprecated.  Will be removed by calmjs-2.0.
     """
 
     module_paths = modpath_all(module)
