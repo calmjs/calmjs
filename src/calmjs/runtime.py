@@ -283,7 +283,7 @@ class Runtime(BaseRuntime):
                 self.argparser.error(msg)
             if target:
                 msg = 'unrecognized arguments: %s' % ' '.join(extras)
-                ArgumentParser.error(self.subparsers[target], msg)
+                self.subparsers[target].error(msg)
 
         with pretty_logging(
                 logger=self.logger, level=self.log_level, stream=sys.stderr):

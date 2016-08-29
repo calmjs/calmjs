@@ -41,9 +41,10 @@ class NpmTestCase(unittest.TestCase):
         npm.npm.cli_driver.interactive = self.inst_interactive
 
     def test_npm_no_path(self):
-        # XXX should be in npm
         os.environ['PATH'] = ''
-        self.assertIsNone(npm.get_npm_version())
+        with pretty_logging(stream=StringIO()) as stderr:
+            self.assertIsNone(npm.get_npm_version())
+            self.assertIn("failed to execute 'npm'", stderr.getvalue())
 
     @unittest.skipIf(npm.get_npm_version() is None, 'npm not found.')
     def test_npm_version_get(self):
@@ -57,7 +58,11 @@ class NpmTestCase(unittest.TestCase):
         os.chdir(tmpdir)
 
         # This is faked.
-        npm.npm_install()
+        with pretty_logging(stream=StringIO()) as stderr:
+            npm.npm_install()
+            self.assertIn(
+                "no package name supplied, "
+                "but continuing with 'npm install'", stderr.getvalue())
         # However we make sure that it's been fake called
         self.assertEqual(self.call_args, ((['npm', 'install'],), {}))
         self.assertFalse(exists(join(tmpdir, 'package.json')))
@@ -91,11 +96,10 @@ class NpmTestCase(unittest.TestCase):
         with open(join(tmpdir, 'package.json'), 'w') as fd:
             json.dump({}, fd)
 
-        stderr = StringIO()
         # capture the logging explicitly as the conditions which
         # determines how the errors are outputted differs from different
         # test harnesses.  Verify that later.
-        with pretty_logging(stream=stderr):
+        with pretty_logging(stream=StringIO()) as stderr:
             # This is faked.
             npm.npm_install('foo')
 
@@ -244,11 +248,16 @@ class NpmDriverInitTestCase(unittest.TestCase):
         tmpdir = mkdtemp(self)
 
         # Write an initial thing
-        with open(join(tmpdir, 'package.json'), 'w') as fd:
+        target = join(tmpdir, 'package.json')
+        with open(target, 'w') as fd:
             json.dump({'dependencies': {}, 'devDependencies': {}}, fd)
 
         os.chdir(tmpdir)
-        self.assertFalse(npm.npm_init('foo', interactive=False))
+
+        with pretty_logging(stream=StringIO()) as stderr:
+            self.assertFalse(npm.npm_init('foo', interactive=False))
+            self.assertIn(
+                "not overwriting existing '%s'" % target, stderr.getvalue())
 
         with open(join(tmpdir, 'package.json')) as fd:
             result = json.load(fd)
@@ -488,7 +497,10 @@ class NpmDriverInitTestCase(unittest.TestCase):
         with open(join(tmpdir, 'package.json'), 'w') as fd:
             fd.write('{')
         os.chdir(tmpdir)
-        self.assertFalse(npm.npm_init('foo'))
+        with pretty_logging(stream=StringIO()) as stderr:
+            self.assertFalse(npm.npm_init('foo'))
+        self.assertIn("ignoring existing malformed", stderr.getvalue())
+
         with open(join(tmpdir, 'package.json')) as fd:
             self.assertEqual('{', fd.read())
 
@@ -498,7 +510,9 @@ class NpmDriverInitTestCase(unittest.TestCase):
         with open(join(tmpdir, 'package.json'), 'w') as fd:
             fd.write('{')
         os.chdir(tmpdir)
-        self.assertTrue(npm.npm_init('foo', overwrite=True))
+        with pretty_logging(stream=StringIO()) as stderr:
+            self.assertTrue(npm.npm_init('foo', overwrite=True))
+        self.assertIn("ignoring existing malformed", stderr.getvalue())
 
         with open(join(tmpdir, 'package.json')) as fd:
             result = json.load(fd)
@@ -514,8 +528,13 @@ class NpmDriverInitTestCase(unittest.TestCase):
         # Nobody expects a package.json as a directory
         os.mkdir(join(tmpdir, 'package.json'))
         os.chdir(tmpdir)
-        with self.assertRaises(IOError):
-            npm.npm_init('foo')
+        with pretty_logging(stream=StringIO()) as stderr:
+            with self.assertRaises(IOError):
+                npm.npm_init('foo')
+        self.assertIn(
+            "package.json' failed; please confirm that it is a file",
+            stderr.getvalue(),
+        )
 
 
 class DistCommandTestCase(unittest.TestCase):
@@ -633,7 +652,7 @@ class DistCommandTestCase(unittest.TestCase):
         )
 
         self.assertIn(
-            "Not overwriting existing '%s'\n" % target,
+            "not overwriting existing '%s'\n" % target,
             sys.stderr.getvalue(),
         )
 

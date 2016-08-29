@@ -51,15 +51,15 @@ def _get_bin_version(bin_path, version_flag='-v', kw={}):
         ).groups()[0]
         version = tuple(int(i) for i in version_str.split('.'))
     except OSError:
-        logger.warning('Failed to execute %s', bin_path)
+        logger.warning("failed to execute '%s'", bin_path)
         return None
     except:
         logger.exception(
-            'Encountered unexpected error while trying to find version of %s:',
-            bin_path
+            "encountered unexpected error while trying to find version of "
+            "'%s':", bin_path
         )
         return None
-    logger.info('Found %s version %s', bin_path, version_str)
+    logger.info("found '%s' version '%s'", bin_path, version_str)
     return version
 
 
@@ -501,10 +501,10 @@ class PackageManagerDriver(NodeDriver):
                     original_json = json.load(fd)
             except ValueError:
                 logger.warning(
-                    "Ignoring existing malformed '%s'.", pkgdef_path)
+                    "ignoring existing malformed '%s'", pkgdef_path)
             except (IOError, OSError):
                 logger.error(
-                    "Reading of existing '%s' failed; "
+                    "reading of existing '%s' failed; "
                     "please confirm that it is a file and/or permissions to "
                     "read and write is permitted before retrying.",
                     pkgdef_path
@@ -563,7 +563,7 @@ class PackageManagerDriver(NodeDriver):
                     )
 
             if not overwrite:
-                logger.warning("Not overwriting existing '%s'", pkgdef_path)
+                logger.warning("not overwriting existing '%s'", pkgdef_path)
                 return False
 
         if pkgdef_json:

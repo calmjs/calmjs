@@ -7,7 +7,8 @@ uses, the following are how things are done here:
 
 utils
     Utilities for use from within calmjs (maybe elsewhere).  Must NOT
-    inherit from other calmjs modules.
+    inherit from other calmjs modules.  As a result this is safe to be
+    imported from any ``test_`` modules.
 
 base
     Module providing Base* classes.  Should only inherit from utils and

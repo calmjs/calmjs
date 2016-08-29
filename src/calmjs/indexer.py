@@ -110,10 +110,9 @@ def modpath_all(module):
     module_paths = getattr(module, '__path__', [])
     if not module_paths:
         logger.warning(
-            '%s does not appear to be a namespace module or does not export '
-            'available paths onto the filesystem; JavaScript source files '
-            'cannot be extracted from this module.',
-            module.__name__
+            "module '%s' does not appear to be a namespace module or does not "
+            "export available paths onto the filesystem; JavaScript source "
+            "files cannot be extracted from this module.", module.__name__
         )
     return module_paths
 
@@ -128,7 +127,7 @@ def modpath_last(module):
     module_paths = modpath_all(module)
     if len(module_paths) > 1:
         logger.info(
-            'module `%s` has multiple paths, default selecting `%s` as base.',
+            "module '%s' has multiple paths, default selecting '%s' as base.",
             module.__name__, module_paths[-1],
         )
     return module_paths[-1:]
@@ -145,9 +144,9 @@ def modpath_pkg_resources(module):
     try:
         return [pkg_resources.resource_filename(module.__name__, '')]
     except ImportError:
-        logger.warning('%s could not be located as a module', module)
+        logger.warning("%r could not be located as a module", module)
     except Exception:
-        logger.warning('%s does not appear to be a valid module', module)
+        logger.warning("%r does not appear to be a valid module", module)
 
     return []
 

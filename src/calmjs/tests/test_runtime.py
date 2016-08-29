@@ -472,7 +472,7 @@ class RuntimeIntegrationTestCase(unittest.TestCase):
             fd.write('not a json')
         stub_stdouts(self)
         rt(['foo', '--init', 'example.package2'])
-        self.assertIn("Ignoring existing malformed", sys.stderr.getvalue())
+        self.assertIn("ignoring existing malformed", sys.stderr.getvalue())
 
     def test_npm_interrupted(self):
         remember_cwd(self)

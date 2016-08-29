@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 import unittest
 
-from calmjs.base import BaseRegistry
-
 import calmjs.registry
+from calmjs.base import BaseRegistry
+from calmjs.utils import pretty_logging
 
 from calmjs.testing import mocks
 
@@ -45,7 +45,11 @@ class RegistryIntegrationTestCase(unittest.TestCase):
             'calmjs.registry', _working_set=working_set)
         # This should not be registered or available
         self.assertIsNone(registry.get_record('calmjs.module'))
-        self.assertIsNone(registry.get_record('failure'))
+
+        with pretty_logging(stream=mocks.StringIO()) as stream:
+            self.assertIsNone(registry.get_record('failure'))
+        # exact error message differs between Python versions.
+        self.assertIn('TypeError: __init__() ', stream.getvalue())
 
     def test_registry_fresh_from_entrypoint(self):
         working_set = mocks.WorkingSet({'calmjs.registry': [

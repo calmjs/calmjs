@@ -8,6 +8,7 @@ from calmjs.registry import Registry
 from calmjs.registry import get
 from calmjs.module import ModuleRegistry
 from calmjs.module import PythonicModuleRegistry
+from calmjs.utils import pretty_logging
 
 from calmjs.testing import mocks
 from calmjs.testing import utils
@@ -26,10 +27,9 @@ class ModuleRegistryTestCase(unittest.TestCase):
             next(self.registry.iter_records())
 
     def test_module_registry_standard(self):
-        self.registry.register_entry_points([
-            EntryPoint.parse(
-                'calmjs.testing.module1 = calmjs.testing.module1'),
-        ])
+        with pretty_logging(stream=mocks.StringIO()):
+            self.registry.register_entry_points([EntryPoint.parse(
+                'calmjs.testing.module1 = calmjs.testing.module1')])
         self.assertEqual(sorted(
             key for key, value in self.registry.iter_records()
         ), [
@@ -42,10 +42,9 @@ class ModuleRegistryTestCase(unittest.TestCase):
 
     def test_module_registry_pythonic(self):
         registry = PythonicModuleRegistry(__name__)
-        registry.register_entry_points([
-            EntryPoint.parse(
-                'calmjs.testing.module1 = calmjs.testing.module1'),
-        ])
+        with pretty_logging(stream=mocks.StringIO()):
+            registry.register_entry_points([EntryPoint.parse(
+                'calmjs.testing.module1 = calmjs.testing.module1')])
         self.assertEqual(sorted(
             key for key, value in registry.iter_records()
         ), [

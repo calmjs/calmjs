@@ -14,6 +14,7 @@ import warnings
 
 from calmjs import cli
 from calmjs.utils import pretty_logging
+from calmjs.testing import mocks
 from calmjs.testing.mocks import MockProvider
 from calmjs.testing.utils import fake_error
 from calmjs.testing.utils import mkdtemp
@@ -245,18 +246,26 @@ class CliDriverTestCase(unittest.TestCase):
     def test_get_bin_version_unexpected(self):
         stub_mod_check_output(self, cli)
         self.check_output_answer = b'Nothing'
-        results = cli._get_bin_version('some_app')
+        with pretty_logging(stream=mocks.StringIO()) as err:
+            results = cli._get_bin_version('some_app')
+        self.assertIn(
+            "encountered unexpected error while trying to find version of "
+            "'some_app'", err.getvalue())
         self.assertIsNone(results)
 
     def test_get_bin_version_no_bin(self):
         stub_mod_check_output(self, cli, fake_error(OSError))
-        results = cli._get_bin_version('some_app')
+        with pretty_logging(stream=mocks.StringIO()) as err:
+            results = cli._get_bin_version('some_app')
+        self.assertIn("failed to execute 'some_app'", err.getvalue())
         self.assertIsNone(results)
 
     def test_node_no_path(self):
         stub_os_environ(self)
         os.environ['PATH'] = ''
-        self.assertIsNone(cli.get_node_version())
+        with pretty_logging(stream=mocks.StringIO()) as err:
+            self.assertIsNone(cli.get_node_version())
+        self.assertIn("failed to execute 'node'", err.getvalue())
 
     def test_node_version_mocked(self):
         stub_mod_check_output(self, cli)
@@ -294,14 +303,17 @@ class CliDriverTestCase(unittest.TestCase):
         self.assertIn('no_such_attr_here', str(e.exception))
         self.assertIsNot(driver.mgr_init, None)
         self.assertIsNot(driver.get_mgr_version, None)
-        driver.mgr_install()
+        with pretty_logging(stream=mocks.StringIO()) as stderr:
+            driver.mgr_install()
+            self.assertIn(
+                "no package name supplied, "
+                "but continuing with 'mgr install'", stderr.getvalue())
         self.assertEqual(self.call_args, ((['mgr', 'install'],), {}))
 
     def test_install_failure(self):
         stub_mod_call(self, cli, fake_error(IOError))
         driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
-        stderr = StringIO()
-        with pretty_logging(stream=stderr):
+        with pretty_logging(stream=mocks.StringIO()) as stderr:
             with self.assertRaises(IOError):
                 driver.mgr_install()
         val = stderr.getvalue()
@@ -310,7 +322,8 @@ class CliDriverTestCase(unittest.TestCase):
     def test_install_arguments(self):
         stub_mod_call(self, cli)
         driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
-        driver.pkg_manager_install(args=('--pedantic',))
+        with pretty_logging(stream=mocks.StringIO()):
+            driver.pkg_manager_install(args=('--pedantic',))
         self.assertEqual(
             self.call_args, ((['mgr', 'install', '--pedantic'],), {}))
 
@@ -318,17 +331,28 @@ class CliDriverTestCase(unittest.TestCase):
         stub_mod_call(self, cli)
         driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', install_cmd='sync')
-        driver.pkg_manager_install()
+        with pretty_logging(stream=mocks.StringIO()) as stderr:
+            driver.pkg_manager_install()
+            self.assertIn(
+                "no package name supplied, "
+                "but continuing with 'mgr sync'", stderr.getvalue())
         self.assertEqual(self.call_args, ((['mgr', 'sync'],), {}))
 
         # Naturally, the short hand call will be changed.
-        driver.mgr_sync(args=('all',))
+        with pretty_logging(stream=mocks.StringIO()) as stderr:
+            # note that args is NOT the package_name, and thus this just
+            # means that init won't be called.
+            driver.mgr_sync(args=('all',))
+            self.assertIn(
+                "no package name supplied, "
+                "but continuing with 'mgr sync'", stderr.getvalue())
         self.assertEqual(self.call_args, ((['mgr', 'sync', 'all'],), {}))
 
     def test_install_other_environ(self):
         stub_mod_call(self, cli)
         driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
-        driver.pkg_manager_install(env={'MGR_ENV': 'production'})
+        with pretty_logging(stream=mocks.StringIO()):
+            driver.pkg_manager_install(env={'MGR_ENV': 'production'})
         self.assertEqual(self.call_args, ((['mgr', 'install'],), {
             'env': {'MGR_ENV': 'production'},
         }))
@@ -340,17 +364,19 @@ class CliDriverTestCase(unittest.TestCase):
             node_path=node_path, pkg_manager_bin='mgr')
 
         # ensure env is passed into the call.
-        driver.pkg_manager_install()
+        with pretty_logging(stream=mocks.StringIO()):
+            driver.pkg_manager_install()
         self.assertEqual(self.call_args, ((['mgr', 'install'],), {
             'env': {'NODE_PATH': node_path},
         }))
 
         # will be overridden by instance settings.
-        driver.pkg_manager_install(env={
-            'PATH': '.',
-            'MGR_ENV': 'dev',
-            'NODE_PATH': '/tmp/somewhere/else/node_mods',
-        })
+        with pretty_logging(stream=mocks.StringIO()):
+            driver.pkg_manager_install(env={
+                'PATH': '.',
+                'MGR_ENV': 'dev',
+                'NODE_PATH': '/tmp/somewhere/else/node_mods',
+            })
         self.assertEqual(self.call_args, ((['mgr', 'install'],), {
             'env': {'NODE_PATH': node_path, 'MGR_ENV': 'dev', 'PATH': '.'},
         }))
@@ -362,7 +388,8 @@ class CliDriverTestCase(unittest.TestCase):
         cwd = mkdtemp(self)
         driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', env_path=somepath, working_dir=cwd)
-        driver.pkg_manager_install()
+        with pretty_logging(stream=mocks.StringIO()):
+            driver.pkg_manager_install()
         args, kwargs = self.call_args
         self.assertEqual(kwargs['env']['PATH'].split(pathsep)[0], somepath)
         self.assertEqual(kwargs['cwd'], cwd)
@@ -372,14 +399,16 @@ class CliDriverTestCase(unittest.TestCase):
         bad_path = '/no/such/path/for/sure/at/here'
         driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', env_path=bad_path)
-        driver.pkg_manager_install()
+        with pretty_logging(stream=mocks.StringIO()):
+            driver.pkg_manager_install()
         args, kwargs = self.call_args
         self.assertNotEqual(kwargs['env']['PATH'].split(pathsep)[0], bad_path)
 
     def test_paths_unset(self):
         stub_mod_call(self, cli)
         driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
-        driver.pkg_manager_install()
+        with pretty_logging(stream=mocks.StringIO()):
+            driver.pkg_manager_install()
         args, kwargs = self.call_args
         self.assertNotIn('PATH', kwargs)
         self.assertNotIn('cwd', kwargs)
@@ -389,7 +418,8 @@ class CliDriverTestCase(unittest.TestCase):
         some_cwd = mkdtemp(self)
         driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', working_dir=some_cwd)
-        driver.pkg_manager_install()
+        with pretty_logging(stream=mocks.StringIO()):
+            driver.pkg_manager_install()
         args, kwargs = self.call_args
         self.assertNotIn('PATH', kwargs)
         self.assertEqual(kwargs['cwd'], some_cwd)
@@ -398,7 +428,11 @@ class CliDriverTestCase(unittest.TestCase):
         stub_mod_call(self, cli)
         driver = cli.PackageManagerDriver(pkg_manager_bin='bower')
         # this will call ``bower install`` instead.
-        driver.pkg_manager_install()
+        with pretty_logging(stream=mocks.StringIO()) as fd:
+            driver.pkg_manager_install()
+            self.assertIn(
+                "no package name supplied, "
+                "but continuing with 'bower install'", fd.getvalue())
         self.assertEqual(self.call_args, ((['bower', 'install'],), {}))
 
     def test_which_is_none(self):
@@ -536,7 +570,9 @@ class CliDriverTestCase(unittest.TestCase):
         with warnings.catch_warnings():
             # Don't spat out stderr
             warnings.simplefilter('ignore')
-            Driver.create_for_module_vars(values)
+            with pretty_logging(stream=mocks.StringIO()) as err:
+                Driver.create_for_module_vars(values)
+            self.assertIn("Unable to locate the 'mgr' binary;", err.getvalue())
 
         # Normally, these will be global names.
         self.assertIn('mgr_install', values)
@@ -556,7 +592,10 @@ class CliDriverTestCase(unittest.TestCase):
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter('always')
-            driver = MgrDriver.create_for_module_vars(values)
+            with pretty_logging(stream=mocks.StringIO()) as err:
+                driver = MgrDriver.create_for_module_vars(values)
+            self.assertIn("Unable to locate the 'mgr' binary;", err.getvalue())
+
             self.assertTrue(issubclass(w[-1].category, RuntimeWarning))
             self.assertIn(
                 "Unable to locate the 'mgr' binary;", str(w[-1].message))
@@ -654,8 +693,11 @@ class CliDriverTestCase(unittest.TestCase):
         with open(target, 'w') as fd:
             result = json.dump({"require": {}}, fd)
 
-        driver.pkg_manager_init(
-            'calmpy.pip', interactive=False, overwrite=False)
+        with pretty_logging(stream=mocks.StringIO()) as err:
+            driver.pkg_manager_init(
+                'calmpy.pip', interactive=False, overwrite=False)
+        self.assertIn('not overwriting existing ', err.getvalue())
+        self.assertIn('requirements.json', err.getvalue())
         with open(target) as fd:
             result = json.load(fd)
         self.assertNotEqual(result, {"require": {"setuptools": "25.1.6"}})

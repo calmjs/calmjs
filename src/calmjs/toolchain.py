@@ -264,7 +264,7 @@ class Toolchain(BaseDriver):
             check = realpath(spec['build_dir'])
             if check != spec['build_dir']:
                 spec['build_dir'] = check
-                logger.warn(
+                logger.warning(
                     "realpath of build_dir resolved to '%s', spec is updated",
                     check
                 )

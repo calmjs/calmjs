@@ -127,6 +127,19 @@ and run ``python setup.py develop`` within a working Python environment,
 or follow the local framework or operating system's default method on
 installation of development packages that have pulled this package in.
 
+Testing
+~~~~~~~
+
+To ensure that the ``calmjs`` installation is functioning correctly, the
+built-in testsuite can be executed by the following:
+
+.. code:: sh
+
+    $ python -m unittest calmjs.tests.make_suite
+
+If there are failures, please file an issue on the issue tracker with
+the full traceback with the method of installation.
+
 
 Usage
 -----

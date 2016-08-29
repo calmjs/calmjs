@@ -9,10 +9,12 @@ from os.path import exists
 from os.path import join
 from os.path import pardir
 
+from calmjs.utils import pretty_logging
 from calmjs.toolchain import Spec
 from calmjs.toolchain import Toolchain
 from calmjs.toolchain import NullToolchain
 
+from calmjs.testing.mocks import StringIO
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import fake_error
 
@@ -78,7 +80,9 @@ class SpecTestCase(unittest.TestCase):
     def test_spec_callback_broken(self):
         spec = Spec()
         spec.add_callback('cleanup', fake_error(Exception))
-        spec.do_callbacks('cleanup')
+        with pretty_logging(stream=StringIO()) as s:
+            spec.do_callbacks('cleanup')
+        self.assertIn('Traceback', s.getvalue())
 
 
 class ToolchainTestCase(unittest.TestCase):
@@ -183,9 +187,11 @@ class ToolchainTestCase(unittest.TestCase):
         spec = Spec()
         spec['build_dir'] = join(fake, pardir, real_base)
 
-        with self.assertRaises(NotImplementedError):
-            self.toolchain(spec)
+        with pretty_logging(stream=StringIO()) as s:
+            with self.assertRaises(NotImplementedError):
+                self.toolchain(spec)
 
+        self.assertIn('realpath of build_dir resolved to', s.getvalue())
         self.assertEqual(spec['build_dir'], real)
 
     def test_toolchain_target_build_dir_inside(self):

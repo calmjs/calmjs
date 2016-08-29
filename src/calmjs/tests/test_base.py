@@ -6,6 +6,7 @@ from pkg_resources import EntryPoint
 from pkg_resources import Distribution
 
 from calmjs import base
+from calmjs.utils import pretty_logging
 from calmjs.testing import mocks
 from calmjs.testing.utils import mkdtemp
 
@@ -66,7 +67,13 @@ class BaseModuleRegistryTestCase(unittest.TestCase):
         working_set = mocks.WorkingSet({__name__: [
             'calmjs.testing.not_a_module = calmjs.testing.not_a_module',
         ]})
-        registry = base.BaseModuleRegistry(__name__, _working_set=working_set)
+        with pretty_logging(stream=mocks.StringIO()) as s:
+            registry = base.BaseModuleRegistry(
+                __name__, _working_set=working_set)
+            self.assertIn(
+                'ImportError: calmjs.testing.not_a_module not found; '
+                'skipping registration', s.getvalue(),
+            )
         self.assertEqual(len(registry.raw_entry_points), 1)
         self.assertEqual(registry.get_record('module'), {})
         self.assertEqual(list(registry.iter_records()), [])
@@ -120,21 +127,28 @@ class BaseModuleRegistryTestCase(unittest.TestCase):
     def test_dummy_implemented_manual_entrypoint(self):
         from calmjs.testing import module1
         registry = DummyModuleRegistry(__name__)
-        registry.register_entry_point(
-            EntryPoint.parse('calmjs.testing.module1 = calmjs.testing.module1')
-        )
+        with pretty_logging(stream=mocks.StringIO()) as s:
+            registry.register_entry_point(
+                EntryPoint.parse(
+                    'calmjs.testing.module1 = calmjs.testing.module1')
+            )
+            # no dist.
+            self.assertIn('manually registering entry_point', s.getvalue())
         result = registry.get_record('calmjs.testing.module1')
         self.assertEqual(result, {'calmjs.testing.module1': module1})
 
     def test_dummy_implemented_manual_entrypoint_double_regisetr(self):
         from calmjs.testing import module1
         registry = DummyModuleRegistry(__name__)
-        registry.register_entry_point(
-            EntryPoint.parse('calmjs.testing.module1 = calmjs.testing.module1')
-        )
-        registry.register_entry_point(
-            EntryPoint.parse('calmjs.testing.module1 = calmjs.testing.module1')
-        )
+        with pretty_logging(stream=mocks.StringIO()) as s:
+            registry.register_entry_point(
+                EntryPoint.parse(
+                    'calmjs.testing.module1 = calmjs.testing.module1'))
+            registry.register_entry_point(
+                EntryPoint.parse(
+                    'calmjs.testing.module1 = calmjs.testing.module1'))
+            # no dist.
+            self.assertIn('manually registering entry_point', s.getvalue())
         result = registry.get_record('calmjs.testing.module1')
         # just merged together.
         self.assertEqual(result, {'calmjs.testing.module1': module1})

@@ -11,8 +11,10 @@ from types import ModuleType
 
 import calmjs
 from calmjs import indexer
+from calmjs.utils import pretty_logging
 
 from calmjs.testing.utils import make_multipath_module3
+from calmjs.testing.mocks import StringIO
 
 # XXX should avoid usage of module.__file__
 calmjs_base_dir = abspath(join(dirname(calmjs.__file__), pardir))
@@ -33,7 +35,11 @@ class IndexerTestCase(unittest.TestCase):
 
     def test_get_modpath_last_empty(self):
         module = ModuleType('nothing')
-        self.assertEqual(indexer.modpath_last(module), [])
+        with pretty_logging(stream=StringIO()) as fd:
+            self.assertEqual(indexer.modpath_last(module), [])
+        self.assertIn(
+            "module 'nothing' does not appear to be a namespace module",
+            fd.getvalue())
 
     def test_get_modpath_last_multi(self):
         module = ModuleType('nothing')
@@ -42,7 +48,11 @@ class IndexerTestCase(unittest.TestCase):
 
     def test_get_modpath_all_empty(self):
         module = ModuleType('nothing')
-        self.assertEqual(indexer.modpath_all(module), [])
+        with pretty_logging(stream=StringIO()) as fd:
+            self.assertEqual(indexer.modpath_all(module), [])
+        self.assertIn(
+            "module 'nothing' does not appear to be a namespace module",
+            fd.getvalue())
 
     def test_get_modpath_all_multi(self):
         module = ModuleType('nothing')
@@ -59,9 +69,16 @@ class IndexerTestCase(unittest.TestCase):
         self.assertTrue(result[0].endswith('calmjs/testing/module3'))
 
     def test_get_modpath_pkg_resources_invalid(self):
-        self.assertEqual([], indexer.modpath_pkg_resources(None))
-        module = ModuleType('nothing')
-        self.assertEqual([], indexer.modpath_pkg_resources(module))
+        with pretty_logging(stream=StringIO()) as fd:
+            self.assertEqual([], indexer.modpath_pkg_resources(None))
+            self.assertIn(
+                "None does not appear to be a valid module", fd.getvalue())
+        with pretty_logging(stream=StringIO()) as fd:
+            module = ModuleType('nothing')
+            self.assertEqual([], indexer.modpath_pkg_resources(module))
+            # module repr differs between python versions.
+            self.assertIn("module 'nothing'", fd.getvalue())
+            self.assertIn("could not be located", fd.getvalue())
 
     def test_module1_loader_es6(self):
         from calmjs.testing import module1
