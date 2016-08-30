@@ -448,8 +448,8 @@ provide this information.  There are workarounds made in the
 ``calmjs.runtime`` module so this situation should not arise, however if
 it does, please file an issue on the tracker.
 
-calmjs.runtime terminating due to a critical error
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+CRITICAL calmjs.runtime terminating due to a critical error
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If ``calmjs`` encounters any unexpected situation, it may abort like so:
 
@@ -469,7 +469,22 @@ using a debug flag (either ``-d`` or ``--debug``).
     ...
 
 Specifying the debug flag twice will enable the ``post_mortem`` mode,
-where a debugger will be fired at the point of failure.
+where a debugger will be fired at the point of failure.  Authors of
+runtime modules may find this useful during their development cycles.
+
+ERROR bad 'calmjs.runtime' entry point
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+ImportError
+    This is typically caused by improper removal of locally installed
+    packages that had a entry point registered, or that an addon package
+    to ``calmjs`` has registered bad entry points.  Either reinstall the
+    listed package again or fully uninstall or remove its files.
+
+bad entry point
+    This is caused by packages defining malformed entry point.  The
+    name of the package triggering this error will be noted in the log;
+    the error may be reported to its developer.
 
 
 Contribute
