@@ -37,7 +37,13 @@ class npm(PackageManagerCommand):
 
     # modules globals will be populated with friendly exported names.
     cli_driver = Driver.create_for_module_vars(globals())
-    runtime = PackageManagerRuntime(cli_driver)
+    runtime = PackageManagerRuntime(
+        cli_driver, package_name='calmjs',
+        description='npm support for the calmjs framework',
+    )
     description = cli_driver.description
 
 npm._initialize_user_options()
+
+if __name__ == '__main__':
+    npm.runtime()

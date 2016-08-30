@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+"""
+The calmjs runtime collection
+"""
+
 from __future__ import absolute_import
 
 import logging
@@ -16,6 +20,8 @@ from calmjs.utils import pdb_post_mortem
 
 CALMJS = 'calmjs'
 CALMJS_RUNTIME = 'calmjs.runtime'
+ATTR_ROOT_PKG = '_calmjs_root_pkg_name'
+ATTR_RT_DIST = '_calmjs_runtime_dist'
 logger = logging.getLogger(__name__)
 DEST_ACTION = 'action'
 DEST_RUNTIME = 'runtime'
@@ -29,6 +35,10 @@ levels = {
 }
 
 valid_command_name = re.compile('^[0-9a-zA-Z]*$')
+
+
+def norm_args(args):
+    return sys.argv[1:] if args is None else (args or [])
 
 
 class Version(Action):
@@ -55,18 +65,33 @@ class Version(Action):
         return name, version, location
 
     def __call__(self, parser, namespace, values, option_string=None):
-        # We can use this directly as nothing else should be cached
-        # where this is typically invoked.
-        dist = default_working_set.find(Requirement.parse(CALMJS))
-        sys.stdout.write('%s %s from %s' % self.get_dist_info(dist, CALMJS))
-        sys.stdout.write(os.linesep)
-        rt_dist = getattr(parser, '_calmjs_runtime_dist', None)
+        rt_pkg_name = getattr(parser, ATTR_ROOT_PKG, None)
+        results = []
+        if rt_pkg_name:
+            # We can use this directly as nothing else should be cached
+            # where this is typically invoked.
+            # XXX actually, if the argparser is actually dumb and won't
+            # do exiting on its own with its other _default_ Actions
+            # I could just return this as a flag and then let the caller
+            # (i.e. the run time) figure this information out and do the
+            # appropriate output...
+            dist = default_working_set.find(
+                Requirement.parse(rt_pkg_name))
+            results.append('%s %s from %s' % self.get_dist_info(dist))
+            results.append(os.linesep)
+
+        rt_dist = getattr(parser, ATTR_RT_DIST, None)
         if rt_dist:
-            sys.stdout.write('%s %s from %s' % self.get_dist_info(rt_dist))
-            sys.stdout.write(os.linesep)
-        # I'd rather assign some values than just exiting outright, but
+            results.append('%s %s from %s' % self.get_dist_info(rt_dist))
+            results.append(os.linesep)
+
+        if not results:
+            results = ['no package information available.']
+        # I'd rather return the results than just exiting outright, but
         # remember the bugs that will make an error happen otherwise...
         # quit early so they don't bug.
+        for i in results:
+            sys.stdout.write(i)
         sys.exit(0)
 
 
@@ -108,10 +133,13 @@ class BootstrapRuntime(object):
             -2), 2)
         self.log_level = levels.get(v)
 
+    def run(self, **kwargs):
+        self.prepare_keywords(kwargs)
+
     def __call__(self, args):
         parsed, extras = self.argparser.parse_known_args(args)
         kwargs = vars(parsed)
-        self.prepare_keywords(kwargs)
+        self.run(**kwargs)
         return extras
 
 
@@ -122,10 +150,15 @@ class BaseRuntime(BootstrapRuntime):
 
     def __init__(
             self, logger='calmjs', action_key=DEST_RUNTIME,
-            working_set=default_working_set, *a, **kw):
+            working_set=default_working_set, package_name=None,
+            description=None, *a, **kw):
         """
-        Arguments:
+        Keyword Arguments:
 
+        logger
+            The logger to enable for pretty logging.
+
+            Default: the calmjs root logger
         action_key
             The destination key where the command will be stored.  Under
             this key the target driver runtime will be stored, and it
@@ -135,6 +168,13 @@ class BaseRuntime(BootstrapRuntime):
             The working_set to use for this instance.
 
             Default: pkg_resources.working_set
+        package_name
+            The package name that this instance of runtime is for.  Used
+            for the version flag.
+
+            Default: calmjs
+        description
+            The description for this runtime.
         """
 
         self.logger = logger
@@ -144,13 +184,16 @@ class BaseRuntime(BootstrapRuntime):
         self.entry_points = {}
         self.argparser = None
         self.subparsers = {}
+        self.description = description or self.__doc__
+        self.package_name = package_name
         super(BaseRuntime, self).__init__(*a, **kw)
 
     def init(self):
         if self.argparser is None:
             self.argparser = ArgumentParser(
-                prog=self.prog, description=self.__doc__)
+                prog=self.prog, description=self.description)
             self.init_argparser(self.argparser)
+        setattr(self.argparser, ATTR_ROOT_PKG, self.package_name)
 
     def init_argparser(self, argparser):
         super(BaseRuntime, self).init_argparser(argparser)
@@ -163,8 +206,80 @@ class BaseRuntime(BootstrapRuntime):
         Subclasses should have their own running method.
         """
 
+    def __call__(self, args=None):
+        args = norm_args(args)
+        # MUST use the bootstrap runtime class to process all the common
+        # flags as inconsistent handling of these between different
+        # versions of Python make this extremely annoying.
+        #
+        # For a simple minimum demonstration, see:
+        # https://gist.github.com/metatoaster/16bb6046d6363682b4c4497518436fc5
+
+        # While we would love to do this:
+        # args = BootstrapRuntime.__call__(self, args)
+        # It doesn't work, because we will NOT be using the argparser
+        # definition created by BootstrapRuntime... so we ened to do it
+        # the long way.
+        bootstrap = BootstrapRuntime()
+        # Also, remember that we need to strip off all the args that
+        # the bootstrap knows, only process any leftovers.
+        args = bootstrap(args)
+        self.log_level = bootstrap.log_level
+        self.debug = bootstrap.debug
+
+        # NOT using parse_args directly because argparser is dumb when
+        # it comes to bad keywords in a subparser - it doesn't invoke
+        # its help text.  Nor does it keep track of what or where the
+        # extra arguments actually came from.  So we are going to do
+        # this manually so the users don't get confused.
+        parsed, extras = self.argparser.parse_known_args(args)
+        kwargs = vars(parsed)
+        target = kwargs.get(self.action_key)
+
+        if extras:
+            # first step, figure out where exactly the problem is
+            before = args[:args.index(target)] if target in args else args
+            # Now, take everything before the target and see that it
+            # got consumed
+            bootstrap = BootstrapRuntime()
+            check = bootstrap(before)
+
+            # XXX msg generated has no gettext like the default one.
+            if check:
+                # So there exists some issues before the target, we can
+                # fail by default.
+                msg = 'unrecognized arguments: %s' % ' '.join(check)
+                self.argparser.error(msg)
+            if target:
+                msg = 'unrecognized arguments: %s' % ' '.join(extras)
+                self.subparsers[target].error(msg)
+
+        with pretty_logging(
+                logger=self.logger, level=self.log_level, stream=sys.stderr):
+            try:
+                return self.run(**kwargs)
+            except KeyboardInterrupt:
+                logger.critical('termination requested; aborted.')
+            except Exception:
+                if not self.debug:
+                    logger.critical(
+                        'terminating due to a critical error; please refer to '
+                        'previous error log entries, alternatively retry with '
+                        '--debug to get the traceback information to aid with '
+                        'debugging.'
+                    )
+                else:
+                    logger.critical(
+                        'terminating due to exception', exc_info=1)
+                    if self.debug > 1:
+                        pdb_post_mortem(sys.exc_info()[2])
+            return False
+
 
 class Runtime(BaseRuntime):
+
+    def __init__(self, package_name=CALMJS, *a, **kw):
+        super(Runtime, self).__init__(package_name=package_name, *a, **kw)
 
     def init_argparser(self, argparser):
         """
@@ -183,9 +298,10 @@ class Runtime(BaseRuntime):
 
         def register(name, runtime, entry_point):
             subparser = commands.add_parser(
-                name, help=inst.cli_driver.description)
+                name, help=inst.description)
             # for version reporting.
-            subparser._calmjs_runtime_dist = entry_point.dist
+            setattr(subparser, ATTR_ROOT_PKG, self.package_name)
+            setattr(subparser, ATTR_RT_DIST, entry_point.dist)
             self.subparsers[name] = subparser
             self.runtimes[name] = runtime
             self.entry_points[name] = entry_point
@@ -292,69 +408,6 @@ class Runtime(BaseRuntime):
         if runtime:
             return runtime.run(**kwargs)
         # nothing is going to happen otherwise?
-
-    def __call__(self, args):
-        # MUST use the bootstrap runtime class to process all the common
-        # flags as inconsistent handling of these between different
-        # versions of Python make this extremely annoying.
-        #
-        # For a simple minimum demonstration, see:
-        # https://gist.github.com/metatoaster/16bb6046d6363682b4c4497518436fc5
-
-        # Also, remember that we need to strip off all the args that
-        # the bootstrap knows, only process any leftovers.
-        bootstrap = BootstrapRuntime()
-        args = bootstrap(args)
-        self.log_level = bootstrap.log_level
-        self.debug = bootstrap.debug
-
-        # NOT using parse_args directly because argparser is dumb when
-        # it comes to bad keywords in a subparser - it doesn't invoke
-        # its help text.  Nor does it keep track of what or where the
-        # extra arguments actually came from.  So we are going to do
-        # this manually so the users don't get confused.
-        parsed, extras = self.argparser.parse_known_args(args)
-        kwargs = vars(parsed)
-        target = kwargs.get(self.action_key)
-
-        if extras:
-            # first step, figure out where exactly the problem is
-            before = args[:args.index(target)] if target in args else args
-            # Now, take everything before the target and see that it
-            # got consumed
-            bootstrap = BootstrapRuntime()
-            check = bootstrap(before)
-
-            # XXX msg generated has no gettext like the default one.
-            if check:
-                # So there exists some issues before the target, we can
-                # fail by default.
-                msg = 'unrecognized arguments: %s' % ' '.join(check)
-                self.argparser.error(msg)
-            if target:
-                msg = 'unrecognized arguments: %s' % ' '.join(extras)
-                self.subparsers[target].error(msg)
-
-        with pretty_logging(
-                logger=self.logger, level=self.log_level, stream=sys.stderr):
-            try:
-                return self.run(**kwargs)
-            except KeyboardInterrupt:
-                logger.critical('termination requested; aborted.')
-            except Exception:
-                if not self.debug:
-                    logger.critical(
-                        'terminating due to a critical error; please refer to '
-                        'previous error log entries, alternatively retry with '
-                        '--debug to get the traceback information to aid with '
-                        'debugging.'
-                    )
-                else:
-                    logger.critical(
-                        'terminating due to exception', exc_info=1)
-                    if self.debug > 1:
-                        pdb_post_mortem(sys.exc_info()[2])
-            return False
 
 
 class DriverRuntime(BaseRuntime):
@@ -505,7 +558,7 @@ def main(args=None):
     bootstrap = BootstrapRuntime()
     # None to distinguish args from unspecified or specified as [], but
     # ultimately the value must be a list.
-    args = sys.argv[1:] if args is None else (args or [])
+    args = norm_args(args)
     extras = bootstrap(args)
     if not extras:
         args = args + ['-h']

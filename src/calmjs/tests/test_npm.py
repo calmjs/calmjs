@@ -873,3 +873,31 @@ class DistCommandTestCase(unittest.TestCase):
         # also test that the cli_driver can actually run...
         bin_dir, stderr = npm.npm.cli_driver.run(['bin'])
         self.assertIn('bin', bin_dir)
+
+
+class StandaloneMainTestCase(unittest.TestCase):
+
+    def test_standalone_main(self):
+        stub_stdouts(self)
+        with self.assertRaises(SystemExit):
+            npm.npm.runtime(['-h'])
+        # Have the help work
+        self.assertIn('npm support for the calmjs', sys.stdout.getvalue())
+
+    def test_standalone_main_version(self):
+        stub_stdouts(self)
+        # the default call method does NOT call sys.exit.
+        with self.assertRaises(SystemExit):
+            npm.npm.runtime(['-V'])
+        self.assertIn('calmjs', sys.stdout.getvalue())
+        self.assertIn('from', sys.stdout.getvalue())
+
+    def test_standalone_reuse_main(self):
+        stub_stdouts(self)
+        # the default call method does NOT call sys.exit.
+        npm.npm.runtime(['calmjs', '-vv'])
+        # Have the help work
+        result = json.loads(sys.stdout.getvalue())
+        self.assertEqual(result['dependencies'], {})
+        err = sys.stderr.getvalue()
+        self.assertIn('DEBUG', err)

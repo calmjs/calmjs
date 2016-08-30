@@ -25,6 +25,31 @@ from calmjs.testing.utils import stub_mod_check_interactive
 from calmjs.testing.utils import stub_stdouts
 
 
+class BaseRuntimeTestCase(unittest.TestCase):
+
+    def test_base_version(self):
+        # The version information should be missing but shouldn't result
+        # in catastrophic errors.
+        stub_stdouts(self)
+        rt = runtime.BaseRuntime()
+        with self.assertRaises(SystemExit):
+            rt(['-V'])
+        out = sys.stdout.getvalue()
+        self.doCleanups()
+        self.assertEqual(out, 'no package information available.')
+
+    def test_norm_args(self):
+        stub_item_attr_value(self, sys, 'argv', ['script'])
+        self.assertEqual(runtime.norm_args(None), [])
+        self.assertEqual(runtime.norm_args([]), [])
+        self.assertEqual(runtime.norm_args(['arg']), ['arg'])
+
+        stub_item_attr_value(self, sys, 'argv', ['script', '-h'])
+        self.assertEqual(runtime.norm_args(None), ['-h'])
+        self.assertEqual(runtime.norm_args([]), [])
+        self.assertEqual(runtime.norm_args(['arg']), ['arg'])
+
+
 class PackageManagerDriverTestCase(unittest.TestCase):
     """
     Test cases for the package manager driver and argparse usage.
@@ -580,7 +605,7 @@ class MainIntegrationTestCase(unittest.TestCase):
         with self.assertRaises(SystemExit) as e:
             runtime.main(['-V'])
         self.assertEqual(e.exception.args[0], 0)
-        self.assertIn('calmjs ? from ?', sys.stdout.getvalue())
+        self.assertIn('? ? from ?', sys.stdout.getvalue())
 
     def test_calmjs_main_runtime_console_version(self):
         stub_stdouts(self)
@@ -588,7 +613,8 @@ class MainIntegrationTestCase(unittest.TestCase):
             runtime.main(['npm', '-V'])
         self.assertEqual(e.exception.args[0], 0)
         # reports both versions.
-        self.assertEqual(2, len(sys.stdout.getvalue().strip().splitlines()))
+        value = sys.stdout.getvalue()
+        self.assertEqual(2, len(value.strip().splitlines()))
 
     def test_calmjs_main_console_entry_point_install(self):
         remember_cwd(self)
