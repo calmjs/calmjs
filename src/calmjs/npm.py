@@ -6,6 +6,8 @@ Provides some helper functions that deal with package.json, and also the
 setuptools integration of certain npm features.
 """
 
+from __future__ import absolute_import
+
 from functools import partial
 
 from calmjs.cli import PackageManagerDriver

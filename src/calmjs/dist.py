@@ -6,6 +6,7 @@ Provides functions and classes that enable the management of npm
 dependencies for JavaScript sources that lives in Python packages.
 """
 
+from __future__ import absolute_import
 import json
 
 from functools import partial

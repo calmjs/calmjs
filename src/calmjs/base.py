@@ -6,6 +6,7 @@ This module contains various base classes from which other parts of this
 framework will inherit/extend from.
 """
 
+from __future__ import absolute_import
 import os
 
 import json

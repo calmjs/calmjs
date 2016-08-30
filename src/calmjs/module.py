@@ -7,6 +7,8 @@ calmjs infrastructure that leverages on the underlying setuptools entry
 point system.
 """
 
+from __future__ import absolute_import
+
 from calmjs.base import BaseRegistry
 from calmjs.base import BaseModuleRegistry
 from calmjs.indexer import mapper_es6

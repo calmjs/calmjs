@@ -28,6 +28,7 @@ at the moment yet, especially given the fact that browsers do not have
 support for them quite just yet as of mid 2016.
 """
 
+from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import codecs

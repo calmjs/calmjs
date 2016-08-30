@@ -20,6 +20,8 @@ framework to produce configuration files and/or transpile the source
 into the usable final form.
 """
 
+from __future__ import absolute_import
+
 from logging import getLogger
 from calmjs.base import BaseRegistry
 

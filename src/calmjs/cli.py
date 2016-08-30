@@ -6,6 +6,7 @@ helpers and classes that also support and provide its own cli for calmjs
 framework.
 """
 
+from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import difflib

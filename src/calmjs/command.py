@@ -4,6 +4,8 @@ Module providing npm distutil command that ultimately integrates with
 setuptools
 """
 
+from __future__ import absolute_import
+
 import sys
 import logging
 
