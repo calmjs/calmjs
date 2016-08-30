@@ -10,25 +10,21 @@ from __future__ import absolute_import
 import os
 
 import json
-from locale import getpreferredencoding
 from os import getcwd
 from os.path import dirname
 from os.path import isdir
 from os.path import join
 from os.path import pathsep
 
-from subprocess import Popen
-from subprocess import PIPE
-
 from collections import OrderedDict
 from logging import getLogger
 from pkg_resources import working_set
 
 from calmjs.utils import which
+from calmjs.utils import fork_exec
 
 NODE_PATH = 'NODE_PATH'
 NODE = 'node'
-locale = getpreferredencoding()
 
 logger = getLogger(__name__)
 _marker = object()
@@ -371,13 +367,7 @@ class BaseDriver(object):
         call_kw = self._gen_call_kws(**env)
         call_args = [binary]
         call_args.extend(args)
-        as_bytes = isinstance(stdin, bytes)
-        source = stdin if as_bytes else stdin.encode(locale)
-        p = Popen(call_args, stdin=PIPE, stdout=PIPE, stderr=PIPE, **call_kw)
-        stdout, stderr = p.communicate(source)
-        if as_bytes:
-            return stdout, stderr
-        return (stdout.decode(locale), stderr.decode(locale))
+        return fork_exec(call_args, stdin, **call_kw)
 
     @property
     def cwd(self):

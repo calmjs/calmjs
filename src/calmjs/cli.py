@@ -14,6 +14,7 @@ import logging
 import json
 import re
 import sys
+from locale import getpreferredencoding
 from os import fstat
 from os.path import exists
 from stat import S_ISCHR
@@ -27,13 +28,13 @@ from calmjs.dist import DEP_KEYS
 
 from calmjs.base import NODE
 from calmjs.base import BaseDriver
-from calmjs.base import locale
 
 __all__ = [
     'NodeDriver',
     'PackageManagerDriver',
 ]
 
+locale = getpreferredencoding()
 logger = logging.getLogger(__name__)
 
 version_expr = re.compile('((?:\d+)(?:\.\d+)*)')
