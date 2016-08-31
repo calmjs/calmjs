@@ -14,13 +14,14 @@ from pkg_resources import WorkingSet
 
 from calmjs import npm
 from calmjs import cli
+from calmjs import dist
 from calmjs.utils import pretty_logging
 
 from calmjs.testing.mocks import StringIO
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import make_dummy_dist
 from calmjs.testing.utils import remember_cwd
-from calmjs.testing.utils import stub_dist_flatten_egginfo_json
+from calmjs.testing.utils import stub_item_attr_value
 from calmjs.testing.utils import stub_mod_call
 from calmjs.testing.utils import stub_mod_check_interactive
 from calmjs.testing.utils import stub_os_environ
@@ -90,7 +91,7 @@ class NpmTestCase(unittest.TestCase):
         ), 'foo', '1.9.0')
         working_set = WorkingSet()
         working_set.add(app, self._calmjs_testing_tmpdir)
-        stub_dist_flatten_egginfo_json(self, [cli], working_set)
+        stub_item_attr_value(self, dist, 'default_working_set', working_set)
 
         # We are going to have a fake package.json
         with open(join(tmpdir, 'package.json'), 'w') as fd:
@@ -133,7 +134,7 @@ class NpmTestCase(unittest.TestCase):
         ), 'foo', '1.9.0')
         working_set = WorkingSet()
         working_set.add(app, self._calmjs_testing_tmpdir)
-        stub_dist_flatten_egginfo_json(self, [cli], working_set)
+        stub_item_attr_value(self, dist, 'default_working_set', working_set)
 
         # We are going to have a fake package.json
         with open(join(tmpdir, 'package.json'), 'w') as fd:
@@ -191,7 +192,7 @@ class NpmDriverInitTestCase(unittest.TestCase):
         working_set.add(app, self._calmjs_testing_tmpdir)
         working_set.add(underscore, self._calmjs_testing_tmpdir)
         working_set.add(named, self._calmjs_testing_tmpdir)
-        stub_dist_flatten_egginfo_json(self, [cli], working_set)
+        stub_item_attr_value(self, dist, 'default_working_set', working_set)
         stub_mod_check_interactive(self, [cli], True)
         # also save this
         self.inst_interactive = npm.npm.cli_driver.interactive
@@ -557,7 +558,7 @@ class DistCommandTestCase(unittest.TestCase):
 
         # Stub out the flatten_egginfo_json calls with one that uses our
         # custom working_set here.
-        stub_dist_flatten_egginfo_json(self, [cli], working_set)
+        stub_item_attr_value(self, dist, 'default_working_set', working_set)
         # Quiet stdout from distutils logs
         stub_stdouts(self)
         # Force auto-detected interactive mode to True, because this is
