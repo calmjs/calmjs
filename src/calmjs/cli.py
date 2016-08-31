@@ -22,6 +22,7 @@ from stat import S_ISCHR
 from subprocess import check_output
 from subprocess import call
 
+from calmjs.dist import convert_package_names
 from calmjs.dist import flatten_egginfo_json
 from calmjs.dist import DEFAULT_JSON
 from calmjs.dist import DEP_KEYS
@@ -402,33 +403,35 @@ class PackageManagerDriver(NodeDriver):
         """
 
         # assuming string, and assume whitespaces are invalid.
-        package_names = (
-            package_names.split()
-            if hasattr(package_names, 'split') else package_names
-        )
+        pkg_names, malformed = convert_package_names(package_names)
+        if malformed:
+            msg = 'malformed package name(s) specified: %s' % ', '.join(
+                malformed)
+            logger.error(msg)
+            raise ValueError(msg)
 
-        if len(package_names) == 1:
+        if len(pkg_names) == 1:
             logger.info(
                 "generating a flattened '%s' for '%s'",
-                self.pkgdef_filename, package_names[0],
+                self.pkgdef_filename, pkg_names[0],
             )
         else:
             logger.info(
                 "generating a flattened '%s' for packages {%s}",
-                self.pkgdef_filename, ', '.join(package_names),
+                self.pkgdef_filename, ', '.join(pkg_names),
             )
 
         # remember the filename is in the context of the distribution,
         # not the filesystem.
         pkgdef_json = flatten_egginfo_json(
-            package_names, filename=self.pkgdef_filename,
+            pkg_names, filename=self.pkgdef_filename,
             dep_keys=self.dep_keys,
         )
 
         if pkgdef_json.get(
                 self.pkg_name_field, NotImplemented) is NotImplemented:
             # use the last item.
-            pkgdef_json[self.pkg_name_field] = package_names[-1]
+            pkgdef_json[self.pkg_name_field] = pkg_names[-1]
 
         if stream:
             self.dump(pkgdef_json, stream)
@@ -476,12 +479,6 @@ class PackageManagerDriver(NodeDriver):
         file or that the existing one matches with the expected version.
         Returns False otherwise.
         """
-
-        # assuming string, and assume whitespaces are invalid.
-        package_names = (
-            package_names.split()
-            if hasattr(package_names, 'split') else package_names
-        )
 
         if interactive is None:
             interactive = self.interactive

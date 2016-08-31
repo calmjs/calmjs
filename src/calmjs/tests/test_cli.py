@@ -618,6 +618,7 @@ class CliDriverTestCase(unittest.TestCase):
         working_set = pkg_resources.WorkingSet()
         working_set.add(mock_dist)
         stub_dist_flatten_egginfo_json(self, [cli], working_set)
+        return working_set
 
     def test_pkg_manager_view(self):
         self.setup_requirements_json()
@@ -732,3 +733,45 @@ class CliDriverTestCase(unittest.TestCase):
             },
             "name": "calmpy.pip",
         })
+
+    def test_pkg_manager_view_extras_requires(self):
+        working_set = self.setup_requirements_json()
+        working_set.add(pkg_resources.Distribution(
+            metadata=MockProvider({
+                'requires.txt': '[dev]\ncalmpy.pip',
+            }),
+            project_name='site',
+            version='0.0.0',
+        ))
+        driver = cli.PackageManagerDriver(
+            pkg_manager_bin='mgr', pkgdef_filename='requirements.json',
+            dep_keys=('require',),
+        )
+        result = driver.pkg_manager_view('site')
+        self.assertEqual(result, {
+            "require": {},
+            "name": "site",
+        })
+        result = driver.pkg_manager_view('site[dev]')
+        self.assertEqual(result, {
+            "require": {"setuptools": "25.1.6"},
+            "name": "site[dev]",
+        })
+
+    def test_pkg_manager_view_bad_entry_point(self):
+        self.setup_requirements_json()
+        driver = cli.PackageManagerDriver(
+            pkg_manager_bin='mgr', pkgdef_filename='requirements.json',
+            dep_keys=('require',),
+        )
+        with pretty_logging(stream=mocks.StringIO()) as err:
+            with self.assertRaises(ValueError):
+                driver.pkg_manager_view('calmpy.pip [dev]')
+        self.assertIn(
+            'malformed package name(s) specified: [dev]', err.getvalue())
+
+        with pretty_logging(stream=mocks.StringIO()) as err:
+            with self.assertRaises(ValueError):
+                driver.pkg_manager_view('{foo} /r')
+        self.assertIn(
+            'malformed package name(s) specified: {foo}, /r', err.getvalue())

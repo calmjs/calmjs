@@ -168,6 +168,29 @@ class DistTestCase(unittest.TestCase):
         self.assertTrue(isinstance(result, pkg_resources.Distribution))
         self.assertEqual(result.project_name, 'setuptools')
 
+    def test_convert_package_names(self):
+        result, error = calmjs_dist.convert_package_names('setuptools calmjs')
+        self.assertEqual(result, ['setuptools', 'calmjs'])
+        self.assertEqual(error, [])
+
+        result, error = calmjs_dist.convert_package_names('calmjs [dev]')
+        self.assertEqual(result, ['calmjs'])
+        self.assertEqual(error, ['[dev]'])
+
+        result, error = calmjs_dist.convert_package_names('calmjs[dev]')
+        self.assertEqual(result, ['calmjs[dev]'])
+        self.assertEqual(error, [])
+
+        result, error = calmjs_dist.convert_package_names(
+            ['setuptools'])
+        self.assertEqual(result, ['setuptools'])
+        self.assertEqual(error, [])
+
+        result, error = calmjs_dist.convert_package_names(
+            ['setuptools', '[dev]', 'calmjs [dev]'])
+        self.assertEqual(result, ['setuptools', 'calmjs [dev]'])
+        self.assertEqual(error, ['[dev]'])
+
     def test_get_pkg_json_integrated_live(self):
         # Try reading a fake package.json from setuptools package
         # directly and see that it will just return nothing while not

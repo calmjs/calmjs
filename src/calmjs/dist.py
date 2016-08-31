@@ -96,7 +96,29 @@ def find_pkg_dist(pkg_name, working_set=None):
     return working_set.find(req)
 
 
-def find_packages_requirements_dists(packages, working_set=None):
+def convert_package_names(package_names):
+    """
+    Convert package names, which can be a string of a number of package
+    names or requirements separated by spaces.
+    """
+
+    results = []
+    errors = []
+
+    for name in (
+            package_names.split()
+            if hasattr(package_names, 'split') else package_names):
+        try:
+            Requirement.parse(name)
+        except ValueError:
+            errors.append(name)
+        else:
+            results.append(name)
+
+    return results, errors
+
+
+def find_packages_requirements_dists(pkg_names, working_set=None):
     """
     Return the entire list of dependency requirements, reversed from the
     bottom.
@@ -104,7 +126,7 @@ def find_packages_requirements_dists(packages, working_set=None):
 
     working_set = working_set or default_working_set
     requirements = [
-        r for r in (Requirement.parse(package) for package in packages)
+        r for r in (Requirement.parse(req) for req in pkg_names)
         if working_set.find(r)
     ]
     return list(reversed(working_set.resolve(requirements)))
@@ -115,7 +137,7 @@ def read_dist_egginfo_json(dist, filename=DEFAULT_JSON):
     Safely get a json within an egginfo from a distribution.
     """
 
-    # use the given package's istribution to acquire the json file.
+    # use the given package's distribution to acquire the json file.
     if not dist.has_metadata(filename):
         logger.debug("no '%s' for '%s'", filename, dist)
         return
