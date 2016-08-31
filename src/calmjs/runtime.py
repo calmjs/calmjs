@@ -9,8 +9,10 @@ import logging
 import re
 import os
 import sys
+import textwrap
 from argparse import Action
 from argparse import ArgumentParser
+from argparse import HelpFormatter
 from argparse import SUPPRESS
 
 from pkg_resources import Requirement
@@ -40,6 +42,13 @@ valid_command_name = re.compile('^[0-9a-zA-Z]*$')
 
 def norm_args(args):
     return sys.argv[1:] if args is None else (args or [])
+
+
+class HyphenNoBreakFormatter(HelpFormatter):
+
+    def _split_lines(self, text, width):
+        text = self._whitespace_matcher.sub(' ', text).strip()
+        return textwrap.wrap(text, width, break_on_hyphens=False)
 
 
 class Version(Action):
@@ -83,7 +92,8 @@ class Version(Action):
 
         rt_dist = getattr(parser, ATTR_RT_DIST, None)
         if rt_dist:
-            results.append('%s %s from %s' % self.get_dist_info(rt_dist))
+            results.append(
+                parser.prog + ': %s %s from %s' % self.get_dist_info(rt_dist))
             results.append(os.linesep)
 
         if not results:
@@ -113,20 +123,23 @@ class BootstrapRuntime(object):
     def init(self):
         if self.argparser is None:
             self.argparser = ArgumentParser(
-                prog=self.prog, description=self.__doc__, add_help=False)
+                prog=self.prog, description=self.__doc__, add_help=False,
+                formatter_class=HyphenNoBreakFormatter,
+            )
             self.init_argparser(self.argparser)
 
     def init_argparser(self, argparser):
-        argparser.add_argument(
+        self.global_opts = argparser.add_argument_group('global options')
+        self.global_opts.add_argument(
             '-d', '--debug', action='count', default=0,
             help="show traceback on error; twice for post_mortem '--debugger'")
-        argparser.add_argument(
+        self.global_opts.add_argument(
             '--debugger', action='store_const', const=2, dest='debug',
             help=SUPPRESS)
-        argparser.add_argument(
+        self.global_opts.add_argument(
             '-q', '--quiet', action='count', default=0,
             help="be more quiet")
-        argparser.add_argument(
+        self.global_opts.add_argument(
             '-v', '--verbose', action='count', default=0,
             help="be more verbose")
 
@@ -195,13 +208,15 @@ class BaseRuntime(BootstrapRuntime):
     def init(self):
         if self.argparser is None:
             self.argparser = ArgumentParser(
-                prog=self.prog, description=self.description)
+                prog=self.prog, description=self.description,
+                formatter_class=HyphenNoBreakFormatter,
+            )
             self.init_argparser(self.argparser)
         setattr(self.argparser, ATTR_ROOT_PKG, self.package_name)
 
     def init_argparser(self, argparser):
         super(BaseRuntime, self).init_argparser(argparser)
-        argparser.add_argument(
+        self.global_opts.add_argument(
             '-V', '--version', action=Version, default=0,
             help="print version information")
 
@@ -302,7 +317,9 @@ class Runtime(BaseRuntime):
 
         def register(name, runtime, entry_point):
             subparser = commands.add_parser(
-                name, help=inst.description)
+                name, help=inst.description,
+                formatter_class=HyphenNoBreakFormatter,
+            )
             # for version reporting.
             setattr(subparser, ATTR_ROOT_PKG, self.package_name)
             setattr(subparser, ATTR_RT_DIST, entry_point.dist)
@@ -446,21 +463,16 @@ class PackageManagerAction(Action):
 
 class PackageManagerRuntime(DriverRuntime):
     """
-    A calmjs runtime
-
-    e.g
-
-    $ calmjs npm --init example.package
-    $ calmjs npm --install example.package
+    A calmjs package manager runtime
     """
 
     _pkg_manager_options = (
         ('view', None,
-         "generate '%(pkgdef_filename)s' for the Python package and "
-         "write to stdout for viewing [default]"),
+         "generate '%(pkgdef_filename)s' for the specified Python package "
+         "and write to stdout for viewing [default]"),
         ('init', None,
          "generate and write '%(pkgdef_filename)s' to the "
-         "current directory for this Python package"),
+         "current directory for the specified Python package"),
         # This required implicit step is done, otherwise there are no
         # difference to running ``npm init`` directly from the shell.
         ('install', None,
@@ -525,6 +537,9 @@ class PackageManagerRuntime(DriverRuntime):
                 for dash, key in zip(('-', '--'), (short, full))
                 if key
             ]
+            # default is singular, but for the argparsed version in our
+            # runtime permits multiple packages.
+            desc = desc.replace('Python package', 'Python package(s)')
             if not short:
                 f = getattr(self.cli_driver, '%s_%s' % (
                     self.cli_driver.binary, full), None)
