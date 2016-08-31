@@ -790,14 +790,14 @@ class CliDriverTestCase(unittest.TestCase):
             pkg_manager_bin='mgr', pkgdef_filename='requirements.json',
             dep_keys=('require',),
         )
-        with pretty_logging(stream=mocks.StringIO()) as err:
-            with self.assertRaises(ValueError):
-                driver.pkg_manager_view('calmpy.pip [dev]')
+        with self.assertRaises(ValueError) as e:
+            driver.pkg_manager_view('calmpy.pip [dev]')
         self.assertIn(
-            'malformed package name(s) specified: [dev]', err.getvalue())
+            'malformed package name(s) specified: [dev]',
+            str(e.exception))
 
-        with pretty_logging(stream=mocks.StringIO()) as err:
-            with self.assertRaises(ValueError):
-                driver.pkg_manager_view('{foo} /r')
+        with self.assertRaises(ValueError) as e:
+            driver.pkg_manager_view('{foo} /r')
         self.assertIn(
-            'malformed package name(s) specified: {foo}, /r', err.getvalue())
+            'malformed package name(s) specified: {foo}, /r',
+            str(e.exception))

@@ -279,13 +279,15 @@ class BaseRuntime(BootstrapRuntime):
                 return self.run(**kwargs)
             except KeyboardInterrupt:
                 logger.critical('termination requested; aborted.')
-            except Exception:
+            except Exception as e:
                 if not self.debug:
                     logger.critical(
-                        'terminating due to a critical error; please refer to '
-                        'previous error log entries, alternatively retry with '
-                        '--debug to get the traceback information to aid with '
-                        'debugging.'
+                        '%s: %s', type(e).__name__, e)
+                    logger.critical(
+                        'terminating due to a critical error; for details '
+                        'please refer to previous log entries, or by retrying '
+                        'with more verbosity (-v) and/or enable debug/'
+                        'traceback output (-d).'
                     )
                 else:
                     logger.critical(

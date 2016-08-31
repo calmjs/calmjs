@@ -419,7 +419,6 @@ class PackageManagerDriver(NodeDriver):
         if malformed:
             msg = 'malformed package name(s) specified: %s' % ', '.join(
                 malformed)
-            logger.error(msg)
             raise ValueError(msg)
 
         if len(pkg_names) == 1:

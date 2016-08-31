@@ -609,6 +609,20 @@ class RuntimeIntegrationTestCase(unittest.TestCase):
         rt(['foo', '--install', 'example.package2', '--debugger'])
         self.assertIn("(Pdb)", sys.stdout.getvalue())
 
+    def test_critical_log_exception(self):
+        remember_cwd(self)
+        tmpdir = mkdtemp(self)
+        os.chdir(tmpdir)
+        rt = self.setup_runtime()
+
+        stub_stdouts(self)
+        # ensure the binary is not found.
+        stub_mod_call(self, cli, fake_error(RuntimeError('fake error')))
+        rt(['foo', '--install', 'example.package2'])
+        self.assertIn(
+            "CRITICAL calmjs.runtime RuntimeError: fake error",
+            sys.stderr.getvalue())
+
 
 class MainIntegrationTestCase(unittest.TestCase):
     """
