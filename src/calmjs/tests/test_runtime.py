@@ -369,6 +369,18 @@ class RuntimeIntegrationTestCase(unittest.TestCase):
             })),
         ), 'example.package2', '2.0')
 
+        make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([
+                'example.package1',
+                'example.package2',
+            ])),
+            ('package.json', json.dumps({
+                'dependencies': {
+                    'backbone': '~1.3.2',
+                },
+            })),
+        ), 'example.package3', '2.0')
+
         working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
 
         # Stub out the underlying data needed for the cli for the tests
@@ -417,9 +429,6 @@ class RuntimeIntegrationTestCase(unittest.TestCase):
         self.assertEqual(self.call_args, ((['npm', 'install'],), {}))
 
     def test_npm_view(self):
-        remember_cwd(self)
-        tmpdir = mkdtemp(self)
-        os.chdir(tmpdir)
         stub_stdouts(self)
         rt = self.setup_runtime()
         rt(['foo', '--view', 'example.package1', 'example.package2'])
@@ -432,6 +441,32 @@ class RuntimeIntegrationTestCase(unittest.TestCase):
         result = json.loads(sys.stdout.getvalue())
         self.assertEqual(result['dependencies']['jquery'], '~3.1.0')
         self.assertEqual(result['dependencies']['underscore'], '~1.8.3')
+
+    def test_npm_view_dependencies(self):
+        stub_stdouts(self)
+        rt = self.setup_runtime()
+        rt(['foo', 'example.package3'])
+        result = json.loads(sys.stdout.getvalue())
+        self.assertEqual(result['dependencies'], {
+            'jquery': '~3.1.0',
+            'underscore': '~1.8.3',
+            'backbone': '~1.3.2',
+        })
+
+        stub_stdouts(self)
+        rt(['foo', 'example.package3', '-E'])
+        result = json.loads(sys.stdout.getvalue())
+        self.assertEqual(result['dependencies'], {
+            'backbone': '~1.3.2',
+        })
+
+        stub_stdouts(self)
+        rt(['foo', 'example.package3', 'example.package2', '--explicit'])
+        result = json.loads(sys.stdout.getvalue())
+        self.assertEqual(result['dependencies'], {
+            'backbone': '~1.3.2',
+            'underscore': '~1.8.3',
+        })
 
     def test_npm_all_the_actions(self):
         remember_cwd(self)

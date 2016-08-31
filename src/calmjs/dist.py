@@ -118,6 +118,14 @@ def convert_package_names(package_names):
     return results, errors
 
 
+def pkg_names_to_dists(pkg_names, working_set=None):
+    working_set = working_set or default_working_set
+    return [
+        find_pkg_dist(pkg_name, working_set=working_set)
+        for pkg_name in pkg_names
+    ]
+
+
 def find_packages_requirements_dists(pkg_names, working_set=None):
     """
     Return the entire list of dependency requirements, reversed from the
@@ -262,10 +270,7 @@ def get_extras_calmjs(pkg_names, working_set=None):
 
     working_set = working_set or default_working_set
     dep_keys = set(get('calmjs.extras_keys').iter_records())
-    dists = [
-        find_pkg_dist(pkg_name, working_set=working_set)
-        for pkg_name in pkg_names
-    ]
+    dists = pkg_names_to_dists(pkg_names, working_set=working_set)
     return flatten_dist_egginfo_json(
         dists, filename=EXTRAS_CALMJS_JSON,
         dep_keys=dep_keys, working_set=working_set

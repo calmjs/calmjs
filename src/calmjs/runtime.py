@@ -494,6 +494,9 @@ class PackageManagerRuntime(DriverRuntime):
         ('overwrite', 'w',
          "automatically overwrite any file changes to current directory "
          "without prompting"),
+        ('explicit', 'E',
+         "explicit mode disables resolution for dependencies; only the "
+         "specified Python package will be used."),
     )
 
     def make_cli_options(self):

@@ -588,11 +588,17 @@ class DistTestCase(unittest.TestCase):
         working_set.add(lib, self._calmjs_testing_tmpdir)
         working_set.add(app, self._calmjs_testing_tmpdir)
 
+        self.assertEqual(1, len(calmjs_dist.pkg_names_to_dists(
+            ['app'], working_set=working_set)))
+
         single = calmjs_dist.get_extras_calmjs(
             ['app'], working_set=working_set)
         self.assertEqual(single['node_modules'], {
             'jquery': 'jquery/dist/jquery.min.js',
         })
+
+        self.assertEqual(2, len(calmjs_dist.find_packages_requirements_dists(
+            ['app'], working_set=working_set)))
 
         results = calmjs_dist.flatten_extras_calmjs(
             ['app'], working_set=working_set)

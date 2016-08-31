@@ -23,7 +23,9 @@ from subprocess import check_output
 from subprocess import call
 
 from calmjs.dist import convert_package_names
-from calmjs.dist import flatten_egginfo_json
+from calmjs.dist import find_packages_requirements_dists
+from calmjs.dist import flatten_dist_egginfo_json
+from calmjs.dist import pkg_names_to_dists
 from calmjs.dist import DEFAULT_JSON
 from calmjs.dist import DEP_KEYS
 
@@ -381,7 +383,8 @@ class PackageManagerDriver(NodeDriver):
         kw = self._gen_call_kws()
         return _get_bin_version(self.pkg_manager_bin, kw=kw)
 
-    def pkg_manager_view(self, package_names, stream=None, **kw):
+    def pkg_manager_view(
+            self, package_names, stream=None, explicit=False, **kw):
         """
         Returns the manifest JSON for the Python package name.  Default
         npm implementation calls for package.json.
@@ -398,9 +401,18 @@ class PackageManagerDriver(NodeDriver):
         stream
             If specified, the generated package.json will be written to
             there.
+        explicit
+            If True, the package names specified are the explicit list
+            to search for - no dependency resolution will then be done.
 
         Returns the manifest json as a dict.
         """
+
+        # For looking up the pkg_name to dist converter for explicit
+        to_dists = {
+            False: find_packages_requirements_dists,
+            True: pkg_names_to_dists,
+        }
 
         # assuming string, and assume whitespaces are invalid.
         pkg_names, malformed = convert_package_names(package_names)
@@ -423,8 +435,9 @@ class PackageManagerDriver(NodeDriver):
 
         # remember the filename is in the context of the distribution,
         # not the filesystem.
-        pkgdef_json = flatten_egginfo_json(
-            pkg_names, filename=self.pkgdef_filename,
+        dists = to_dists[explicit](pkg_names)
+        pkgdef_json = flatten_dist_egginfo_json(
+            dists, filename=self.pkgdef_filename,
             dep_keys=self.dep_keys,
         )
 

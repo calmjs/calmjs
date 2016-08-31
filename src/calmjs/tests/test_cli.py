@@ -735,6 +735,31 @@ class CliDriverTestCase(unittest.TestCase):
             "name": "calmpy.pip",
         })
 
+    def test_pkg_manager_view_requires(self):
+        working_set = self.setup_requirements_json()
+        working_set.add(pkg_resources.Distribution(
+            metadata=MockProvider({
+                'requires.txt': 'calmpy.pip',
+            }),
+            project_name='site',
+            version='0.0.0',
+        ))
+        driver = cli.PackageManagerDriver(
+            pkg_manager_bin='mgr', pkgdef_filename='requirements.json',
+            dep_keys=('require',),
+        )
+        result = driver.pkg_manager_view('site')
+        self.assertEqual(result, {
+            "require": {"setuptools": "25.1.6"},
+            "name": "site",
+        })
+        # try explicit
+        result = driver.pkg_manager_view('site', explicit=True)
+        self.assertEqual(result, {
+            "require": {},
+            "name": "site",
+        })
+
     def test_pkg_manager_view_extras_requires(self):
         working_set = self.setup_requirements_json()
         working_set.add(pkg_resources.Distribution(
