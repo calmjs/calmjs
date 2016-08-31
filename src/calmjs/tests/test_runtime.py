@@ -569,6 +569,11 @@ class RuntimeIntegrationTestCase(unittest.TestCase):
         self.assertIn("Traceback ", sys.stderr.getvalue())
         self.assertIn("(Pdb)", sys.stdout.getvalue())
 
+        stub_stdouts(self)
+        self.assertNotIn("(Pdb)", sys.stdout.getvalue())
+        rt(['foo', '--install', 'example.package2', '--debugger'])
+        self.assertIn("(Pdb)", sys.stdout.getvalue())
+
 
 class MainIntegrationTestCase(unittest.TestCase):
     """

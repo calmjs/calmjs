@@ -11,6 +11,7 @@ import os
 import sys
 from argparse import Action
 from argparse import ArgumentParser
+from argparse import SUPPRESS
 
 from pkg_resources import Requirement
 from pkg_resources import working_set as default_working_set
@@ -118,7 +119,10 @@ class BootstrapRuntime(object):
     def init_argparser(self, argparser):
         argparser.add_argument(
             '-d', '--debug', action='count', default=0,
-            help="enable debugging features")
+            help="show traceback on error; twice for post_mortem '--debugger'")
+        argparser.add_argument(
+            '--debugger', action='store_const', const=2, dest='debug',
+            help=SUPPRESS)
         argparser.add_argument(
             '-q', '--quiet', action='count', default=0,
             help="be more quiet")
