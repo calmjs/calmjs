@@ -114,6 +114,8 @@ class Toolchain(BaseDriver):
     for talking to those scripts and binaries.
     """
 
+    filename_suffix = '.js'
+
     def __init__(self, *a, **kw):
         """
         Refer to parent for exact arguments.
@@ -143,13 +145,23 @@ class Toolchain(BaseDriver):
         with opener(source, 'r') as reader, opener(target, 'w') as writer:
             self.transpiler(spec, reader, writer)
 
+    def modname_source_to_target(self, modname, source):
+        """
+        Create a target file name from the input module name and its
+        source file name.
+
+        Default is to append the module name with the filename_suffix
+        """
+
+        return modname + self.filename_suffix
+
     def _gen_req_src_targets(self, d):
         # modname = CommonJS require/import module name.
         # source = path to JavaScript source file from a Python package.
         # target = the target write path
 
         for modname, source in d.items():
-            target = modname + '.js'
+            target = self.modname_source_to_target(modname, source)
             yield modname, source, target
 
     def prepare(self, spec):
@@ -285,7 +297,7 @@ class Toolchain(BaseDriver):
 
 class NullToolchain(Toolchain):
     """
-    A null toolchain that does nothing except mayble move some files
+    A null toolchain that does nothing except maybe move some files
     around.
     """
 
