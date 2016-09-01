@@ -155,6 +155,17 @@ class Toolchain(BaseDriver):
 
         return modname + self.filename_suffix
 
+    def pick_compiled_mod_target_name(self, modname, source, target):
+        """
+        Typical JavaScript tools will get confused if '.js' is added, so
+        by default the same modname is returned rather than the target.
+
+        The source argument is included simply to aid pedantic tools for
+        any lookup they might need.
+        """
+
+        return modname
+
     def _gen_req_src_targets(self, d):
         # modname = CommonJS require/import module name.
         # source = path to JavaScript source file from a Python package.
@@ -191,7 +202,8 @@ class Toolchain(BaseDriver):
 
         for modname, source, target in self._gen_req_src_targets(
                 transpile_source_map):
-            compiled_paths[modname] = modname
+            compiled_paths[modname] = self.pick_compiled_mod_target_name(
+                modname, source, target)
             module_names.append(modname)
             compile_target = join(spec['build_dir'], target)
             self._validate_build_target(spec, compile_target)
@@ -199,7 +211,8 @@ class Toolchain(BaseDriver):
 
         for modname, source, target in self._gen_req_src_targets(
                 bundled_source_map):
-            bundled_paths[modname] = modname
+            bundled_paths[modname] = self.pick_compiled_mod_target_name(
+                modname, source, target)
             if isfile(source):
                 module_names.append(modname)
                 copy_target = join(spec['build_dir'], target)
