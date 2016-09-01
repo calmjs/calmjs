@@ -294,18 +294,34 @@ class IntegrationGeneratorTestCase(unittest.TestCase):
         self.assertEqual(framework_dist.location, tmpdir)
 
         self.assertTrue(exists(
-            join(tmpdir, 'node_modules', 'jquery', 'dist', 'jquery.js')))
+            join(tmpdir, 'fake_modules', 'jquery', 'dist', 'jquery.js')))
         self.assertTrue(exists(
-            join(tmpdir, 'node_modules', 'underscore', 'underscore.js')))
+            join(tmpdir, 'fake_modules', 'underscore', 'underscore.js')))
 
     def test_integration_setup_and_teardown(self):
         from calmjs.registry import get
+        # See that the standard registry has what we expected
+        std_extra_keys = list(get('calmjs.extras_keys').iter_records())
+        self.assertNotEqual(std_extra_keys, ['fake_modules'])
+        self.assertIn('node_modules', std_extra_keys)
+
+        self.assertIn('node_modules', std_extra_keys)
         TestCase = type('TestCase', (unittest.TestCase,), {})
         utils.setup_class_integration_environment(TestCase)
         self.assertIn(TestCase.dist_dir, self.mock_tempfile.dirs)
         registry = get('calmjs.registry')
         self.assertEqual(TestCase.registry_name, 'calmjs.module.simulated')
         self.assertTrue(registry.get('calmjs.module.simulated'))
+
+        # See that the registry fake_modules actually got registered
+        extra_keys = list(get('calmjs.extras_keys').iter_records())
+        self.assertEqual(extra_keys, ['fake_modules'])
+
         utils.teardown_class_integration_environment(TestCase)
         self.assertIsNone(registry.get('calmjs.module.simulated'))
         self.assertFalse(exists(TestCase.dist_dir))
+
+        # See that the registry fake_modules actually got registered
+        std_extra_keys = list(get('calmjs.extras_keys').iter_records())
+        self.assertNotEqual(std_extra_keys, ['fake_modules'])
+        self.assertIn('node_modules', std_extra_keys)

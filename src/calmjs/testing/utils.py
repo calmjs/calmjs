@@ -39,7 +39,7 @@ def fake_error(exception):
 
 def generate_integration_environment(
         working_dir, registry_id='calmjs.module.simulated',
-        pkgman_filename='package.json', extras_calmjs_key='node_modules'):
+        pkgman_filename='package.json', extras_calmjs_key='fake_modules'):
     """
     Generate a comprehensive integration testing environment for test
     cases in other packages that integrates with calmjs.
@@ -60,7 +60,7 @@ def generate_integration_environment(
 
     extras_calmjs_key
         The extras keys for the extras_calmjs definition.  Defaults to
-        node_modules.
+        fake_modules.
 
     Returns a tuple of the mock working set and the registry.
     """
@@ -70,6 +70,13 @@ def generate_integration_environment(
 
     def make_entry_points(registry_id, *raw):
         return '\n'.join(['[%s]' % registry_id] + list(raw))
+
+    make_dummy_dist(None, (
+        ('entry_points.txt', make_entry_points(
+            'calmjs.extras_keys',
+            '%s = enabled' % extras_calmjs_key,
+        )),
+    ), 'calmjs.simulated', '420', working_dir=working_dir)
 
     make_dummy_dist(None, (
         ('requires.txt', '\n'.join([
@@ -203,10 +210,12 @@ def generate_integration_environment(
             exports.RichEditWidget = 'widget.richedit.RichEditWidget';
         '''),
         (('widget', 'datepicker.js'), '''
+            var _ = require('underscore');
             var core = require('widget/core');
             exports.DatePickerWidget = 'widget.datepicker.DatePickerWidget';
         '''),
         (('forms', 'ui.js'), '''
+            var $ = require('jquery');
             var richedit = require('widget/richedit');
             var datepicker = require('widget/datepicker');
             exports.RichForm = [
@@ -268,7 +277,8 @@ def generate_integration_environment(
         if not isdir(base):
             makedirs(base)
         with open(target, 'w') as fd:
-            pass  # yeah right.
+            # return a module that returns the name of the file.
+            fd.write("define([], function () { return '%s' });" % source)
 
     makedirs(join(working_dir, '_bad_dir_'))
     with open(join(working_dir, '_bad_dir_', 'unsupported'), 'w') as fd:
@@ -285,22 +295,29 @@ def generate_integration_environment(
 
 def setup_class_integration_environment(cls, **kw):
     from calmjs import dist as calmjs_dist
+    from calmjs import base
     from calmjs.registry import _inst as root_registry
     cls.dist_dir = tempfile.mkdtemp()
     results = generate_integration_environment(cls.dist_dir, **kw)
     working_set, registry = results
     cls.registry_name = registry.registry_name
+    # reset that to force creation from stubbed working_set
+    root_registry.records.pop('calmjs.extras_keys', None)
     root_registry.records[cls.registry_name] = registry
     cls.root_working_set, calmjs_dist.default_working_set = (
         calmjs_dist.default_working_set, working_set)
+    base.working_set = working_set
 
 
 def teardown_class_integration_environment(cls):
     from calmjs import dist as calmjs_dist
+    from calmjs import base
     from calmjs.registry import _inst as root_registry
     rmtree(cls.dist_dir)
     root_registry.records.pop(cls.registry_name)
+    root_registry.records.pop('calmjs.extras_keys', None)
     calmjs_dist.default_working_set = cls.root_working_set
+    base.working_set = cls.root_working_set
 
 
 def mkdtemp(testcase_inst):
