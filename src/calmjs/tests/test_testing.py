@@ -10,6 +10,7 @@ import os
 from os.path import exists
 from os.path import join
 from os.path import normcase
+from os.path import realpath
 from shutil import rmtree
 
 from calmjs.testing import utils
@@ -26,7 +27,7 @@ class MockTempfile(object):
 
     def mkdtemp(self):
         self.count += 1
-        result = tempfile.mkdtemp()
+        result = realpath(tempfile.mkdtemp())
         self.dirs.append(result)
         return result
 
@@ -42,7 +43,7 @@ class BootstrapTestingUtilsTestCase(unittest.TestCase):
     """
 
     def setUp(self):
-        self.tmpdir = tempfile.mkdtemp()
+        self.tmpdir = realpath(tempfile.mkdtemp())
         tempfile.tempdir = self.tmpdir
 
     def tearDown(self):

@@ -9,6 +9,7 @@ from os.path import exists
 from os.path import join
 from os.path import dirname
 from os.path import isdir
+from os.path import realpath
 from shutil import rmtree
 from types import ModuleType
 from unittest import TestCase
@@ -35,6 +36,10 @@ def fake_error(exception):
     def stub(*a, **kw):
         raise exception
     return stub
+
+
+def mkdtemp_realpath():
+    return realpath(tempfile.mkdtemp())
 
 
 def create_fake_bin(path, name):
@@ -311,7 +316,7 @@ def setup_class_integration_environment(cls, **kw):
     from calmjs import dist as calmjs_dist
     from calmjs import base
     from calmjs.registry import _inst as root_registry
-    cls.dist_dir = tempfile.mkdtemp()
+    cls.dist_dir = mkdtemp_realpath()
     results = generate_integration_environment(cls.dist_dir, **kw)
     working_set, registry = results
     cls.registry_name = registry.registry_name
@@ -357,7 +362,7 @@ def mkdtemp(testcase_inst):
             rmtree(tmpdir)
 
     # create the temporary dir and add the cleanup for that immediately.
-    tmpdir = tempfile.mkdtemp()
+    tmpdir = mkdtemp_realpath()
     testcase_inst.addCleanup(cleanup, tmpdir)
     return tmpdir
 

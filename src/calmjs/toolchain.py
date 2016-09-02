@@ -270,7 +270,7 @@ class Toolchain(BaseDriver):
             raise TypeError('spec must be of type Spec')
 
         if not spec.get('build_dir'):
-            tempdir = mkdtemp()
+            tempdir = realpath(mkdtemp())
             spec.add_callback('cleanup', shutil.rmtree, tempdir)
             build_dir = join(tempdir, 'build')
             mkdir(build_dir)

@@ -8,6 +8,7 @@ from os.path import basename
 from os.path import exists
 from os.path import join
 from os.path import pardir
+from os.path import realpath
 
 from calmjs.utils import pretty_logging
 from calmjs.toolchain import Spec
@@ -114,7 +115,8 @@ class ToolchainTestCase(unittest.TestCase):
             self.toolchain.link(spec)
 
         # Check that the build_dir is set on the spec based on tempfile
-        self.assertTrue(spec['build_dir'].startswith(tempfile.gettempdir()))
+        self.assertTrue(spec['build_dir'].startswith(
+            realpath(tempfile.gettempdir())))
         # Also that it got deleted properly.
         self.assertFalse(exists(spec['build_dir']))
 
@@ -126,7 +128,8 @@ class ToolchainTestCase(unittest.TestCase):
 
         # While build_dir is defined, no value was assigned.  See that
         # the process will give it a new one.
-        self.assertTrue(spec['build_dir'].startswith(tempfile.gettempdir()))
+        self.assertTrue(spec['build_dir'].startswith(
+            realpath(tempfile.gettempdir())))
         # Also that it got deleted properly.
         self.assertFalse(exists(spec['build_dir']))
 
