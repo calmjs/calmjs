@@ -475,6 +475,22 @@ def stub_item_attr_value(testcase_inst, item, attr, value):
     setattr(item, attr, value)
 
 
+def stub_base_which(testcase_inst, fake_cmd=None):
+    """
+    A stub on the which in the base module so that it returns the
+    identity if no specific targets are given, otherwise return that.
+    """
+
+    from calmjs import base
+
+    def fake_which(cmd, *a, **kw):
+        if fake_cmd is None:
+            return cmd
+        return fake_cmd
+
+    stub_item_attr_value(testcase_inst, base, 'which', fake_which)
+
+
 def stub_mod_call(testcase_inst, mod, f=None):
     def fake_call(*a, **kw):
         testcase_inst.call_args = (a, kw)

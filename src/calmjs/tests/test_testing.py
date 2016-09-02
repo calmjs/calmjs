@@ -223,6 +223,19 @@ class TestingUtilsTestCase(unittest.TestCase):
         self.doCleanups()
         self.assertIs(Dummy.foo, marker)
 
+    def test_stub_base_which(self):
+        from calmjs import base
+        utils.stub_base_which(self)
+        _marker = object()
+        self.assertIs(base.which(_marker), _marker)
+        self.doCleanups()
+
+        _alternative = object()
+        utils.stub_base_which(self, _alternative)
+        _marker = object()
+        self.assertIs(base.which(_marker), _alternative)
+        self.doCleanups()
+
     def test_stub_mod_check_interactive(self):
         from calmjs import cli
         original = cli.check_interactive
