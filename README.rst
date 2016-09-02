@@ -13,10 +13,10 @@ common set of Python-based tools.  This ensures the consistent
 reproducibility during usage within a continuous integration and/or
 deployment environment.
 
-.. image:: https://travis-ci.org/calmjs/calmjs.svg?branch=master
+.. image:: https://travis-ci.org/calmjs/calmjs.svg?branch=1.0.x
     :target: https://travis-ci.org/calmjs/calmjs
-.. image:: https://coveralls.io/repos/github/calmjs/calmjs/badge.svg?branch=master
-    :target: https://coveralls.io/github/calmjs/calmjs?branch=master
+.. image:: https://coveralls.io/repos/github/calmjs/calmjs/badge.svg?branch=1.0.x
+    :target: https://coveralls.io/github/calmjs/calmjs?branch=1.0.x
 
 .. |AMD| replace:: AMD (Asynchronous Module Definition)
 .. |calmjs.bower| replace:: ``calmjs.bower``
