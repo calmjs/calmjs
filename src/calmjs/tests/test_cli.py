@@ -8,6 +8,7 @@ import os
 import sys
 from os.path import exists
 from os.path import join
+from os.path import normcase
 from os.path import pathsep
 import pkg_resources
 import warnings
@@ -15,8 +16,10 @@ import warnings
 from calmjs import cli
 from calmjs import dist
 from calmjs.utils import pretty_logging
+from calmjs.utils import which
 from calmjs.testing import mocks
 from calmjs.testing.mocks import MockProvider
+from calmjs.testing.utils import create_fake_bin
 from calmjs.testing.utils import fake_error
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import remember_cwd
@@ -24,6 +27,8 @@ from calmjs.testing.utils import stub_item_attr_value
 from calmjs.testing.utils import stub_mod_call
 from calmjs.testing.utils import stub_mod_check_output
 from calmjs.testing.utils import stub_os_environ
+
+which_node = which('node')
 
 
 class CliGenerateMergeDictTestCase(unittest.TestCase):
@@ -275,7 +280,7 @@ class CliDriverTestCase(unittest.TestCase):
         self.assertEqual(version, (0, 10, 25))
 
     # live test, no stubbing
-    @unittest.skipIf(cli.get_node_version() is None, 'Node.js not found.')
+    @unittest.skipIf(which_node is None, 'Node.js not found.')
     def test_node_version_get(self):
         version = cli.get_node_version()
         self.assertIsNotNone(version)
@@ -287,14 +292,19 @@ class CliDriverTestCase(unittest.TestCase):
             cli.node('process.stdout.write("Hello World!");')
 
     # live test, no stubbing
-    @unittest.skipIf(cli.get_node_version() is None, 'Node.js not found.')
+    # some of these may take a long time on Windows for some reason.
+    @unittest.skipIf(which_node is None, 'Node.js not found.')
     def test_node_run(self):
         stdout, stderr = cli.node('process.stdout.write("Hello World!");')
         self.assertEqual(stdout, 'Hello World!')
-        stdout, stderr = cli.node(b'process.stdout.write("Hello World!");')
-        self.assertEqual(stdout, b'Hello World!')
         stdout, stderr = cli.node('window')
         self.assertIn('window is not defined', stderr)
+
+    # live test, no stubbing
+    @unittest.skipIf(cli.get_node_version() is None, 'Node.js not found.')
+    def test_node_run_bytes(self):
+        stdout, stderr = cli.node(b'process.stdout.write("Hello World!");')
+        self.assertEqual(stdout, b'Hello World!')
 
     def test_helper_attr(self):
         stub_mod_call(self, cli)
@@ -442,25 +452,32 @@ class CliDriverTestCase(unittest.TestCase):
         driver.env_path = mkdtemp(self)
         self.assertIsNone(driver.which())
 
+    def create_fake_mgr_bin(self, root):
+        return create_fake_bin(root, 'mgr')
+
     def test_which_is_set(self):
         stub_os_environ(self)
         tmpdir = mkdtemp(self)
-        # fake an executable
-        mgr_bin = join(tmpdir, 'mgr')
-        with open(mgr_bin, 'w'):
-            pass
-        os.chmod(mgr_bin, 0o777)
-
+        mgr_bin = self.create_fake_mgr_bin(tmpdir)
         driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
-        # With env_path is set
         driver.env_path = tmpdir
-        self.assertEqual(driver.which(), mgr_bin)
+        self.assertEqual(normcase(driver.which()), normcase(mgr_bin))
 
         driver.env_path = None
         self.assertIsNone(driver.which())
 
-        # with an explicitly defined environ PATH
-        os.environ['PATH'] = tmpdir
+    def test_which_is_set_env_path(self):
+        stub_os_environ(self)
+        tmpdir = mkdtemp(self)
+        mgr_bin = self.create_fake_mgr_bin(tmpdir)
+        driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
+        # With both env_path attr and environ PATH set
+        os.environ['PATH'] = driver.env_path = tmpdir
+        self.assertEqual(normcase(driver.which()), normcase(mgr_bin))
+
+        # the autodetection should still work through ENV_PATH
+        driver.env_path = None
+        self.assertEqual(normcase(driver.which()), normcase(mgr_bin))
 
     def test_set_env_path_with_node_modules_fail(self):
         stub_os_environ(self)
@@ -475,10 +492,7 @@ class CliDriverTestCase(unittest.TestCase):
         # fake an executable in node_modules
         bin_dir = join(tmpdir, 'node_modules', '.bin')
         os.makedirs(bin_dir)
-        mgr_bin = join(bin_dir, 'mgr')
-        with open(mgr_bin, 'w'):
-            pass
-        os.chmod(mgr_bin, 0o777)
+        self.create_fake_mgr_bin(bin_dir)
         return tmpdir, bin_dir
 
     def test_set_env_path_with_node_modules_success(self):

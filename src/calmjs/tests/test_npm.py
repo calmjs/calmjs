@@ -16,6 +16,7 @@ from calmjs import npm
 from calmjs import cli
 from calmjs import dist
 from calmjs.utils import pretty_logging
+from calmjs.utils import which
 
 from calmjs.testing.mocks import StringIO
 from calmjs.testing.utils import mkdtemp
@@ -27,6 +28,8 @@ from calmjs.testing.utils import stub_mod_check_interactive
 from calmjs.testing.utils import stub_os_environ
 from calmjs.testing.utils import stub_stdin
 from calmjs.testing.utils import stub_stdouts
+
+which_npm = which('npm')
 
 
 class NpmTestCase(unittest.TestCase):
@@ -47,7 +50,7 @@ class NpmTestCase(unittest.TestCase):
             self.assertIsNone(npm.get_npm_version())
             self.assertIn("failed to execute 'npm'", stderr.getvalue())
 
-    @unittest.skipIf(npm.get_npm_version() is None, 'npm not found.')
+    @unittest.skipIf(which_npm is None, 'npm not found.')
     def test_npm_version_get(self):
         version = npm.get_npm_version()
         self.assertTrue(isinstance(version, tuple))
@@ -869,7 +872,7 @@ class DistCommandTestCase(unittest.TestCase):
         })
         self.assertEqual(self.call_args, ((['npm', 'install'],), {}))
 
-    @unittest.skipIf(npm.get_npm_version() is None, 'npm not found.')
+    @unittest.skipIf(which_npm is None, 'npm not found.')
     def test_npm_bin_get(self):
         # also test that the cli_driver can actually run...
         bin_dir, stderr = npm.npm.cli_driver.run(['bin'])

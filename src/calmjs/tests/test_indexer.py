@@ -5,6 +5,7 @@ from os.path import abspath
 from os.path import join
 from os.path import pardir
 from os.path import relpath
+from os.path import sep
 
 from types import ModuleType
 
@@ -13,6 +14,11 @@ from calmjs.utils import pretty_logging
 
 from calmjs.testing.utils import make_multipath_module3
 from calmjs.testing.mocks import StringIO
+
+
+def to_os_sep_path(p):
+    # turn the given / separated path into an os specific path
+    return sep.join(p.split('/'))
 
 
 class IndexerTestCase(unittest.TestCase):
@@ -61,7 +67,8 @@ class IndexerTestCase(unittest.TestCase):
         from calmjs.testing import module3
         result = indexer.modpath_pkg_resources(module3)
         self.assertEqual(len(result), 1)
-        self.assertTrue(result[0].endswith('calmjs/testing/module3'))
+        self.assertTrue(result[0].endswith(
+            to_os_sep_path('calmjs/testing/module3')))
 
     def test_get_modpath_pkg_resources_invalid(self):
         with pretty_logging(stream=StringIO()) as fd:
@@ -84,7 +91,8 @@ class IndexerTestCase(unittest.TestCase):
             for k, v in indexer.mapper_es6(module1).items()
         }
         self.assertEqual(results, {
-            'calmjs/testing/module1/hello': 'calmjs/testing/module1/hello.js',
+            'calmjs/testing/module1/hello':
+                to_os_sep_path('calmjs/testing/module1/hello.js'),
         })
 
     def test_module1_loader_python(self):
@@ -96,7 +104,8 @@ class IndexerTestCase(unittest.TestCase):
             for k, v in indexer.mapper_python(module1).items()
         }
         self.assertEqual(results, {
-            'calmjs.testing.module1.hello': 'calmjs/testing/module1/hello.js',
+            'calmjs.testing.module1.hello':
+                to_os_sep_path('calmjs/testing/module1/hello.js'),
         })
 
     def test_module2_recursive_es6(self):
@@ -109,11 +118,11 @@ class IndexerTestCase(unittest.TestCase):
         }
         self.assertEqual(results, {
             'calmjs/testing/module2/index':
-                'calmjs/testing/module2/index.js',
+                to_os_sep_path('calmjs/testing/module2/index.js'),
             'calmjs/testing/module2/helper':
-                'calmjs/testing/module2/helper.js',
+                to_os_sep_path('calmjs/testing/module2/helper.js'),
             'calmjs/testing/module2/mod/helper':
-                'calmjs/testing/module2/mod/helper.js',
+                to_os_sep_path('calmjs/testing/module2/mod/helper.js'),
         })
 
     def test_module3_multi_path(self):

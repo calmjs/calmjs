@@ -37,6 +37,20 @@ def fake_error(exception):
     return stub
 
 
+def create_fake_bin(path, name):
+    """
+    Create a fake executable with name at path.  For windows we will
+    need a valid PATHEXT; typically .exe will suffice.
+    """
+
+    fn = name if sys.platform != 'win32' else name + '.exe'
+    target = join(path, fn)
+    with open(target, 'w'):
+        pass
+    os.chmod(target, 0o777)
+    return target
+
+
 def generate_integration_environment(
         working_dir, registry_id='calmjs.module.simulated',
         pkgman_filename='package.json', extras_calmjs_key='fake_modules'):
@@ -336,7 +350,10 @@ def mkdtemp(testcase_inst):
             'unittest2.' % testcase_inst)
 
     def cleanup(tmpdir):
+        cwd = os.getcwd()
         if exists(tmpdir):
+            if cwd.startswith(tmpdir):
+                os.chdir(join(tmpdir, os.path.pardir))
             rmtree(tmpdir)
 
     # create the temporary dir and add the cleanup for that immediately.

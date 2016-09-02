@@ -9,6 +9,7 @@ from pkg_resources import Requirement
 import os
 from os.path import exists
 from os.path import join
+from os.path import normcase
 from shutil import rmtree
 
 from calmjs.testing import utils
@@ -122,6 +123,13 @@ class TestingUtilsTestCase(unittest.TestCase):
         self.assertFalse(exists(new_target))
         self.assertFalse(hasattr(self, '_calmjs_testing_tmpdir'))
 
+    def test_create_fake_bin(self):
+        path = mkdtemp(self)
+        program = utils.create_fake_bin(path, 'program')
+        self.assertTrue(exists(program))
+        self.assertIn('program', program)
+        # Further, more actual testing will be done in test modules
+
     def tests_make_dummy_dist(self):
         target = make_dummy_dist(  # noqa: F841
             self, (
@@ -177,11 +185,30 @@ class TestingUtilsTestCase(unittest.TestCase):
         self.assertEqual(distributions[1].requires(), [
             Requirement.parse('parentpkg>=0.8')])
 
-    def test_remember_cwd(self):
+    # both of these incidentally will test mkdtemp's behavior with chdir
+    # inside windows, too.
+
+    def test_remember_cwd_mkdtemp(self):
+        cwd = os.getcwd()
+        # must be done in this order as the cleanups are done FILO.
+        utils.remember_cwd(self)
+        tmpdir = mkdtemp(self)
+        # this will mean that cwd would normally be in tmpdir before
+        # the cwd cleanup gets called.
+        os.chdir(tmpdir)
+        self.assertNotEqual(cwd, os.getcwd())
+        self.doCleanups()
+        self.assertEqual(cwd, os.getcwd())
+
+    def test_remember_cwd_mkdtemp_chdir_deep(self):
         cwd = os.getcwd()
         utils.remember_cwd(self)
-        os.chdir(mkdtemp(self))
+        tmpdir = mkdtemp(self)
+        newdir = join(tmpdir, 'some', 'nested', 'dir')
+        os.makedirs(newdir)
+        os.chdir(newdir)
         self.assertNotEqual(cwd, os.getcwd())
+
         self.doCleanups()
         self.assertEqual(cwd, os.getcwd())
 
@@ -282,16 +309,16 @@ class IntegrationGeneratorTestCase(unittest.TestCase):
         self.assertEqual(len(service_records), 2)
         self.assertTrue(exists(service_records['service/rpc/lib']))
         self.assertTrue(service_records['service/rpc/lib'].endswith(
-            '/service/rpc/lib.js'))
+            join('service', 'rpc', 'lib.js')))
         self.assertTrue(service_records['service/rpc/lib'].startswith(tmpdir))
         self.assertTrue(service_records['service/endpoint'].endswith(
-            '/service/endpoint.js'))
+            join('service', 'endpoint.js')))
         self.assertTrue(service_records['service/endpoint'].startswith(tmpdir))
 
         # Test out the working set
         framework_dist = working_set.find(Requirement.parse('framework'))
         self.assertEqual(framework_dist.project_name, 'framework')
-        self.assertEqual(framework_dist.location, tmpdir)
+        self.assertEqual(normcase(framework_dist.location), normcase(tmpdir))
 
         self.assertTrue(exists(
             join(tmpdir, 'fake_modules', 'jquery', 'dist', 'jquery.js')))
