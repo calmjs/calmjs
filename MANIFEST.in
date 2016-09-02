@@ -1,0 +1,5 @@
+recursive-include src *
+recursive-include docs *.txt
+recursive-include docs *.rst
+include *.txt
+include *.rst
