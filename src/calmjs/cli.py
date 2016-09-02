@@ -655,7 +655,7 @@ class PackageManagerDriver(NodeDriver):
             cmd = [self._get_exec_binary(call_kw), self.install_cmd]
             cmd.extend(args)
             call(cmd, **call_kw)
-        except (IOError, OSError) as e:
+        except (IOError, OSError):
             logger.error(
                 "invocation of the '%s' binary failed; please ensure it and "
                 "its dependencies are installed and available.", self.binary

@@ -73,12 +73,14 @@ class WhichTestCase(unittest.TestCase):
     # ensure the right error is raised for the running python version
 
     def test_raise_os_error_file_not_found(self):
-        e = OSError if sys.version_info < (3, 0) else FileNotFoundError
+        e = OSError if sys.version_info < (
+            3, 0) else FileNotFoundError  # noqa: F821
         with self.assertRaises(e):
             raise_os_error(errno.ENOENT)
 
     def test_raise_os_error_not_dir(self):
-        e = OSError if sys.version_info < (3, 0) else NotADirectoryError
+        e = OSError if sys.version_info < (
+            3, 0) else NotADirectoryError  # noqa: F821
         with self.assertRaises(e):
             raise_os_error(errno.ENOTDIR)
 
