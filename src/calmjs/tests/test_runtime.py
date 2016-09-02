@@ -13,6 +13,7 @@ from calmjs import cli
 from calmjs import dist
 from calmjs import runtime
 from calmjs.utils import pretty_logging
+from calmjs.utils import which
 
 from calmjs.testing import mocks
 from calmjs.testing.utils import fake_error
@@ -20,9 +21,12 @@ from calmjs.testing.utils import make_dummy_dist
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import remember_cwd
 from calmjs.testing.utils import stub_item_attr_value
+from calmjs.testing.utils import stub_base_which
 from calmjs.testing.utils import stub_mod_call
 from calmjs.testing.utils import stub_mod_check_interactive
 from calmjs.testing.utils import stub_stdouts
+
+which_npm = which('npm')
 
 
 class BaseRuntimeTestCase(unittest.TestCase):
@@ -416,6 +420,7 @@ class RuntimeIntegrationTestCase(unittest.TestCase):
         tmpdir = mkdtemp(self)
         os.chdir(tmpdir)
         stub_mod_call(self, cli)
+        stub_base_which(self, which_npm)
         rt = self.setup_runtime()
         rt(['foo', '--install', 'example.package1', 'example.package2'])
 
@@ -426,7 +431,7 @@ class RuntimeIntegrationTestCase(unittest.TestCase):
         self.assertEqual(result['dependencies']['underscore'], '~1.8.3')
         # not foo install, but npm install since entry point specified
         # the actual runtime instance.
-        self.assertEqual(self.call_args, ((['npm', 'install'],), {}))
+        self.assertEqual(self.call_args, (([which_npm, 'install'],), {}))
 
     def test_npm_view(self):
         stub_stdouts(self)
@@ -474,6 +479,7 @@ class RuntimeIntegrationTestCase(unittest.TestCase):
         os.chdir(tmpdir)
         stub_stdouts(self)
         stub_mod_call(self, cli)
+        stub_base_which(self, which_npm)
         rt = self.setup_runtime()
         rt(['foo', '--install', '--view', '--init',
             'example.package1', 'example.package2'])
@@ -490,7 +496,7 @@ class RuntimeIntegrationTestCase(unittest.TestCase):
         self.assertEqual(result['dependencies']['underscore'], '~1.8.3')
         # not foo install, but npm install since entry point specified
         # the actual runtime instance.
-        self.assertEqual(self.call_args, ((['npm', 'install'],), {}))
+        self.assertEqual(self.call_args, (([which_npm, 'install'],), {}))
 
     def test_npm_verbose_quiet(self):
         remember_cwd(self)

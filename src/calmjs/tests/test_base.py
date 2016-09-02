@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import unittest
 import os
+from os.path import normcase
 
 from pkg_resources import EntryPoint
 from pkg_resources import Distribution
@@ -9,6 +10,7 @@ from calmjs import base
 from calmjs.utils import pretty_logging
 from calmjs.testing import mocks
 from calmjs.testing.utils import mkdtemp
+from calmjs.testing.utils import create_fake_bin
 
 
 class DummyModuleRegistry(base.BaseModuleRegistry):
@@ -197,6 +199,16 @@ class BaseDriverClassTestCase(unittest.TestCase):
         driver = base.BaseDriver()
         # no binary, no nothing.
         self.assertIsNone(driver.which())
+
+    def test_get_exec_binary_no_binary(self):
+        with self.assertRaises(OSError):
+            base._get_exec_binary('no_such_binary_hopefully', {})
+
+    def test_get_exec_binary_with_binary(self):
+        tmpdir = mkdtemp(self)
+        prog = create_fake_bin(tmpdir, 'prog')
+        self.assertEqual(normcase(prog), normcase(base._get_exec_binary(
+            'prog', {'env': {'PATH': tmpdir}})))
 
     def test_set_env_path_with_node_modules_undefined(self):
         driver = base.BaseDriver()

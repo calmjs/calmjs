@@ -31,6 +31,7 @@ from calmjs.dist import DEP_KEYS
 
 from calmjs.base import NODE
 from calmjs.base import BaseDriver
+from calmjs.base import _get_exec_binary
 
 __all__ = [
     'NodeDriver',
@@ -51,8 +52,9 @@ lower = str.lower
 
 def _get_bin_version(bin_path, version_flag='-v', kw={}):
     try:
+        prog = _get_exec_binary(bin_path, kw)
         version_str = version_expr.search(
-            check_output([bin_path, version_flag], **kw).decode(locale)
+            check_output([prog, version_flag], **kw).decode(locale)
         ).groups()[0]
         version = tuple(int(i) for i in version_str.split('.'))
     except OSError:
@@ -649,11 +651,11 @@ class PackageManagerDriver(NodeDriver):
         if self.working_dir:
             logger.debug(
                 "invoked from working directory '%s'", self.working_dir)
-        cmd = [self.pkg_manager_bin, self.install_cmd]
-        cmd.extend(args)
         try:
+            cmd = [self._get_exec_binary(call_kw), self.install_cmd]
+            cmd.extend(args)
             call(cmd, **call_kw)
-        except IOError:
+        except (IOError, OSError) as e:
             logger.error(
                 "invocation of the '%s' binary failed; please ensure it and "
                 "its dependencies are installed and available.", self.binary
@@ -669,7 +671,8 @@ class PackageManagerDriver(NodeDriver):
         by locale.
         """
 
-        return self._exec(self.pkg_manager_bin, args=args, env=env)
+        # the following will call self._get_exec_binary
+        return self._exec(self.binary, args=args, env=env)
 
 
 _inst = NodeDriver()

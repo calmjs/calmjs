@@ -9,6 +9,7 @@ framework will inherit/extend from.
 from __future__ import absolute_import
 import os
 
+import errno
 import json
 from os import getcwd
 from os.path import dirname
@@ -22,6 +23,7 @@ from pkg_resources import working_set
 
 from calmjs.utils import which
 from calmjs.utils import fork_exec
+from calmjs.utils import raise_os_error
 
 NODE_PATH = 'NODE_PATH'
 NODE = 'node'
@@ -39,6 +41,25 @@ def _check_isdir_assign_key(d, key, value, error_msg=None):
             "not manually setting '%s' to '%s' as it not a directory%s",
             key, value, extra_info
         )
+
+
+def _get_exec_binary(binary, kw):
+    """
+    On win32, the subprocess module can only reliably resolve the
+    target binary if it's actually a binary; as for a Node.js script
+    it seems to only work iff shell=True was specified, presenting
+    a security risk.  Resolve the target manually through which will
+    account for that.
+
+    The kw argument is the keyword arguments that will be passed into
+    whatever respective subprocess.Popen family of methods.  The PATH
+    environment variable will be used if available.
+    """
+
+    binary = which(binary, path=kw.get('env', {}).get('PATH'))
+    if binary is None:
+        raise_os_error(errno.ENOENT)
+    return binary
 
 
 class BaseRegistry(object):
@@ -354,6 +375,16 @@ class BaseDriver(object):
             kw['env'] = env
         return kw
 
+    def _get_exec_binary(self, kw):
+        """
+        This wraps the base function for BaseDriver classes; should only
+        be called by this instance's external execution methods as they
+        will be also invoke _gen_call_kws to pass into the call_kw
+        argument.
+        """
+
+        return _get_exec_binary(self.binary, kw)
+
     def _exec(self, binary, stdin='', args=(), env={}):
         """
         Executes the binary using stdin and args with environment
@@ -365,7 +396,7 @@ class BaseDriver(object):
         """
 
         call_kw = self._gen_call_kws(**env)
-        call_args = [binary]
+        call_args = [self._get_exec_binary(call_kw)]
         call_args.extend(args)
         return fork_exec(call_args, stdin, **call_kw)
 

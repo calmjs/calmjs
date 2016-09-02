@@ -24,6 +24,7 @@ from calmjs.testing.utils import fake_error
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import remember_cwd
 from calmjs.testing.utils import stub_item_attr_value
+from calmjs.testing.utils import stub_base_which
 from calmjs.testing.utils import stub_mod_call
 from calmjs.testing.utils import stub_mod_check_output
 from calmjs.testing.utils import stub_os_environ
@@ -232,12 +233,14 @@ class CliDriverTestCase(unittest.TestCase):
 
     def test_get_bin_version_long(self):
         stub_mod_check_output(self, cli)
+        stub_base_which(self)
         self.check_output_answer = b'Some app v.1.2.3.4. All rights reserved'
         results = cli._get_bin_version('some_app')
         self.assertEqual(results, (1, 2, 3, 4))
 
     def test_get_bin_version_longer(self):
         stub_mod_check_output(self, cli)
+        stub_base_which(self)
         # tags are ignored for now.
         self.check_output_answer = b'version.11.200.345.4928-what'
         results = cli._get_bin_version('some_app')
@@ -245,12 +248,14 @@ class CliDriverTestCase(unittest.TestCase):
 
     def test_get_bin_version_short(self):
         stub_mod_check_output(self, cli)
+        stub_base_which(self)
         self.check_output_answer = b'1'
         results = cli._get_bin_version('some_app')
         self.assertEqual(results, (1,))
 
     def test_get_bin_version_unexpected(self):
         stub_mod_check_output(self, cli)
+        stub_base_which(self)
         self.check_output_answer = b'Nothing'
         with pretty_logging(stream=mocks.StringIO()) as err:
             results = cli._get_bin_version('some_app')
@@ -261,6 +266,7 @@ class CliDriverTestCase(unittest.TestCase):
 
     def test_get_bin_version_no_bin(self):
         stub_mod_check_output(self, cli, fake_error(OSError))
+        stub_base_which(self)
         with pretty_logging(stream=mocks.StringIO()) as err:
             results = cli._get_bin_version('some_app')
         self.assertIn("failed to execute 'some_app'", err.getvalue())
@@ -275,6 +281,7 @@ class CliDriverTestCase(unittest.TestCase):
 
     def test_node_version_mocked(self):
         stub_mod_check_output(self, cli)
+        stub_base_which(self)
         self.check_output_answer = b'v0.10.25'
         version = cli.get_node_version()
         self.assertEqual(version, (0, 10, 25))
@@ -306,8 +313,16 @@ class CliDriverTestCase(unittest.TestCase):
         stdout, stderr = cli.node(b'process.stdout.write("Hello World!");')
         self.assertEqual(stdout, b'Hello World!')
 
+    # Note that for the following tests with the mock 'mgr' binary, both
+    # call calmjs.cli and calmjs.base.which are stubbed.  This is due to
+    # how the _exec method uses the which function to locate the binary,
+    # and as mgr is not there it will fail.  The alternative is to keep
+    # creating a dummy binary, but the tests for those are already done
+    # so we can skip that for with mocks for the following tests.
+
     def test_helper_attr(self):
         stub_mod_call(self, cli)
+        stub_base_which(self)
         driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
         with self.assertRaises(AttributeError) as e:
             driver.no_such_attr_here
@@ -323,6 +338,7 @@ class CliDriverTestCase(unittest.TestCase):
 
     def test_install_failure(self):
         stub_mod_call(self, cli, fake_error(IOError))
+        stub_base_which(self)
         driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
         with pretty_logging(stream=mocks.StringIO()) as stderr:
             with self.assertRaises(IOError):
@@ -332,6 +348,7 @@ class CliDriverTestCase(unittest.TestCase):
 
     def test_install_arguments(self):
         stub_mod_call(self, cli)
+        stub_base_which(self)
         driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
         with pretty_logging(stream=mocks.StringIO()):
             driver.pkg_manager_install(args=('--pedantic',))
@@ -340,6 +357,7 @@ class CliDriverTestCase(unittest.TestCase):
 
     def test_alternative_install_cmd(self):
         stub_mod_call(self, cli)
+        stub_base_which(self)
         driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', install_cmd='sync')
         with pretty_logging(stream=mocks.StringIO()) as stderr:
@@ -361,6 +379,7 @@ class CliDriverTestCase(unittest.TestCase):
 
     def test_install_other_environ(self):
         stub_mod_call(self, cli)
+        stub_base_which(self)
         driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
         with pretty_logging(stream=mocks.StringIO()):
             driver.pkg_manager_install(env={'MGR_ENV': 'production'})
@@ -370,6 +389,7 @@ class CliDriverTestCase(unittest.TestCase):
 
     def test_set_node_path(self):
         stub_mod_call(self, cli)
+        stub_base_which(self)
         node_path = mkdtemp(self)
         driver = cli.PackageManagerDriver(
             node_path=node_path, pkg_manager_bin='mgr')
@@ -395,6 +415,7 @@ class CliDriverTestCase(unittest.TestCase):
     def test_predefined_path(self):
         # ensure that the various paths are passed to env or cwd.
         stub_mod_call(self, cli)
+        stub_base_which(self)
         somepath = mkdtemp(self)
         cwd = mkdtemp(self)
         driver = cli.PackageManagerDriver(
@@ -407,6 +428,7 @@ class CliDriverTestCase(unittest.TestCase):
 
     def test_env_path_not_exist(self):
         stub_mod_call(self, cli)
+        stub_base_which(self)
         bad_path = '/no/such/path/for/sure/at/here'
         driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', env_path=bad_path)
@@ -417,6 +439,7 @@ class CliDriverTestCase(unittest.TestCase):
 
     def test_paths_unset(self):
         stub_mod_call(self, cli)
+        stub_base_which(self)
         driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
         with pretty_logging(stream=mocks.StringIO()):
             driver.pkg_manager_install()
@@ -426,6 +449,7 @@ class CliDriverTestCase(unittest.TestCase):
 
     def test_working_dir_set(self):
         stub_mod_call(self, cli)
+        stub_base_which(self)
         some_cwd = mkdtemp(self)
         driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', working_dir=some_cwd)
@@ -437,6 +461,7 @@ class CliDriverTestCase(unittest.TestCase):
 
     def test_set_binary(self):
         stub_mod_call(self, cli)
+        stub_base_which(self)
         driver = cli.PackageManagerDriver(pkg_manager_bin='bower')
         # this will call ``bower install`` instead.
         with pretty_logging(stream=mocks.StringIO()) as fd:

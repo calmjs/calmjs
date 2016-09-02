@@ -23,6 +23,7 @@ from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import make_dummy_dist
 from calmjs.testing.utils import remember_cwd
 from calmjs.testing.utils import stub_item_attr_value
+from calmjs.testing.utils import stub_base_which
 from calmjs.testing.utils import stub_mod_call
 from calmjs.testing.utils import stub_mod_check_interactive
 from calmjs.testing.utils import stub_os_environ
@@ -56,8 +57,14 @@ class NpmTestCase(unittest.TestCase):
         self.assertTrue(isinstance(version, tuple))
         self.assertGreater(len(version), 0)
 
+    # For a number of the following tests, the which function in the
+    # calmjs.base module will be stubbed out to return the initial
+    # response we got above with the real function, to better mimic the
+    # expected output.
+
     def test_npm_install_package_json(self):
         stub_mod_call(self, cli)
+        stub_base_which(self, which_npm)
         tmpdir = mkdtemp(self)
         os.chdir(tmpdir)
 
@@ -68,7 +75,7 @@ class NpmTestCase(unittest.TestCase):
                 "no package name supplied, "
                 "but continuing with 'npm install'", stderr.getvalue())
         # However we make sure that it's been fake called
-        self.assertEqual(self.call_args, ((['npm', 'install'],), {}))
+        self.assertEqual(self.call_args, (([which_npm, 'install'],), {}))
         self.assertFalse(exists(join(tmpdir, 'package.json')))
 
     def test_npm_install_package_json_no_overwrite_interactive(self):
@@ -753,6 +760,7 @@ class DistCommandTestCase(unittest.TestCase):
     def test_install_no_init(self):
         # install implies init
         stub_mod_call(self, cli)
+        stub_base_which(self, which_npm)
         tmpdir = mkdtemp(self)
         os.chdir(tmpdir)
         dist = Distribution(dict(
@@ -773,10 +781,11 @@ class DistCommandTestCase(unittest.TestCase):
             'devDependencies': {},
             'name': 'foo',
         })
-        self.assertEqual(self.call_args, ((['npm', 'install'],), {}))
+        self.assertEqual(self.call_args, (([which_npm, 'install'],), {}))
 
     def test_install_init_install(self):
         stub_mod_call(self, cli)
+        stub_base_which(self, which_npm)
         tmpdir = mkdtemp(self)
         os.chdir(tmpdir)
         dist = Distribution(dict(
@@ -796,7 +805,7 @@ class DistCommandTestCase(unittest.TestCase):
             'name': 'foo',
         })
         # Should still invoke install
-        self.assertEqual(self.call_args, ((['npm', 'install'],), {}))
+        self.assertEqual(self.call_args, (([which_npm, 'install'],), {}))
 
     def test_install_no_init_has_package_json_interactive_default_input(self):
         stub_stdin(self, u'')
@@ -852,6 +861,7 @@ class DistCommandTestCase(unittest.TestCase):
 
     def test_install_view(self):
         stub_mod_call(self, cli)
+        stub_base_which(self, which_npm)
         tmpdir = mkdtemp(self)
         os.chdir(tmpdir)
         dist = Distribution(dict(
@@ -870,7 +880,7 @@ class DistCommandTestCase(unittest.TestCase):
             'devDependencies': {},
             'name': 'foo',
         })
-        self.assertEqual(self.call_args, ((['npm', 'install'],), {}))
+        self.assertEqual(self.call_args, (([which_npm, 'install'],), {}))
 
     @unittest.skipIf(which_npm is None, 'npm not found.')
     def test_npm_bin_get(self):
