@@ -135,10 +135,10 @@ Well-defined modular architecture to ensure code reuse and extensibility
 
     In fact, |calmjs| out of the box only ships with just the core
     framework plus the |npm| interfacing part, with the support for
-    tools like `Bower`_ or |r.js|_ as completely separate packages (in
-    |calmjs.bower|_ and |calmjs.rjs|_ respectively) such that projects,
-    environments or sites that do not need those functionality can
-    simply not have them installed.
+    tools like `Bower`_ or |r.js|_ as completely separate packages (as
+    |calmjs.bower|_ and |calmjs.rjs|_ respectively), such that projects,
+    environments or sites that do not need the functionality those
+    packages provide can simply opt to not have them installed.
 
 
 Installation
@@ -167,8 +167,15 @@ Alternatively, the git repository can be cloned directly and execute
 ``python setup.py develop`` while inside the root of the source
 directory.
 
-Testing
-~~~~~~~
+As |calmjs| is declared as both a namespace and a package, mixing
+installation methods as described above when installing with other
+|calmjs| packages may result in the module importer being unable to look
+up the target files.  If such an error does arise please remove all
+modules and only stick with a single installation method for all
+packages within the |calmjs| namespace.
+
+Testing the installation
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 To ensure that the |calmjs| installation is functioning correctly, the
 built-in testsuite can be executed by the following:
