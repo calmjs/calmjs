@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import unittest
+import errno
 import io
 import logging
 import os
@@ -10,6 +11,7 @@ import sys
 from calmjs.utils import which
 from calmjs.utils import enable_pretty_logging
 from calmjs.utils import pretty_logging
+from calmjs.utils import raise_os_error
 
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import stub_os_environ
@@ -67,6 +69,18 @@ class WhichTestCase(unittest.TestCase):
         self.assertEqual(which('binary', path=tempdir), f)
         self.assertEqual(which('binary.exe', path=tempdir), f)
         self.assertIsNone(which('binary.com', path=tempdir))
+
+    # ensure the right error is raised for the running python version
+
+    def test_raise_os_error_file_not_found(self):
+        e = OSError if sys.version_info < (3, 0) else FileNotFoundError
+        with self.assertRaises(e):
+            raise_os_error(errno.ENOENT)
+
+    def test_raise_os_error_not_dir(self):
+        e = OSError if sys.version_info < (3, 0) else NotADirectoryError
+        with self.assertRaises(e):
+            raise_os_error(errno.ENOTDIR)
 
 
 class LoggingTestCase(unittest.TestCase):

@@ -11,6 +11,7 @@ import os
 import sys
 from contextlib import contextmanager
 from locale import getpreferredencoding
+from os import strerror
 from os.path import curdir
 from os.path import defpath
 from os.path import normcase
@@ -65,6 +66,15 @@ def fork_exec(args, stdin='', **kwargs):
     if as_bytes:
         return stdout, stderr
     return (stdout.decode(locale), stderr.decode(locale))
+
+
+def raise_os_error(_errno):
+    """
+    Helper for raising the correct exception under Python 3 while still
+    being able to raise the same common exception class in Python 2.7.
+    """
+
+    raise OSError(_errno, strerror(_errno))
 
 
 def which(cmd, mode=os.F_OK | os.X_OK, path=None):

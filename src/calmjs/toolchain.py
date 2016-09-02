@@ -32,12 +32,11 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import codecs
+import errno
 import logging
 import shutil
-import errno
 from os import mkdir
 from os import makedirs
-from os import strerror
 from os.path import join
 from os.path import dirname
 from os.path import exists
@@ -47,17 +46,9 @@ from os.path import realpath
 from tempfile import mkdtemp
 
 from calmjs.base import BaseDriver
+from calmjs.utils import raise_os_error
 
 logger = logging.getLogger(__name__)
-
-
-def raise_os_error(_errno):
-    """
-    Helper for raising the correct exception under Python 3 while still
-    being able to raise the same common exception class in Python 2.7.
-    """
-
-    raise OSError(_errno, strerror(_errno))
 
 
 def _opener(*a):
