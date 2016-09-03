@@ -25,12 +25,15 @@ locale = getpreferredencoding()
 # sys.platform have required keys for environment variables for Popen
 _PLATFORM_ENV_KEYS = {
     # win32 specific keys
+    # PATH
+    #    Well, if it's not available, funnily enough even with a full
+    #    path executable things will just also not work.
     # PATHEXT
     #    For cases where supplied argument has no PATHEXT
     # SYSTEMROOT
     #    Without this, on Windows 7 (probably others) will just result
     #    in "socket: (10106)" error.
-    'win32': ['PATHEXT', 'SYSTEMROOT'],
+    'win32': ['PATH', 'PATHEXT', 'SYSTEMROOT'],
 }
 
 
