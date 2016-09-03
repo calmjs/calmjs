@@ -22,6 +22,17 @@ from subprocess import PIPE
 
 locale = getpreferredencoding()
 
+# sys.platform have required keys for environment variables for Popen
+_PLATFORM_ENV_KEYS = {
+    # win32 specific keys
+    # PATHEXT
+    #    For cases where supplied argument has no PATHEXT
+    # SYSTEMROOT
+    #    Without this, on Windows 7 (probably others) will just result
+    #    in "socket: (10106)" error.
+    'win32': ['PATHEXT', 'SYSTEMROOT'],
+}
+
 
 def enable_pretty_logging(logger='calmjs', level=logging.DEBUG, stream=None):
     """
@@ -53,10 +64,25 @@ def pretty_logging(logger='calmjs', level=logging.DEBUG, stream=None):
         cleanup()
 
 
+def finalize_env(env):
+    """
+    Produce a platform specific env for passing into subprocess.Popen
+    family of external process calling methods, and the supplied env
+    will be updated on top of it.  Returns a new env.
+    """
+
+    keys = _PLATFORM_ENV_KEYS.get(sys.platform, ())
+    results = {
+        key: os.environ.get(key, '') for key in keys
+    }
+    results.update(env)
+    return results
+
+
 def fork_exec(args, stdin='', **kwargs):
     """
     Do a fork-exec through the subprocess.Popen abstraction in a way
-    that takes a stadin and return stdout.
+    that takes a stdin and return stdout.
     """
 
     as_bytes = isinstance(stdin, bytes)
