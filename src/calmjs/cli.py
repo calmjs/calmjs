@@ -370,7 +370,7 @@ class PackageManagerDriver(NodeDriver):
                 "explicitly defined arguments." % {
                     'binary': inst.binary,
                     'PATH': 'PATH',
-                    'NODE_PATH': inst.node_path,
+                    'NODE_PATH': 'NODE_PATH',
                     'cwd': inst.join_cwd(),
                 }
             )
