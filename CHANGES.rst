@@ -1,6 +1,11 @@
 Changelog
 =========
 
+1.0.1 (2016-09-04)
+------------------
+
+- Fixed invocation of binaries on the Windows platform.
+
 1.0.0 (2016-09-02)
 ------------------
 
