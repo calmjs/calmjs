@@ -10,6 +10,8 @@ import sys
 
 from calmjs.utils import which
 from calmjs.utils import enable_pretty_logging
+from calmjs.utils import finalize_env
+from calmjs.utils import fork_exec
 from calmjs.utils import pretty_logging
 from calmjs.utils import raise_os_error
 
@@ -53,7 +55,7 @@ class WhichTestCase(unittest.TestCase):
         os.environ['PATH'] = ''
         self.assertEqual(which('binary', path=tempdir), f)
 
-    def test_found_nt(self):
+    def test_found_win32(self):
         sys.platform = 'win32'
         tempdir = os.environ['PATH'] = mkdtemp(self)
         os.environ['PATHEXT'] = pathsep.join(('.com', '.exe', '.bat'))
@@ -69,6 +71,41 @@ class WhichTestCase(unittest.TestCase):
         self.assertEqual(which('binary', path=tempdir), f)
         self.assertEqual(which('binary.exe', path=tempdir), f)
         self.assertIsNone(which('binary.com', path=tempdir))
+
+    def test_finalize_env_others(self):
+        self.assertEqual(finalize_env({}), {})
+
+    def test_finalize_env_win32(self):
+        sys.platform = 'win32'
+
+        # when os.environ is empty or missing the required keys, the
+        # values will be empty strings.
+        os.environ = {}
+        self.assertEqual(finalize_env({}), {'PATHEXT': '', 'SYSTEMROOT': ''})
+
+        # should be identical with the keys copied
+        os.environ['PATHEXT'] = pathsep.join(('.com', '.exe', '.bat'))
+        os.environ['SYSTEMROOT'] = 'C:\\Windows'
+        self.assertEqual(finalize_env({}), os.environ)
+
+    # This test is done with conjunction with finalize_env to mimic how
+    # this is typically used within the rest of the library.
+
+    def test_fork_exec_bytes(self):
+        stdout, stderr = fork_exec(
+            [sys.executable, '-c', 'import sys;print(sys.stdin.read())'],
+            stdin=b'hello',
+            env=finalize_env({}),
+        )
+        self.assertEqual(stdout, b'hello\n')
+
+    def test_fork_exec_str(self):
+        stdout, stderr = fork_exec(
+            [sys.executable, '-c', 'import sys;print(sys.stdin.read())'],
+            stdin=u'hello',
+            env=finalize_env({}),
+        )
+        self.assertEqual(stdout, u'hello\n')
 
     # ensure the right error is raised for the running python version
 

@@ -22,6 +22,7 @@ from logging import getLogger
 from pkg_resources import working_set
 
 from calmjs.utils import which
+from calmjs.utils import finalize_env
 from calmjs.utils import fork_exec
 from calmjs.utils import raise_os_error
 
@@ -372,7 +373,7 @@ class BaseDriver(object):
                 kw, 'cwd', self.working_dir,
                 error_msg="current working directory left as default")
         if env:
-            kw['env'] = env
+            kw['env'] = finalize_env(env)
         return kw
 
     def _get_exec_binary(self, kw):
