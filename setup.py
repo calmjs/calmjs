@@ -1,7 +1,7 @@
 from setuptools import setup
 from setuptools import find_packages
 
-version = '1.0.1'
+version = '1.0.2'
 
 classifiers = """
 Development Status :: 5 - Production/Stable
@@ -21,7 +21,10 @@ setup(
     name='calmjs',
     version=version,
     description="Toolchain for deploying JavaScript with Python modules.",
-    long_description=open('README.rst').read(),
+    long_description=(
+        open('README.rst').read() + "\n" +
+        open('CHANGES.rst').read()
+    ),
     classifiers=classifiers,
     keywords='',
     author='Tommy Yu',
