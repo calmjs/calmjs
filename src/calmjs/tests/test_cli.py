@@ -16,6 +16,7 @@ import warnings
 from calmjs import cli
 from calmjs import dist
 from calmjs.utils import pretty_logging
+from calmjs.utils import finalize_env
 from calmjs.utils import which
 from calmjs.testing import mocks
 from calmjs.testing.mocks import MockProvider
@@ -384,7 +385,7 @@ class CliDriverTestCase(unittest.TestCase):
         with pretty_logging(stream=mocks.StringIO()):
             driver.pkg_manager_install(env={'MGR_ENV': 'production'})
         self.assertEqual(self.call_args, ((['mgr', 'install'],), {
-            'env': {'MGR_ENV': 'production'},
+            'env': finalize_env({'MGR_ENV': 'production'}),
         }))
 
     def test_set_node_path(self):
@@ -398,7 +399,7 @@ class CliDriverTestCase(unittest.TestCase):
         with pretty_logging(stream=mocks.StringIO()):
             driver.pkg_manager_install()
         self.assertEqual(self.call_args, ((['mgr', 'install'],), {
-            'env': {'NODE_PATH': node_path},
+            'env': finalize_env({'NODE_PATH': node_path}),
         }))
 
         # will be overridden by instance settings.
@@ -409,7 +410,8 @@ class CliDriverTestCase(unittest.TestCase):
                 'NODE_PATH': '/tmp/somewhere/else/node_mods',
             })
         self.assertEqual(self.call_args, ((['mgr', 'install'],), {
-            'env': {'NODE_PATH': node_path, 'MGR_ENV': 'dev', 'PATH': '.'},
+            'env': finalize_env(
+                {'NODE_PATH': node_path, 'MGR_ENV': 'dev', 'PATH': '.'}),
         }))
 
     def test_predefined_path(self):

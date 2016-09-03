@@ -73,6 +73,7 @@ class WhichTestCase(unittest.TestCase):
         self.assertIsNone(which('binary.com', path=tempdir))
 
     def test_finalize_env_others(self):
+        sys.platform = 'others'
         self.assertEqual(finalize_env({}), {})
 
     def test_finalize_env_win32(self):
@@ -81,9 +82,11 @@ class WhichTestCase(unittest.TestCase):
         # when os.environ is empty or missing the required keys, the
         # values will be empty strings.
         os.environ = {}
-        self.assertEqual(finalize_env({}), {'PATHEXT': '', 'SYSTEMROOT': ''})
+        self.assertEqual(finalize_env({}), {
+            'PATH': '', 'PATHEXT': '', 'SYSTEMROOT': ''})
 
         # should be identical with the keys copied
+        os.environ['PATH'] = 'C:\\Windows'
         os.environ['PATHEXT'] = pathsep.join(('.com', '.exe', '.bat'))
         os.environ['SYSTEMROOT'] = 'C:\\Windows'
         self.assertEqual(finalize_env({}), os.environ)
@@ -97,7 +100,7 @@ class WhichTestCase(unittest.TestCase):
             stdin=b'hello',
             env=finalize_env({}),
         )
-        self.assertEqual(stdout, b'hello\n')
+        self.assertEqual(stdout.strip(), b'hello')
 
     def test_fork_exec_str(self):
         stdout, stderr = fork_exec(
@@ -105,7 +108,7 @@ class WhichTestCase(unittest.TestCase):
             stdin=u'hello',
             env=finalize_env({}),
         )
-        self.assertEqual(stdout, u'hello\n')
+        self.assertEqual(stdout.strip(), u'hello')
 
     # ensure the right error is raised for the running python version
 
