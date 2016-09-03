@@ -149,8 +149,8 @@ need to be available within the environment; if they are not installed
 please follow the installation steps for `Node.js`_ appropriate for the
 running environment/platform.
 
-To install |calmjs| into your Python environment, the following command
-can be executed to install directly from PyPI:
+To install |calmjs| into a given Python environment, the following
+command can be executed to install directly from PyPI:
 
 .. code:: sh
 
@@ -185,7 +185,10 @@ built-in testsuite can be executed by the following:
     $ python -m unittest calmjs.tests.make_suite
 
 If there are failures, please file an issue on the issue tracker with
-the full traceback, and/or the method of installation.
+the full traceback, and/or the method of installation.  Please also
+remember to include platform specific information, such as Python
+version, operating system environments and version, and other related
+information related to the issue at hand.
 
 
 Usage
