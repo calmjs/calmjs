@@ -16,6 +16,7 @@ from os.path import dirname
 from os.path import isdir
 from os.path import join
 from os.path import pathsep
+from os.path import realpath
 
 from collections import OrderedDict
 from logging import getLogger
@@ -317,7 +318,7 @@ class BaseDriver(object):
             logger.debug(
                 "found '%s'; "
                 "not modifying PATH environment variable in instance of '%s'.",
-                default, modcls_name)
+                realpath(default), modcls_name)
             return True
 
         node_path = self.node_path
