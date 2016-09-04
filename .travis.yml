@@ -1,6 +1,8 @@
 sudo: false
 matrix:
   allow_failures:
+    # While the code here is good, travis as of now still do not have
+    # first class support for Python, so not going to rely on this yet.
     - os: osx
   include:
     - language: python
