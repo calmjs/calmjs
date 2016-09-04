@@ -357,8 +357,8 @@ class PackageManagerDriver(NodeDriver):
         if not inst._set_env_path_with_node_modules():
             import warnings
             msg = (
-                "Unable to locate the '%(binary)s' binary; default module "
-                "level functions will not work. Please either provide "
+                "Unable to locate the '%(binary)s' binary or runtime; default "
+                "module level functions will not work. Please either provide "
                 "%(PATH)s and/or update %(PATH)s environment variable "
                 "with one that provides '%(binary)s'; or specify a "
                 "working %(NODE_PATH)s environment variable with "

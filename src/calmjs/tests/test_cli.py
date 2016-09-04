@@ -614,7 +614,8 @@ class CliDriverTestCase(unittest.TestCase):
             warnings.simplefilter('ignore')
             with pretty_logging(stream=mocks.StringIO()) as err:
                 Driver.create_for_module_vars(values)
-            self.assertIn("Unable to locate the 'mgr' binary;", err.getvalue())
+            self.assertIn(
+                "Unable to locate the 'mgr' binary or runtime", err.getvalue())
 
         # Normally, these will be global names.
         self.assertIn('mgr_install', values)
@@ -636,11 +637,13 @@ class CliDriverTestCase(unittest.TestCase):
             warnings.simplefilter('always')
             with pretty_logging(stream=mocks.StringIO()) as err:
                 driver = MgrDriver.create_for_module_vars(values)
-            self.assertIn("Unable to locate the 'mgr' binary;", err.getvalue())
+            self.assertIn(
+                "Unable to locate the 'mgr' binary or runtime", err.getvalue())
 
             self.assertTrue(issubclass(w[-1].category, RuntimeWarning))
             self.assertIn(
-                "Unable to locate the 'mgr' binary;", str(w[-1].message))
+                "Unable to locate the 'mgr' binary or runtime",
+                str(w[-1].message))
 
         self.assertTrue(isinstance(driver, MgrDriver))
 
