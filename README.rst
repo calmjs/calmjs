@@ -156,6 +156,9 @@ command can be executed to install directly from PyPI:
 
     $ pip install calmjs
 
+Alternative installation methods (for developers, advanced users)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 Development is still ongoing with |calmjs|, for the latest features and
 bug fixes, the development version can be installed through git like so:
 
@@ -165,7 +168,9 @@ bug fixes, the development version can be installed through git like so:
 
 Alternatively, the git repository can be cloned directly and execute
 ``python setup.py develop`` while inside the root of the source
-directory.
+directory.  However this method WILL require all packages under the
+|calmjs| namespace to be uninstalled and be reinstalled using this
+development only method.
 
 As |calmjs| is declared as both a namespace and a package, mixing
 installation methods as described above when installing with other
@@ -552,9 +557,14 @@ ERROR bad 'calmjs.runtime' entry point
 
 ImportError
     This is typically caused by improper removal of locally installed
-    packages that had a entry point registered, or that an addon package
-    to |calmjs| has registered bad entry points.  Either reinstall the
-    listed package again or fully uninstall or remove its files.
+    packages that had an entry point registered, an addon package to
+    |calmjs| registered entry points pointing to bad import locations,
+    or conflicting installation methods was used for the current
+    environment as outlined in the installation section of this
+    document.  Either reinstall the broken package again with the
+    correct installation method for the environment, or fully uninstall
+    or remove files belonging to the packages or sources that are
+    triggering the undesirable error messages.
 
 bad entry point
     This is caused by packages defining malformed entry point.  The name
