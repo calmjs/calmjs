@@ -31,6 +31,7 @@ from calmjs.testing.utils import stub_mod_check_output
 from calmjs.testing.utils import stub_os_environ
 
 which_node = which('node')
+isatty = sys.stdin.isatty()
 
 
 class CliGenerateMergeDictTestCase(unittest.TestCase):
@@ -111,7 +112,7 @@ class CliCheckInteractiveTestCase(unittest.TestCase):
         with open(fn) as fd2:
             self.assertFalse(cli._check_interactive(fd2, fd1))
 
-    @unittest.skipIf(sys.__stdin__.name != '<stdin>', 'stdin is modified')
+    @unittest.skipIf(not isatty, 'Environment not a tty')
     def test_check_interactive_good(self):
         self.assertTrue(cli._check_interactive(sys.__stdin__, sys.__stdout__))
 
