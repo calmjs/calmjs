@@ -1,0 +1,21 @@
+environment:
+  nodejs_version: "4.5"
+  matrix:
+    - PYTHON: "C:\\Python27"
+    - PYTHON: "C:\\Python33"
+    - PYTHON: "C:\\Python34"
+    - PYTHON: "C:\\Python35"
+
+install:
+  - ps: Install-Product node $env:nodejs_version
+  - "%PYTHON%\\python.exe setup.py develop"
+
+test_script:
+  # piping empty echo to disable the tty test which is non-working on
+  # appveyor.
+  - "echo | %PYTHON%\\python.exe -m unittest calmjs.tests.make_suite"
+
+artifacts:
+  - path: dist\*
+
+build: off
