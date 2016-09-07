@@ -1,6 +1,13 @@
 Changelog
 =========
 
+1.0.3 (Unreleased)
+------------------
+
+- Fixed the issue with bad environmental variables for subprocess.Popen
+  for Windows under Python 2.7.
+- Other minor testing fixes on CI platforms.
+
 1.0.2 (2016-09-04)
 ------------------
 
