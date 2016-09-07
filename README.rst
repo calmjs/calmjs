@@ -15,8 +15,8 @@ deployment environment.
 
 .. image:: https://travis-ci.org/calmjs/calmjs.svg?branch=master
     :target: https://travis-ci.org/calmjs/calmjs
-.. image:: https://ci.appveyor.com/project/metatoaster/calmjs/branch/master
-    :target: https://ci.appveyor.com/api/projects/status/45054tm9cfk7ryam/branch/master?svg=true
+.. image:: https://ci.appveyor.com/api/projects/status/45054tm9cfk7ryam/branch/master?svg=true
+    :target: https://ci.appveyor.com/project/metatoaster/calmjs/branch/master
 .. image:: https://coveralls.io/repos/github/calmjs/calmjs/badge.svg?branch=master
     :target: https://coveralls.io/github/calmjs/calmjs?branch=master
 
