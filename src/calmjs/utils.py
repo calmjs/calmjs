@@ -4,7 +4,6 @@ Assortment of utility functions.
 """
 
 from __future__ import absolute_import
-from __future__ import unicode_literals
 
 import logging
 import os
@@ -52,7 +51,7 @@ def enable_pretty_logging(logger='calmjs', level=logging.DEBUG, stream=None):
     old_level = logger.level
     handler = logging.StreamHandler(stream)
     handler.setFormatter(logging.Formatter(
-        '%(asctime)s %(levelname)s %(name)s %(message)s'))
+        u'%(asctime)s %(levelname)s %(name)s %(message)s'))
     logger.addHandler(handler)
     logger.setLevel(level)
     return cleanup
