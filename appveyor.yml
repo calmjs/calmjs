@@ -7,13 +7,16 @@ environment:
     - PYTHON: "C:\\Python35"
 
 install:
+  - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
   - ps: Install-Product node $env:nodejs_version
-  - "%PYTHON%\\python.exe setup.py develop"
+  - "%PYTHON%\\python.exe -m pip install coverage"
+  - "%PYTHON%\\python.exe setup.py install"
 
 test_script:
-  # piping empty echo to disable the tty test which is non-working on
-  # appveyor.
-  - "echo | %PYTHON%\\python.exe -m unittest calmjs.tests.make_suite"
+  # piping empty echo to disable the tty test which is reported as
+  # working but actually non-working on appveyor.
+  - echo | coverage run setup.py test
+  - coverage report -m
 
 artifacts:
   - path: dist\*
