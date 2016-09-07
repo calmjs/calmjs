@@ -2,16 +2,7 @@ calmjs
 ======
 
 A Python framework for building toolchains and utilities for working
-with the JavaScript/Node.js ecosystem.  The JavaScript source files can
-be sourced from packages from any supported Node.js based package
-repositories or embedded in Python packages.  |calmjs| strives to make
-the usage of JavaScript in Python environments done in a consistent,
-well integrated manner.  Locations, dependencies and related metadata
-related to the JavaScript sources at hand will be defined and handled
-within a common framework, resulting in ease of accessibility through a
-common set of Python-based tools.  This ensures the consistent
-reproducibility during usage within a continuous integration and/or
-deployment environment.
+with the JavaScript/Node.js ecosystem from within a Python environment.
 
 .. image:: https://travis-ci.org/calmjs/calmjs.svg?branch=master
     :target: https://travis-ci.org/calmjs/calmjs
@@ -40,21 +31,29 @@ deployment environment.
 Introduction
 ------------
 
-In essence, ``calmjs`` provides a set of extension to |setuptools|_ that
-assists with the tracking and management of dependencies of JavaScript
-or `Node.js`_ based packages (such as ones through |npm|_) for a given
-Python package.  It also provides a number of base classes that can be
-used to build custom toolchains that implement different strategies for
-managing and compiling required JavaScript code and related assets into
-the deployment artifacts that an application server may use.  Related
-packages that make use of this framework implementing the most commonly
-used patterns for the various use cases will become available to
-facilitate painless and easy deployments of JavaScript and assets to
-servers for developers and integrators to use.  These use cases will
-include the management of testing frameworks, to the generation of
-deployable artifacts.
+In essence, |calmjs| defines a framework and provide a set of tools that
+enable Python packages to declare their what JavaScript package or
+sources they require for their complete functionality.  This common
+framework will ensure the accessibility of these metadata under a common
+protocol, instead of being otherwise scattered across different tools or
+locations.  Ultimately, this permits better `Node.js`_ integration with a
+given Python environment, lowering the amount of effort needed to
+achieve continuous integration and/or delivery of Python packages in
+conjunction with Node.js/JavaScript packages in a reproducible manner.
 
-The name ``calmjs`` was originally derived from the steps in the first
+In order to achieve this, the calmjs framework provides a set of
+extension to |setuptools|_ that assists with the tracking and management
+of dependencies of JavaScript or Node.js based packages (such as ones
+through |npm|_) for a given Python package.  It also provides a number
+of base classes that can be used to build custom toolchains that
+implement different strategies for managing and compiling required
+JavaScript code and related assets into the deployment artifacts that an
+application server may use, or to generate test harnesses to ensure
+correctness under both the development and production environment.
+These extra functionalities will be provided by other Python packages
+under the |calmjs| namespace.
+
+The name |calmjs| was originally derived from the steps in the first
 iteration of the toolchain which involves the steps compile, assemble,
 and linkage into a module of JavaScript using the namespace from the
 host Python package.  The `m` in the logo is the ear of a rabbit.  The
@@ -71,10 +70,11 @@ A framework for integration with Node.js based package managers
     Through |setuptools| command hooks, |calmjs| provides Python
     packages with the ability to declare and manage manifest definition
     files for Node.js based package management systems (e.g. such as
-    ``package.json`` for |npm|).  In the typical use case, this means
-    the declaration of ``dependencies`` or ``devDependencies`` for the
+    ``package.json`` for |npm|).  Under typical usage, this means the
+    declaration of ``dependencies`` or ``devDependencies`` for the
     JavaScript packages needed by a given Python package can be tracked,
-    all within the |setuptools| framework.
+    all within the |setuptools| framework through the extensions
+    provided by |calmjs|.
 
     The other part of this infrastructure is that these declarations
     follow the Python package dependency graph.  Developers and users
@@ -84,7 +84,7 @@ A framework for integration with Node.js based package managers
     within the completed application stack, tailored for all the
     packages at hand.
 
-    |calmjs| integrates the support for |npm| by default.
+    |calmjs| includes the support for |npm| by default.
 
 Export JavaScript code out of Python packages with the same namespace
     A given Python package that included associated JavaScript source
@@ -146,10 +146,10 @@ Well-defined modular architecture to ensure code reuse and extensibility
 Installation
 ------------
 
-As the goal of |calmjs| is to integrate with Node.js and |npm|, they
-need to be available within the environment; if they are not installed
-please follow the installation steps for `Node.js`_ appropriate for the
-running environment/platform.
+As the goal of |calmjs| is to integrate Node.js and |npm| into a Python
+environment, they need to be available within the environment; if they
+are not installed please follow the installation steps for `Node.js`_
+appropriate for the target operating system/environment/platform.
 
 To install |calmjs| into a given Python environment, the following
 command can be executed to install directly from PyPI:
@@ -324,7 +324,7 @@ declarations between packages within the environment will be resolved
 and merged in the same manner as dependencies conflicts declared in
 ``package_json``.
 
-Please do note that complete paths must be declared (note that the
+Please do note that complete path names must be declared (note that the
 ``.js`` filename suffix is included in the example); directories can
 also be declared.  However, as these declarations are done from within
 Python, explicit, full paths are required thus it is up to downstream
@@ -493,7 +493,7 @@ Toolchain
 ~~~~~~~~~
 
 Documentation on how to extend the Toolchain class to support use cases
-is currently missing.  This is usually combined together with a
+is currently incomplete.  This is usually combined together with a
 ``calmjs.runtime.DriverRuntime`` to hook into the ``calmjs`` runtime.
 
 Unfortunately at this time a detailed guide on how to do this is not yet
