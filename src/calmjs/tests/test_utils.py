@@ -83,9 +83,10 @@ class WhichTestCase(unittest.TestCase):
         # values will be empty strings.
         os.environ = {}
         self.assertEqual(finalize_env({}), {
-            'PATH': '', 'PATHEXT': '', 'SYSTEMROOT': ''})
+            'APPDATA': '', 'PATH': '', 'PATHEXT': '', 'SYSTEMROOT': ''})
 
         # should be identical with the keys copied
+        os.environ['APPDATA'] = 'C:\\Users\\Guest\\AppData\\Roaming'
         os.environ['PATH'] = 'C:\\Windows'
         os.environ['PATHEXT'] = pathsep.join(('.com', '.exe', '.bat'))
         os.environ['SYSTEMROOT'] = 'C:\\Windows'
