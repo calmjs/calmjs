@@ -24,6 +24,8 @@ locale = getpreferredencoding()
 # sys.platform have required keys for environment variables for Popen
 _PLATFORM_ENV_KEYS = {
     # win32 specific keys
+    # APPDATA
+    #    Some node scripts really need this for some reason?
     # PATH
     #    Well, if it's not available, funnily enough even with a full
     #    path executable things will just also not work.
@@ -32,7 +34,7 @@ _PLATFORM_ENV_KEYS = {
     # SYSTEMROOT
     #    Without this, on Windows 7 (probably others) will just result
     #    in "socket: (10106)" error.
-    'win32': ['PATH', 'PATHEXT', 'SYSTEMROOT'],
+    'win32': ['APPDATA', 'PATH', 'PATHEXT', 'SYSTEMROOT'],
 }
 
 
