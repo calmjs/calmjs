@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.0.3 (Unreleased)
+1.0.3 (2016-09-07)
 ------------------
 
 - Fixed the issue with bad environmental variables for subprocess.Popen
