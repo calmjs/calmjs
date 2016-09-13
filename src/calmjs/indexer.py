@@ -27,9 +27,10 @@ _utils = {
 }
 
 
-def _modgen(module,
-            modpath='last', globber='root', fext=JS_EXT,
-            registry=_utils):
+def modgen(
+        module,
+        modpath='last', globber='root', fext=JS_EXT,
+        registry=_utils):
     """
     JavaScript styled module location listing generator.
 
@@ -64,8 +65,8 @@ def _modgen(module,
     For each of the module basepath and source files the globber finds.
     """
 
-    globber_f = registry['globber'][globber]
-    modpath_f = registry['modpath'][modpath]
+    globber_f = globber if callable(globber) else registry['globber'][globber]
+    modpath_f = modpath if callable(modpath) else registry['modpath'][modpath]
 
     logger.debug(
         'modgen generating file listing for module %s',
@@ -188,19 +189,19 @@ def modname_python(fragments):
 
 
 def mapper(module, modpath='last', globber='root', modname='es6',
-           registry=_utils):
+           fext=JS_EXT, registry=_utils):
     """
     General mapper
 
     Loads components from the micro registry.
     """
 
-    modname_f = _utils['modname'][modname]
+    modname_f = modname if callable(modname) else _utils['modname'][modname]
 
     return {
         modname_f(modname_fragments): join(base, subpath)
-        for modname_fragments, base, subpath in _modgen(
-            module, modpath, globber)
+        for modname_fragments, base, subpath in modgen(
+            module, modpath, globber, fext=fext, registry=_utils)
     }
 
 

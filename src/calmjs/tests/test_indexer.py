@@ -148,3 +148,25 @@ class IndexerTestCase(unittest.TestCase):
             'calmjs/testing/module3/math': join_mod3('math.js'),
             'calmjs/testing/module3/mod/index': join_mod3('mod', 'index.js'),
         })
+
+    def test_module2_callables(self):
+        from calmjs.testing import module2
+        calmjs_base_dir = abspath(join(
+            indexer.modpath_pkg_resources(indexer)[0], pardir))
+        results = {
+            k: relpath(v, calmjs_base_dir)
+            for k, v in indexer.mapper(
+                module2,
+                globber=indexer.globber_recursive,
+                modname=indexer.modname_python,
+                modpath=indexer.modpath_pkg_resources,
+            ).items()
+        }
+        self.assertEqual(results, {
+            'calmjs.testing.module2.index':
+                to_os_sep_path('calmjs/testing/module2/index.js'),
+            'calmjs.testing.module2.helper':
+                to_os_sep_path('calmjs/testing/module2/helper.js'),
+            'calmjs.testing.module2.mod.helper':
+                to_os_sep_path('calmjs/testing/module2/mod/helper.js'),
+        })
