@@ -249,6 +249,31 @@ class NullToolchainTestCase(unittest.TestCase):
 
         self.assertEqual(js_code, result)
 
+    def test_toolchain_naming(self):
+        self.assertEqual(self.toolchain.modname_source_to_modname(
+            'example/module', '/tmp/example.module/src/example/module.js'),
+            'example/module',
+        )
+        self.assertEqual(self.toolchain.modname_source_to_source(
+            'example/module', '/tmp/example.module/src/example/module.js'),
+            '/tmp/example.module/src/example/module.js',
+        )
+        self.assertEqual(self.toolchain.modname_source_to_target(
+            'example/module', '/tmp/example.module/src/example/module.js'),
+            'example/module.js',
+        )
+
+    def test_toolchain_gen_req_src_targets(self):
+        result = sorted(self.toolchain._gen_req_src_targets({
+            'ex/module1': '/src/ex/module1.js',
+            'ex/module2': '/src/ex/module2.js',
+        }))
+
+        self.assertEqual(result, [
+            ('ex/module1', '/src/ex/module1.js', 'ex/module1.js'),
+            ('ex/module2', '/src/ex/module2.js', 'ex/module2.js'),
+        ])
+
     def test_null_toolchain_transpile_sources(self):
         source_dir = mkdtemp(self)
         build_dir = mkdtemp(self)

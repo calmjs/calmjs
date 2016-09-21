@@ -136,6 +136,20 @@ class Toolchain(BaseDriver):
         with opener(source, 'r') as reader, opener(target, 'w') as writer:
             self.transpiler(spec, reader, writer)
 
+    def modname_source_to_modname(self, modname, source):
+        """
+        Subclass has the option to override this
+        """
+
+        return modname
+
+    def modname_source_to_source(self, modname, source):
+        """
+        Subclass has the option to override this
+        """
+
+        return source
+
     def modname_source_to_target(self, modname, source):
         """
         Create a target file name from the input module name and its
@@ -162,8 +176,10 @@ class Toolchain(BaseDriver):
         # source = path to JavaScript source file from a Python package.
         # target = the target write path
 
-        for modname, source in d.items():
-            target = self.modname_source_to_target(modname, source)
+        for modname_, source_ in d.items():
+            modname = self.modname_source_to_modname(modname_, source_)
+            source = self.modname_source_to_source(modname_, source_)
+            target = self.modname_source_to_target(modname_, source_)
             yield modname, source, target
 
     def prepare(self, spec):
