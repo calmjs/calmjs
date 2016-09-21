@@ -35,6 +35,8 @@ import codecs
 import errno
 import logging
 import shutil
+import sys
+from functools import partial
 from os import mkdir
 from os import makedirs
 from os.path import join
@@ -46,6 +48,7 @@ from os.path import realpath
 from tempfile import mkdtemp
 
 from calmjs.base import BaseDriver
+from calmjs.exc import ValueSkip
 from calmjs.utils import raise_os_error
 
 logger = logging.getLogger(__name__)
@@ -177,9 +180,31 @@ class Toolchain(BaseDriver):
         # target = the target write path
 
         for modname_, source_ in d.items():
-            modname = self.modname_source_to_modname(modname_, source_)
-            source = self.modname_source_to_source(modname_, source_)
-            target = self.modname_source_to_target(modname_, source_)
+            try:
+                modname = self.modname_source_to_modname(modname_, source_)
+                source = self.modname_source_to_source(modname_, source_)
+                target = self.modname_source_to_target(modname_, source_)
+            except ValueError as e:
+                # figure out which of the above 3 functions failed by
+                # acquiring the name from one frame down.
+                f_name = sys.exc_info()[2].tb_next.tb_frame.f_code.co_name
+
+                if isinstance(e, ValueSkip):
+                    # a purposely benign failure.
+                    log = partial(
+                        logger.info,
+                        "toolchain purposely skipping on '%s' where "
+                        "modname='%s', source='%s'",
+                    )
+                else:
+                    log = partial(
+                        logger.warning,
+                        "toolchain failed to acquire name with '%s' where "
+                        "modname='%s', source='%s'; skipping",
+                    )
+
+                log(f_name, modname_, source_)
+                continue
             yield modname, source, target
 
     def prepare(self, spec):

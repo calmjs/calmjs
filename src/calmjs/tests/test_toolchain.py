@@ -10,6 +10,7 @@ from os.path import join
 from os.path import pardir
 from os.path import realpath
 
+from calmjs.exc import ValueSkip
 from calmjs.utils import pretty_logging
 from calmjs.toolchain import Spec
 from calmjs.toolchain import Toolchain
@@ -273,6 +274,47 @@ class NullToolchainTestCase(unittest.TestCase):
             ('ex/module1', '/src/ex/module1.js', 'ex/module1.js'),
             ('ex/module2', '/src/ex/module2.js', 'ex/module2.js'),
         ])
+
+    def test_toolchain_gen_req_src_targets_failure(self):
+        # allow subclasses to raise ValueError to trigger a skip.
+        class FailToolchain(NullToolchain):
+            def modname_source_to_target(self, modname, source):
+                if 'fail' in source:
+                    raise ValueError('source cannot fail')
+                elif 'skip' in source:
+                    raise ValueSkip('skipping source')
+                return super(FailToolchain, self).modname_source_to_target(
+                    modname, source)
+
+        toolchain = FailToolchain()
+
+        with pretty_logging(stream=StringIO()) as s:
+            result = sorted(toolchain._gen_req_src_targets({
+                'ex/module1': '/src/ex/module1.js',
+                'ex/module2': 'fail',
+                'ex/module3': '/src/ex/module3.js',
+            }))
+
+        self.assertIn("WARNING", s.getvalue())
+        self.assertIn(
+            "failed to acquire name with 'modname_source_to_target' where "
+            "modname='ex/module2', source='fail'", s.getvalue(),
+        )
+
+        self.assertEqual(result, [
+            ('ex/module1', '/src/ex/module1.js', 'ex/module1.js'),
+            ('ex/module3', '/src/ex/module3.js', 'ex/module3.js'),
+        ])
+
+        with pretty_logging(stream=StringIO()) as s:
+            self.assertEqual(sorted(toolchain._gen_req_src_targets({
+                'skip': 'skip'})), [])
+
+        self.assertIn("INFO", s.getvalue())
+        self.assertIn(
+            "toolchain purposely skipping on 'modname_source_to_target' where "
+            "modname='skip', source='skip'", s.getvalue(),
+        )
 
     def test_null_toolchain_transpile_sources(self):
         source_dir = mkdtemp(self)

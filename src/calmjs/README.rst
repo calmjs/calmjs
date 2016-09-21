@@ -5,6 +5,9 @@ To give a guide on how modules should be laid out, in the case for other
 packages that that may depend on ``calmjs`` for integration and other
 uses, the following are how things are done here:
 
+exc
+    Generic exception classes specific for this project.
+
 utils
     Utilities for use from within calmjs (maybe elsewhere).  Must NOT
     inherit from other calmjs modules.  As a result this is safe to be
