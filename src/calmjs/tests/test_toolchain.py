@@ -267,19 +267,38 @@ class NullToolchainTestCase(unittest.TestCase):
             'example/module.js',
         )
 
-    def test_toolchain_gen_modname_source_target(self):
+    def test_toolchain_gen_modname_source_target_modpath(self):
         spec = Spec()
-        result = sorted(self.toolchain._gen_modname_source_target(spec, {
-            'ex/module1': '/src/ex/module1.js',
-            'ex/module2': '/src/ex/module2.js',
+        toolchain = self.toolchain
+        result = sorted(toolchain._gen_modname_source_target_modpath(spec, {
+            'ex/mod1': '/src/ex/mod1.js',
+            'ex/mod2': '/src/ex/mod2.js',
         }))
 
         self.assertEqual(result, [
-            ('ex/module1', '/src/ex/module1.js', 'ex/module1.js'),
-            ('ex/module2', '/src/ex/module2.js', 'ex/module2.js'),
+            ('ex/mod1', '/src/ex/mod1.js', 'ex/mod1.js', 'ex/mod1'),
+            ('ex/mod2', '/src/ex/mod2.js', 'ex/mod2.js', 'ex/mod2'),
         ])
 
-    def test_toolchain_gen_modname_source_target_failure_safe(self):
+    def test_toolchain_gen_modname_source_target_modpath_alt_names(self):
+        class AltToolchain(NullToolchain):
+            def modname_source_target_modnamesource_to_modpath(
+                    self, spec, modname, source, target, modname_source):
+                return '/-'.join(modname_source)
+
+        spec = Spec()
+        toolchain = AltToolchain()
+        result = sorted(toolchain._gen_modname_source_target_modpath(spec, {
+            'ex/m1': '/src/ex/m1.js',
+            'ex/m2': '/src/ex/m2.js',
+        }))
+
+        self.assertEqual(result, [
+            ('ex/m1', '/src/ex/m1.js', 'ex/m1.js', 'ex/m1/-/src/ex/m1.js'),
+            ('ex/m2', '/src/ex/m2.js', 'ex/m2.js', 'ex/m2/-/src/ex/m2.js'),
+        ])
+
+    def test_toolchain_gen_modname_source_target_modpath_failure_safe(self):
         # allow subclasses to raise ValueError to trigger a skip.
         class FailToolchain(NullToolchain):
             def modname_source_to_target(self, spec, modname, source):
@@ -294,26 +313,29 @@ class NullToolchainTestCase(unittest.TestCase):
         toolchain = FailToolchain()
 
         with pretty_logging(stream=StringIO()) as s:
-            result = sorted(toolchain._gen_modname_source_target(spec, {
-                'ex/module1': '/src/ex/module1.js',
-                'ex/module2': 'fail',
-                'ex/module3': '/src/ex/module3.js',
-            }))
+            result = sorted(toolchain._gen_modname_source_target_modpath(
+                spec, {
+                    'ex/mod1': '/src/ex/mod1.js',
+                    'ex/mod2': 'fail',
+                    'ex/mod3': '/src/ex/mod3.js',
+                },
+            ))
 
         self.assertIn("WARNING", s.getvalue())
         self.assertIn(
             "failed to acquire name with 'modname_source_to_target' where "
-            "modname='ex/module2', source='fail'", s.getvalue(),
+            "modname='ex/mod2', source='fail'", s.getvalue(),
         )
 
         self.assertEqual(result, [
-            ('ex/module1', '/src/ex/module1.js', 'ex/module1.js'),
-            ('ex/module3', '/src/ex/module3.js', 'ex/module3.js'),
+            ('ex/mod1', '/src/ex/mod1.js', 'ex/mod1.js', 'ex/mod1'),
+            ('ex/mod3', '/src/ex/mod3.js', 'ex/mod3.js', 'ex/mod3'),
         ])
 
         with pretty_logging(stream=StringIO()) as s:
-            self.assertEqual(sorted(toolchain._gen_modname_source_target(
-                spec, {'skip': 'skip'})), [])
+            self.assertEqual(sorted(
+                toolchain._gen_modname_source_target_modpath(
+                    spec, {'skip': 'skip'})), [])
 
         self.assertIn("INFO", s.getvalue())
         self.assertIn(

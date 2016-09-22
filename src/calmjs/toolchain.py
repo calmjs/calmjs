@@ -165,12 +165,13 @@ class Toolchain(BaseDriver):
 
         return modname + self.filename_suffix
 
-    def modname_source_target_to_path(self, spec, modname, source, target):
+    def modname_source_target_to_modpath(self, spec, modname, source, target):
         """
         Typical JavaScript tools will get confused if '.js' is added, so
         by default the same modname is returned as path rather than the
-        target file.  Some other tools may desire the target to be
-        returned instead, or construct some other string that is more
+        target file for the module path to be written to the output file
+        for linkage by tools.  Some other tools may desire the target to
+        be returned instead, or construct some other string that is more
         suitable for the tool that will do the assemble and link step.
 
         The modname and source argument provided to aid pedantic tools,
@@ -180,16 +181,41 @@ class Toolchain(BaseDriver):
 
         return modname
 
-    def _gen_modname_source_target(self, spec, d):
-        # modname = CommonJS require/import module name.
-        # source = path to JavaScript source file from a Python package.
-        # target = the target write path
+    def modname_source_target_modnamesource_to_modpath(
+            self, spec, modname, source, target, modname_source):
+        """
+        Same as above, but includes the original raw key-value as a
+        2-tuple.
+        """
+
+        return self.modname_source_target_to_modpath(
+            spec, modname, source, target)
+
+    def _gen_modname_source_target_modpath(self, spec, d):
+        """
+        Private generator that will consume those above functions.  This
+        should NOT be overridden.
+
+        Produces the following 4-tuple on iteration with the input dict
+
+        modname
+            CommonJS require/import module name.
+        source
+            path to JavaScript source file from a Python package.
+        target
+            the target write path relative to build_dir
+        modpath
+            the module path that is compatible with tool referencing
+            the target
+        """
 
         for modname_source in d.items():
             try:
                 modname = self.modname_source_to_modname(spec, *modname_source)
                 source = self.modname_source_to_source(spec, *modname_source)
                 target = self.modname_source_to_target(spec, *modname_source)
+                modpath = self.modname_source_target_modnamesource_to_modpath(
+                    spec, modname, source, target, modname_source)
             except ValueError as e:
                 # figure out which of the above 3 functions failed by
                 # acquiring the name from one frame down.
@@ -211,7 +237,7 @@ class Toolchain(BaseDriver):
 
                 log(f_name, *modname_source)
                 continue
-            yield modname, source, target
+            yield modname, source, target, modpath
 
     def prepare(self, spec):
         """
@@ -231,10 +257,10 @@ class Toolchain(BaseDriver):
         # the compiled and bundled sources.
         module_names = []
 
-        for modname, source, target in self._gen_modname_source_target(
-                spec, transpile_source_map):
-            transpiled_paths[modname] = self.modname_source_target_to_path(
-                spec, modname, source, target)
+        itr = self._gen_modname_source_target_modpath(
+            spec, transpile_source_map)
+        for modname, source, target, modpath in itr:
+            transpiled_paths[modname] = modpath
             module_names.append(modname)
             self.transpile_modname_source_target(spec, modname, source, target)
 
@@ -249,10 +275,9 @@ class Toolchain(BaseDriver):
         # the compiled and bundled sources.
         module_names = []
 
-        for modname, source, target in self._gen_modname_source_target(
-                spec, bundle_source_map):
-            bundled_paths[modname] = self.modname_source_target_to_path(
-                spec, modname, source, target)
+        itr = self._gen_modname_source_target_modpath(spec, bundle_source_map)
+        for modname, source, target, modpath in itr:
+            bundled_paths[modname] = modpath
             if isfile(source):
                 module_names.append(modname)
                 copy_target = join(spec['build_dir'], target)
@@ -270,9 +295,6 @@ class Toolchain(BaseDriver):
         the files and feed them through the transpilation process or by
         simple copying.
         """
-
-        # for compile_suffix, store_key in self.compile_map:
-        #     method = getattr(self, self.compile_prefix + compile_suffix, None)
 
         transpiled_paths, transpiled_module_names = self.compile_transpile_all(
             spec)
