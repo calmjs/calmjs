@@ -1,31 +1,19 @@
 # -*- coding: utf-8 -*-
 """
-This provides a JavaScript "toolchain".
+This provides a "toolchain" for the calmjs framework.
 
-When I have a hammer every problem starts to look like JavaScript.
+The toolchain module provides two classes, a ``Spec`` which instances of
+act as the orchestration object for the ``Toolchain`` instances, where
+the states of a single workflow through it is tracked.  The other being
+the ``Toolchain`` class, which `compiles`, `assembles` and `links` the
+stuff as specified in the ``Spec`` into a standalone `module`, which can
+be treated as an artifact file.  This whole thing jumpstarts that
+process.
 
-Honestly, it's a bit easier to deal with JavaScript when one treats that
-as a compilation target.
-
-How this supposed to work?
-
-1) Write raw JS code without any UMD wrappers, but treat everything in
-the file as UMD.  Remember to import everything needed using ``require``
-and declare the exported things by assigning it to ``exports``.
-2) Leave that file somewhere in the src directory, along with Python
-code.
-3) Run compile.  They will be compiled into the corresponding thing that
-correlates to the Pythonic namespace identifiers.
-
-At least this is the idea, have to see whether this idea actually end up
-being sane (it won't be sane, when the entire thing was insane to begin
-with).
-
-One final thing: es6 does have modules, imports and exports done in a
-different but dedicated syntax.  Though to really support them a proper
-es6 compatible environment will be needed, however those are not a norm
-at the moment yet, especially given the fact that browsers do not have
-support for them quite just yet as of mid 2016.
+This whole thing started simply because the author thought it is a lot
+easier to deal with JavaScript when one treats that as a compilation
+target.  However given that the generic method works better, this module
+encapsulates the generalized implementation of the previous version.
 """
 
 from __future__ import absolute_import
@@ -53,6 +41,8 @@ from calmjs.utils import raise_os_error
 
 logger = logging.getLogger(__name__)
 
+__all__ = ['Spec', 'Toolchain', 'null_transpiler']
+
 
 def _opener(*a):
     return codecs.open(*a, encoding='utf-8')
@@ -63,19 +53,52 @@ def null_transpiler(spec, reader, writer):
 
 
 class Spec(dict):
+    """
+    Instances of these will track the progress through a Toolchain
+    instance.
+    """
 
     def __init__(self, *a, **kw):
         super(Spec, self).__init__(*a, **kw)
         self._callbacks = {}
 
     def update_selected(self, other, selected):
+        """
+        Like update, however a list of selected keys must be provided.
+        """
+
         self.update({k: other[k] for k in selected})
 
     def add_callback(self, name, f, *a, **kw):
+        """
+        Add a callback that can be called by do_callbacks.
+
+        Arguments:
+
+        name
+            The name of the callback group
+        f
+            A callable method or function.
+
+        The rest of the arguments will be passed as arguments and
+        keyword arguments to f when it's invoked.
+        """
+
         self._callbacks[name] = self._callbacks.get(name, [])
         self._callbacks[name].append((f, a, kw))
 
     def do_callbacks(self, name):
+        """
+        Do all the callbacks
+
+        Arguments:
+
+        name
+            The name of the callback group.  All the callables
+            registered to this group will be invoked, last-in-first-out
+            style.
+        """
+
         callbacks = self._callbacks.get(name, [])
         while callbacks:
             try:
@@ -119,6 +142,8 @@ class Toolchain(BaseDriver):
         self.setup_transpiler()
         self.setup_prefix_suffix()
         self.setup_compile_entries()
+
+    # Setup related methods
 
     def setup_filename_suffix(self):
         """
@@ -191,11 +216,22 @@ class Toolchain(BaseDriver):
             ('bundle', 'bundle', 'bundled'),
         )
 
+    # Default built-in methods referenced by build_compile_entries;
+    # these are for the transpile and bundle processes.
+
     def _validate_build_target(self, spec, target):
+        """
+        Essentially validate that the target is inside the build_dir.
+        """
+
         if not realpath(target).startswith(spec['build_dir']):
             raise ValueError('build_target %s is outside build_dir' % target)
 
     def transpile_modname_source_target(self, spec, modname, source, target):
+        """
+        The function that gets called by
+        """
+
         bd_target = join(spec['build_dir'], target)
         self._validate_build_target(spec, bd_target)
         logger.info('Transpiling %s to %s', source, bd_target)
@@ -205,16 +241,71 @@ class Toolchain(BaseDriver):
         with opener(source, 'r') as reader, opener(bd_target, 'w') as writer:
             self.transpiler(spec, reader, writer)
 
+    def compile_transpile(self, spec, entries):
+        """
+        The transpile method for the compile process.  This invokes the
+        transpiler that was set up to transpile the input files into the
+        build directory.
+        """
+
+        # Contains a mapping of the module name to the compiled file's
+        # relative path starting from the base build_dir.
+        transpiled_paths = {}
+        # List of exported module names, should be equal to all keys of
+        # the compiled and bundled sources.
+        module_names = []
+
+        for modname, source, target, modpath in entries:
+            transpiled_paths[modname] = modpath
+            module_names.append(modname)
+            self.transpile_modname_source_target(spec, modname, source, target)
+
+        return transpiled_paths, module_names
+
+    def compile_bundle(self, spec, entries):
+        """
+        The transpile method for the bundle process.  This copies the
+        source file or directory into the build directory.
+        """
+
+        # Contains a mapping of the bundled name to the bundled file's
+        # relative path starting from the base build_dir.
+        bundled_paths = {}
+        # List of exported module names, should be equal to all keys of
+        # the compiled and bundled sources.
+        module_names = []
+
+        for modname, source, target, modpath in entries:
+            bundled_paths[modname] = modpath
+            if isfile(source):
+                module_names.append(modname)
+                copy_target = join(spec['build_dir'], target)
+                shutil.copy(source, copy_target)
+            elif isdir(source):
+                copy_target = join(spec['build_dir'], modname)
+                shutil.copytree(source, copy_target)
+
+        return bundled_paths, module_names
+
+    # The naming methods, which are needed by certain toolchains that
+    # need to generate specific names to maintain compatibility.
+
     def modname_source_to_modname(self, spec, modname, source):
         """
-        Subclass has the option to override this
+        Method to get a modname.  Should really return the modname, but
+        subclass has the option to override this.
+
+        Called by generator method `_gen_modname_source_target_modpath`.
         """
 
         return modname
 
     def modname_source_to_source(self, spec, modname, source):
         """
-        Subclass has the option to override this
+        Method to get a source file name.  Should really return itself,
+        but subclass has the option to override this.
+
+        Called by generator method `_gen_modname_source_target_modpath`.
         """
 
         return source
@@ -222,9 +313,13 @@ class Toolchain(BaseDriver):
     def modname_source_to_target(self, spec, modname, source):
         """
         Create a target file name from the input module name and its
-        source file name.
+        source file name.  The result should be a path relative to the
+        build_dir.
 
         Default is to append the module name with the filename_suffix
+        assigned to this instance (setup by setup_filename_suffix).
+
+        Called by generator method `_gen_modname_source_target_modpath`.
         """
 
         return modname + self.filename_suffix
@@ -248,12 +343,27 @@ class Toolchain(BaseDriver):
     def modname_source_target_modnamesource_to_modpath(
             self, spec, modname, source, target, modname_source):
         """
-        Same as above, but includes the original raw key-value as a
-        2-tuple.
+        Typical JavaScript tools will get confused if '.js' is added, so
+        by default the same modname is returned as path rather than the
+        target file for the module path to be written to the output file
+        for linkage by tools.  Some other tools may desire the target to
+        be returned instead, or construct some other string that is more
+        suitable for the tool that will do the assemble and link step.
+
+        The modname and source argument provided to aid pedantic tools,
+        but really though this provides more consistency to method
+        signatures.
+
+        Same as `self.modname_source_target_to_modpath`, but includes
+        the original raw key-value as a 2-tuple.
+
+        Called by generator method `_gen_modname_source_target_modpath`.
         """
 
         return self.modname_source_target_to_modpath(
             spec, modname, source, target)
+
+    # Generator methods
 
     def _gen_modname_source_target_modpath(self, spec, d):
         """
@@ -303,6 +413,8 @@ class Toolchain(BaseDriver):
                 continue
             yield modname, source, target, modpath
 
+    # The core functions to be implemented for the toolchain.
+
     def prepare(self, spec):
         """
         Optional preparation step for handling the spec.
@@ -311,41 +423,6 @@ class Toolchain(BaseDriver):
         checking and/or other validation steps in order to result in a
         successful compilation run.
         """
-
-    def compile_transpile(self, spec, entries):
-        # Contains a mapping of the module name to the compiled file's
-        # relative path starting from the base build_dir.
-        transpiled_paths = {}
-        # List of exported module names, should be equal to all keys of
-        # the compiled and bundled sources.
-        module_names = []
-
-        for modname, source, target, modpath in entries:
-            transpiled_paths[modname] = modpath
-            module_names.append(modname)
-            self.transpile_modname_source_target(spec, modname, source, target)
-
-        return transpiled_paths, module_names
-
-    def compile_bundle(self, spec, entries):
-        # Contains a mapping of the bundled name to the bundled file's
-        # relative path starting from the base build_dir.
-        bundled_paths = {}
-        # List of exported module names, should be equal to all keys of
-        # the compiled and bundled sources.
-        module_names = []
-
-        for modname, source, target, modpath in entries:
-            bundled_paths[modname] = modpath
-            if isfile(source):
-                module_names.append(modname)
-                copy_target = join(spec['build_dir'], target)
-                shutil.copy(source, copy_target)
-            elif isdir(source):
-                copy_target = join(spec['build_dir'], modname)
-                shutil.copytree(source, copy_target)
-
-        return bundled_paths, module_names
 
     def compile(self, spec):
         """
@@ -391,6 +468,11 @@ class Toolchain(BaseDriver):
             source_map = spec.get(spec_read_key, {})
             entries = self._gen_modname_source_target_modpath(spec, source_map)
             spec[spec_write_key], new_module_names = method(spec, entries)
+            logger.debug(
+                "entry %r wrote %d entries to spec[%r], added %d module_names",
+                entry, len(spec[spec_write_key]), spec_write_key,
+                len(new_module_names),
+            )
             module_names.extend(new_module_names)
 
     def assemble(self, spec):
