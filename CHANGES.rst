@@ -1,6 +1,16 @@
 Changelog
 =========
 
+2.0.0 (Unreleased)
+------------------
+
+- Expose the indexer module functions mapper and modgen as public.
+- Completely refactored the Toolchain class to have much more consistent
+  method naming convention and argument lists.
+- The compile method now reads from an instance specific list of methods
+  which allow very customizable compilation steps.
+- Specific ways for a toolchain to skip specific names based.
+
 1.0.3 (2016-09-07)
 ------------------
 
