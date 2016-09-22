@@ -216,21 +216,14 @@ class Toolchain(BaseDriver):
         successful compilation run.
         """
 
-    def compile_all(self, spec):
+    def do_transpile(self, spec):
+        transpile_source_map = spec.get('transpile_source_map', {})
         # Contains a mapping of the module name to the compiled file's
         # relative path starting from the base build_dir.
         compiled_paths = {}
-
-        # Contains a mapping of the bundled name to the bundled file's
-        # relative path starting from the base build_dir.
-        bundled_paths = {}
-
         # List of exported module names, should be equal to all keys of
-        # the compiled_paths.
+        # the compiled and bundled sources.
         module_names = []
-
-        transpile_source_map = spec.get('transpile_source_map', {})
-        bundled_source_map = spec.get('bundled_source_map', {})
 
         for modname, source, target in self._gen_req_src_targets(
                 transpile_source_map):
@@ -240,6 +233,17 @@ class Toolchain(BaseDriver):
             compile_target = join(spec['build_dir'], target)
             self._validate_build_target(spec, compile_target)
             self.compile(spec, source, compile_target)
+
+        return compiled_paths, module_names
+
+    def do_bundle(self, spec):
+        bundled_source_map = spec.get('bundled_source_map', {})
+        # Contains a mapping of the bundled name to the bundled file's
+        # relative path starting from the base build_dir.
+        bundled_paths = {}
+        # List of exported module names, should be equal to all keys of
+        # the compiled and bundled sources.
+        module_names = []
 
         for modname, source, target in self._gen_req_src_targets(
                 bundled_source_map):
@@ -253,6 +257,18 @@ class Toolchain(BaseDriver):
                 copy_target = join(spec['build_dir'], modname)
                 shutil.copytree(source, copy_target)
 
+        return bundled_paths, module_names
+
+    def compile_all(self, spec):
+        """
+        Generic step that compiles everything needed for the bundle.
+        This step involves bundling all the files needed into the build
+        directory, either through transpilation or simple copying.
+        """
+
+        compiled_paths, compiled_module_names = self.do_transpile(spec)
+        bundled_paths, bundled_module_names = self.do_bundle(spec)
+        module_names = compiled_module_names + bundled_module_names
         spec.update_selected(locals(), [
             'compiled_paths', 'bundled_paths', 'module_names'])
 
