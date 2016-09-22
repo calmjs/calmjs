@@ -108,8 +108,6 @@ class Toolchain(BaseDriver):
     for talking to those scripts and binaries.
     """
 
-    filename_suffix = '.js'
-
     def __init__(self, *a, **kw):
         """
         Refer to parent for exact arguments.
@@ -117,7 +115,17 @@ class Toolchain(BaseDriver):
 
         super(Toolchain, self).__init__(*a, **kw)
         self.opener = _opener
+        self.setup_filename_suffix()
         self.setup_transpiler()
+        self.setup_prefix_suffix()
+        self.setup_compile_entries()
+
+    def setup_filename_suffix(self):
+        """
+        Set up the filename suffix for the sources and targets.
+        """
+
+        self.filename_suffix = '.js'
 
     def setup_transpiler(self):
         """
@@ -126,6 +134,62 @@ class Toolchain(BaseDriver):
         """
 
         self.transpiler = NotImplemented
+
+    def setup_prefix_suffix(self):
+        """
+        Set up the compile prefix and the source suffix attribute, which
+        are the prefix to the function name and the suffix to retrieve
+        the values from for creating the generator function.
+        """
+
+        self.compile_prefix = 'compile_'
+        self.sourcemap_suffix = '_source_map'
+        self.path_suffix = '_paths'
+
+    def setup_compile_entries(self):
+        """
+        The method that sets up the map that maps the compile methods
+        stored in this class instance to the spec key that the generated
+        maps should be stored at.
+        """
+
+        self.compile_entries = self.build_compile_entries()
+
+    def build_compile_entries(self):
+        """
+        Build the entries that will be used to acquire the methods for
+        the compile step.
+
+        This is to be a list of 3-tuples.
+
+        first element being the method name, which is a name that will
+        be prefixed with the compile_prefix, default being `compile_`;
+        alternatively a callable could be provided.  This method must
+        return a 2-tuple.
+
+        second element being the read key for the source map, which is
+        the name to be read from the spec and it will be suffixed with
+        the sourcemap_suffix, default being `_source_map`.
+
+        third element being the write key for first return value of the
+        method, it will be suffixed with the path_suffix, defaults to
+        `_path`.
+
+        The method referenced SHOULD NOT assign values to the spec, and
+        it must produce and return a 2-tuple:
+
+        first element should be the map from the module to the written
+        targets, the key being the module name (modname) and the value
+        being the relative path of the final file to the build_dir
+
+        the second element must be a list of module names that it
+        exported.
+        """
+
+        return (
+            ('transpile', 'transpile', 'transpiled'),
+            ('bundle', 'bundle', 'bundled'),
+        )
 
     def _validate_build_target(self, spec, target):
         if not realpath(target).startswith(spec['build_dir']):
@@ -241,15 +305,14 @@ class Toolchain(BaseDriver):
 
     def prepare(self, spec):
         """
-        Optional preparation step.
+        Optional preparation step for handling the spec.
 
         Implementation can make use of this to do pre-compilation
         checking and/or other validation steps in order to result in a
         successful compilation run.
         """
 
-    def compile_transpile_all(self, spec):
-        transpile_source_map = spec.get('transpile_source_map', {})
+    def compile_transpile(self, spec, entries):
         # Contains a mapping of the module name to the compiled file's
         # relative path starting from the base build_dir.
         transpiled_paths = {}
@@ -257,17 +320,14 @@ class Toolchain(BaseDriver):
         # the compiled and bundled sources.
         module_names = []
 
-        itr = self._gen_modname_source_target_modpath(
-            spec, transpile_source_map)
-        for modname, source, target, modpath in itr:
+        for modname, source, target, modpath in entries:
             transpiled_paths[modname] = modpath
             module_names.append(modname)
             self.transpile_modname_source_target(spec, modname, source, target)
 
         return transpiled_paths, module_names
 
-    def compile_bundle_all(self, spec):
-        bundle_source_map = spec.get('bundle_source_map', {})
+    def compile_bundle(self, spec, entries):
         # Contains a mapping of the bundled name to the bundled file's
         # relative path starting from the base build_dir.
         bundled_paths = {}
@@ -275,8 +335,7 @@ class Toolchain(BaseDriver):
         # the compiled and bundled sources.
         module_names = []
 
-        itr = self._gen_modname_source_target_modpath(spec, bundle_source_map)
-        for modname, source, target, modpath in itr:
+        for modname, source, target, modpath in entries:
             bundled_paths[modname] = modpath
             if isfile(source):
                 module_names.append(modname)
@@ -296,12 +355,43 @@ class Toolchain(BaseDriver):
         simple copying.
         """
 
-        transpiled_paths, transpiled_module_names = self.compile_transpile_all(
-            spec)
-        bundled_paths, bundled_module_names = self.compile_bundle_all(spec)
-        module_names = transpiled_module_names + bundled_module_names
-        spec.update_selected(locals(), [
-            'transpiled_paths', 'bundled_paths', 'module_names'])
+        spec['module_names'] = module_names = spec.get('module_names', [])
+        if not isinstance(module_names, list):
+            raise TypeError(
+                "spec provided a 'module_names' but it is not of type list "
+                "(got %r instead)" % module_names
+            )
+
+        for entry in self.compile_entries:
+            m, read_key, store_key = entry
+            if callable(m):
+                method_name = m.__name__
+                method = m
+            else:
+                method_name = self.compile_prefix + m
+                method = getattr(self, method_name, None)
+                if not callable(method):
+                    logger.error(
+                        "'%s' not a callable attribute for %r from "
+                        "compile_entries entry %r; skipping", m, self, entry
+                    )
+                    continue
+
+            spec_read_key = read_key + self.sourcemap_suffix
+            spec_write_key = store_key + self.path_suffix
+
+            if spec_write_key in spec:
+                logger.error(
+                    "compile map entry %r attempting to write to to key '%s' "
+                    "which already exists in spec; not overwriting, skipping",
+                    entry, spec_write_key,
+                )
+                continue
+
+            source_map = spec.get(spec_read_key, {})
+            entries = self._gen_modname_source_target_modpath(spec, source_map)
+            spec[spec_write_key], new_module_names = method(spec, entries)
+            module_names.extend(new_module_names)
 
     def assemble(self, spec):
         """
@@ -337,7 +427,7 @@ class Toolchain(BaseDriver):
 
     def _calf(self, spec):
         """
-        The main call, assuming everything is prepared.
+        The main call, assuming the base spec is prepared.
         """
 
         self.prepare(spec)

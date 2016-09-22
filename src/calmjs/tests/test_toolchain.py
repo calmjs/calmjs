@@ -141,6 +141,67 @@ class ToolchainTestCase(unittest.TestCase):
         self.assertEqual(spec['bundled_paths'], {})
         self.assertEqual(spec['module_names'], [])
 
+    def test_toolchain_standard_compile_existing_values(self):
+        # Test that in the case where existing path maps will block, and
+        # the existing module_names will be kept
+        transpiled_paths = {}
+        bundled_paths = {}
+        module_names = ['fake_names']
+        spec = Spec(
+            transpiled_paths=transpiled_paths,
+            bundled_paths=bundled_paths,
+            module_names=module_names,
+        )
+
+        with pretty_logging(stream=StringIO()) as s:
+            self.toolchain.compile(spec)
+
+        msg = s.getvalue()
+        self.assertIn("attempting to write to to key 'transpiled_paths'", msg)
+        self.assertIn("attempting to write to to key 'bundled_paths'", msg)
+
+        self.assertIs(spec['transpiled_paths'], transpiled_paths)
+        self.assertIs(spec['bundled_paths'], bundled_paths)
+        self.assertIs(spec['module_names'], module_names)
+
+    def test_toolchain_standard_compile_bad_module_names_type(self):
+        module_names = {}
+        spec = Spec(module_names=module_names)
+
+        with self.assertRaises(TypeError):
+            self.toolchain.compile(spec)
+
+    def test_toolchain_standard_compile_alternate_entries(self):
+        # Not a standard way to override this, but good enough as a
+        # demo.
+        def compile_faked(spec, entries):
+            return {'fake': 'nothing-here'}, ['fake']
+
+        self.toolchain.compile_entries = ((compile_faked, 'fake', 'faked'),)
+        spec = Spec()
+
+        self.toolchain.compile(spec)
+
+        self.assertNotIn('transpiled_paths', spec)
+        self.assertNotIn('bundled_paths', spec)
+        self.assertEqual(spec['faked_paths'], {'fake': 'nothing-here'})
+        self.assertEqual(spec['module_names'], ['fake'])
+
+    def test_toolchain_standard_compile_alternate_entries_not_callable(self):
+        # Again, this is not the right way, should subclass/define a new
+        # build_compile_entries method.
+        self.toolchain.compile_entries = (('very_not_here', 'fake', 'faked'),)
+        spec = Spec()
+
+        with pretty_logging(stream=StringIO()) as s:
+            self.toolchain.compile(spec)
+
+        msg = s.getvalue()
+        self.assertIn("'very_not_here' not a callable attribute for", msg)
+
+        self.assertNotIn('transpiled_paths', spec)
+        self.assertNotIn('bundled_paths', spec)
+
     def test_toolchain_standard_good(self):
         # good, with a mock
         called = []
