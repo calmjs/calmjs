@@ -131,29 +131,31 @@ class Toolchain(BaseDriver):
         if not realpath(target).startswith(spec['build_dir']):
             raise ValueError('build_target %s is outside build_dir' % target)
 
-    def compile(self, spec, source, target):
-        logger.info('Compiling %s to %s', source, target)
-        if not exists(dirname(target)):
-            makedirs(dirname(target))
+    def transpile_modname_source_target(self, spec, modname, source, target):
+        bd_target = join(spec['build_dir'], target)
+        self._validate_build_target(spec, bd_target)
+        logger.info('Transpiling %s to %s', source, bd_target)
+        if not exists(dirname(bd_target)):
+            makedirs(dirname(bd_target))
         opener = self.opener
-        with opener(source, 'r') as reader, opener(target, 'w') as writer:
+        with opener(source, 'r') as reader, opener(bd_target, 'w') as writer:
             self.transpiler(spec, reader, writer)
 
-    def modname_source_to_modname(self, modname, source):
+    def modname_source_to_modname(self, spec, modname, source):
         """
         Subclass has the option to override this
         """
 
         return modname
 
-    def modname_source_to_source(self, modname, source):
+    def modname_source_to_source(self, spec, modname, source):
         """
         Subclass has the option to override this
         """
 
         return source
 
-    def modname_source_to_target(self, modname, source):
+    def modname_source_to_target(self, spec, modname, source):
         """
         Create a target file name from the input module name and its
         source file name.
@@ -163,27 +165,31 @@ class Toolchain(BaseDriver):
 
         return modname + self.filename_suffix
 
-    def pick_compiled_mod_target_name(self, modname, source, target):
+    def modname_source_target_to_path(self, spec, modname, source, target):
         """
         Typical JavaScript tools will get confused if '.js' is added, so
-        by default the same modname is returned rather than the target.
+        by default the same modname is returned as path rather than the
+        target file.  Some other tools may desire the target to be
+        returned instead, or construct some other string that is more
+        suitable for the tool that will do the assemble and link step.
 
-        The source argument is included simply to aid pedantic tools for
-        any lookup they might need.
+        The modname and source argument provided to aid pedantic tools,
+        but really though this provides more consistency to method
+        signatures.
         """
 
         return modname
 
-    def _gen_req_src_targets(self, d):
+    def _gen_modname_source_target(self, spec, d):
         # modname = CommonJS require/import module name.
         # source = path to JavaScript source file from a Python package.
         # target = the target write path
 
-        for modname_, source_ in d.items():
+        for modname_source in d.items():
             try:
-                modname = self.modname_source_to_modname(modname_, source_)
-                source = self.modname_source_to_source(modname_, source_)
-                target = self.modname_source_to_target(modname_, source_)
+                modname = self.modname_source_to_modname(spec, *modname_source)
+                source = self.modname_source_to_source(spec, *modname_source)
+                target = self.modname_source_to_target(spec, *modname_source)
             except ValueError as e:
                 # figure out which of the above 3 functions failed by
                 # acquiring the name from one frame down.
@@ -203,7 +209,7 @@ class Toolchain(BaseDriver):
                         "modname='%s', source='%s'; skipping",
                     )
 
-                log(f_name, modname_, source_)
+                log(f_name, *modname_source)
                 continue
             yield modname, source, target
 
@@ -216,28 +222,26 @@ class Toolchain(BaseDriver):
         successful compilation run.
         """
 
-    def do_transpile(self, spec):
+    def compile_transpile_all(self, spec):
         transpile_source_map = spec.get('transpile_source_map', {})
         # Contains a mapping of the module name to the compiled file's
         # relative path starting from the base build_dir.
-        compiled_paths = {}
+        transpiled_paths = {}
         # List of exported module names, should be equal to all keys of
         # the compiled and bundled sources.
         module_names = []
 
-        for modname, source, target in self._gen_req_src_targets(
-                transpile_source_map):
-            compiled_paths[modname] = self.pick_compiled_mod_target_name(
-                modname, source, target)
+        for modname, source, target in self._gen_modname_source_target(
+                spec, transpile_source_map):
+            transpiled_paths[modname] = self.modname_source_target_to_path(
+                spec, modname, source, target)
             module_names.append(modname)
-            compile_target = join(spec['build_dir'], target)
-            self._validate_build_target(spec, compile_target)
-            self.compile(spec, source, compile_target)
+            self.transpile_modname_source_target(spec, modname, source, target)
 
-        return compiled_paths, module_names
+        return transpiled_paths, module_names
 
-    def do_bundle(self, spec):
-        bundled_source_map = spec.get('bundled_source_map', {})
+    def compile_bundle_all(self, spec):
+        bundle_source_map = spec.get('bundle_source_map', {})
         # Contains a mapping of the bundled name to the bundled file's
         # relative path starting from the base build_dir.
         bundled_paths = {}
@@ -245,10 +249,10 @@ class Toolchain(BaseDriver):
         # the compiled and bundled sources.
         module_names = []
 
-        for modname, source, target in self._gen_req_src_targets(
-                bundled_source_map):
-            bundled_paths[modname] = self.pick_compiled_mod_target_name(
-                modname, source, target)
+        for modname, source, target in self._gen_modname_source_target(
+                spec, bundle_source_map):
+            bundled_paths[modname] = self.modname_source_target_to_path(
+                spec, modname, source, target)
             if isfile(source):
                 module_names.append(modname)
                 copy_target = join(spec['build_dir'], target)
@@ -259,18 +263,23 @@ class Toolchain(BaseDriver):
 
         return bundled_paths, module_names
 
-    def compile_all(self, spec):
+    def compile(self, spec):
         """
-        Generic step that compiles everything needed for the bundle.
-        This step involves bundling all the files needed into the build
-        directory, either through transpilation or simple copying.
+        Generic step that compiles from a spec to build the specified
+        things into the build directory `build_dir`, by gathering all
+        the files and feed them through the transpilation process or by
+        simple copying.
         """
 
-        compiled_paths, compiled_module_names = self.do_transpile(spec)
-        bundled_paths, bundled_module_names = self.do_bundle(spec)
-        module_names = compiled_module_names + bundled_module_names
+        # for compile_suffix, store_key in self.compile_map:
+        #     method = getattr(self, self.compile_prefix + compile_suffix, None)
+
+        transpiled_paths, transpiled_module_names = self.compile_transpile_all(
+            spec)
+        bundled_paths, bundled_module_names = self.compile_bundle_all(spec)
+        module_names = transpiled_module_names + bundled_module_names
         spec.update_selected(locals(), [
-            'compiled_paths', 'bundled_paths', 'module_names'])
+            'transpiled_paths', 'bundled_paths', 'module_names'])
 
     def assemble(self, spec):
         """
@@ -310,7 +319,7 @@ class Toolchain(BaseDriver):
         """
 
         self.prepare(spec)
-        self.compile_all(spec)
+        self.compile(spec)
         self.assemble(spec)
         self.link(spec)
         self.finalize(spec)

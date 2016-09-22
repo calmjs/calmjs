@@ -134,10 +134,10 @@ class ToolchainTestCase(unittest.TestCase):
         # Also that it got deleted properly.
         self.assertFalse(exists(spec['build_dir']))
 
-    def test_toolchain_standard_compile_all(self):
+    def test_toolchain_standard_compile(self):
         spec = Spec()
-        self.toolchain.compile_all(spec)
-        self.assertEqual(spec['compiled_paths'], {})
+        self.toolchain.compile(spec)
+        self.assertEqual(spec['transpiled_paths'], {})
         self.assertEqual(spec['bundled_paths'], {})
         self.assertEqual(spec['module_names'], [])
 
@@ -237,35 +237,39 @@ class NullToolchainTestCase(unittest.TestCase):
         tmpdir = mkdtemp(self)
         js_code = 'var dummy = function () {};\n'
         source = join(tmpdir, 'source.js')
-        target = join(tmpdir, 'target.js')
+        target = 'target.js'
 
         with open(source, 'w') as fd:
             fd.write(js_code)
 
-        spec = Spec()
-        self.toolchain.compile(spec, source, target)
+        spec = Spec(build_dir=tmpdir)
+        modname = 'dummy'
+        self.toolchain.transpile_modname_source_target(
+            spec, modname, source, target)
 
-        with open(target) as fd:
+        with open(join(tmpdir, target)) as fd:
             result = fd.read()
 
         self.assertEqual(js_code, result)
 
     def test_toolchain_naming(self):
+        s = Spec()
         self.assertEqual(self.toolchain.modname_source_to_modname(
-            'example/module', '/tmp/example.module/src/example/module.js'),
+            s, 'example/module', '/tmp/example.module/src/example/module.js'),
             'example/module',
         )
         self.assertEqual(self.toolchain.modname_source_to_source(
-            'example/module', '/tmp/example.module/src/example/module.js'),
+            s, 'example/module', '/tmp/example.module/src/example/module.js'),
             '/tmp/example.module/src/example/module.js',
         )
         self.assertEqual(self.toolchain.modname_source_to_target(
-            'example/module', '/tmp/example.module/src/example/module.js'),
+            s, 'example/module', '/tmp/example.module/src/example/module.js'),
             'example/module.js',
         )
 
-    def test_toolchain_gen_req_src_targets(self):
-        result = sorted(self.toolchain._gen_req_src_targets({
+    def test_toolchain_gen_modname_source_target(self):
+        spec = Spec()
+        result = sorted(self.toolchain._gen_modname_source_target(spec, {
             'ex/module1': '/src/ex/module1.js',
             'ex/module2': '/src/ex/module2.js',
         }))
@@ -275,21 +279,22 @@ class NullToolchainTestCase(unittest.TestCase):
             ('ex/module2', '/src/ex/module2.js', 'ex/module2.js'),
         ])
 
-    def test_toolchain_gen_req_src_targets_failure(self):
+    def test_toolchain_gen_modname_source_target_failure_safe(self):
         # allow subclasses to raise ValueError to trigger a skip.
         class FailToolchain(NullToolchain):
-            def modname_source_to_target(self, modname, source):
+            def modname_source_to_target(self, spec, modname, source):
                 if 'fail' in source:
                     raise ValueError('source cannot fail')
                 elif 'skip' in source:
                     raise ValueSkip('skipping source')
                 return super(FailToolchain, self).modname_source_to_target(
-                    modname, source)
+                    spec, modname, source)
 
+        spec = Spec()
         toolchain = FailToolchain()
 
         with pretty_logging(stream=StringIO()) as s:
-            result = sorted(toolchain._gen_req_src_targets({
+            result = sorted(toolchain._gen_modname_source_target(spec, {
                 'ex/module1': '/src/ex/module1.js',
                 'ex/module2': 'fail',
                 'ex/module3': '/src/ex/module3.js',
@@ -307,8 +312,8 @@ class NullToolchainTestCase(unittest.TestCase):
         ])
 
         with pretty_logging(stream=StringIO()) as s:
-            self.assertEqual(sorted(toolchain._gen_req_src_targets({
-                'skip': 'skip'})), [])
+            self.assertEqual(sorted(toolchain._gen_modname_source_target(
+                spec, {'skip': 'skip'})), [])
 
         self.assertIn("INFO", s.getvalue())
         self.assertIn(
@@ -340,7 +345,7 @@ class NullToolchainTestCase(unittest.TestCase):
             },
 
             'bundled_paths': {},
-            'compiled_paths': {
+            'transpiled_paths': {
                 'namespace.dummy.source': 'namespace.dummy.source',
             },
             'module_names': ['namespace.dummy.source'],
@@ -350,9 +355,9 @@ class NullToolchainTestCase(unittest.TestCase):
         })
         self.assertTrue(exists(join(build_dir, 'namespace.dummy.source.js')))
 
-    def test_null_toolchain_bundled_sources(self):
+    def test_null_toolchain_bundle_sources(self):
         source_dir = mkdtemp(self)
-        bundled_dir = mkdtemp(self)
+        bundle_dir = mkdtemp(self)
         build_dir = mkdtemp(self)
 
         source_file = join(source_dir, 'source.js')
@@ -360,14 +365,14 @@ class NullToolchainTestCase(unittest.TestCase):
         with open(source_file, 'w') as fd:
             fd.write('var dummy = function () {};\n')
 
-        with open(join(bundled_dir, 'bundled.js'), 'w') as fd:
+        with open(join(bundle_dir, 'bundle.js'), 'w') as fd:
             fd.write('var dummy = function () {};\n')
 
         spec = Spec(
             build_dir=build_dir,
-            bundled_source_map={
+            bundle_source_map={
                 'bundle1': source_file,
-                'bundle2': bundled_dir,
+                'bundle2': bundle_dir,
             },
         )
         self.toolchain(spec)
@@ -375,23 +380,23 @@ class NullToolchainTestCase(unittest.TestCase):
         # name, and relative filename to the build_path
         self.assertEqual(spec, {
             'build_dir': build_dir,
-            'bundled_source_map': {
+            'bundle_source_map': {
                 'bundle1': source_file,
-                'bundle2': bundled_dir,
+                'bundle2': bundle_dir,
             },
 
             'bundled_paths': {
                 'bundle1': 'bundle1',
                 'bundle2': 'bundle2',
             },
-            'compiled_paths': {},
+            'transpiled_paths': {},
             'module_names': ['bundle1'],
             'prepare': 'prepared',
             'assemble': 'assembled',
             'link': 'linked',
         })
         self.assertTrue(exists(join(build_dir, 'bundle1.js')))
-        self.assertTrue(exists(join(build_dir, 'bundle2', 'bundled.js')))
+        self.assertTrue(exists(join(build_dir, 'bundle2', 'bundle.js')))
 
     def test_null_toolchain_transpile_js_ns_directory_sources(self):
         """
@@ -428,7 +433,7 @@ class NullToolchainTestCase(unittest.TestCase):
             },
 
             'bundled_paths': {},
-            'compiled_paths': {
+            'transpiled_paths': {
                 'namespace/dummy/source': 'namespace/dummy/source',
             },
             'module_names': ['namespace/dummy/source'],
