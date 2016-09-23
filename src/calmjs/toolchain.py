@@ -399,17 +399,18 @@ class Toolchain(BaseDriver):
                     # a purposely benign failure.
                     log = partial(
                         logger.info,
-                        "toolchain purposely skipping on '%s' where "
-                        "modname='%s', source='%s'",
+                        "toolchain purposely skipping on '%s', "
+                        "reason: %s, where modname='%s', source='%s'",
                     )
                 else:
                     log = partial(
                         logger.warning,
-                        "toolchain failed to acquire name with '%s' where "
-                        "modname='%s', source='%s'; skipping",
+                        "toolchain failed to acquire name with '%s', "
+                        "reason: %s, where modname='%s', source='%s'; "
+                        "skipping",
                     )
 
-                log(f_name, *modname_source)
+                log(f_name, e, *modname_source)
                 continue
             yield modname, source, target, modpath
 

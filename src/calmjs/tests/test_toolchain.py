@@ -384,8 +384,9 @@ class NullToolchainTestCase(unittest.TestCase):
 
         self.assertIn("WARNING", s.getvalue())
         self.assertIn(
-            "failed to acquire name with 'modname_source_to_target' where "
-            "modname='ex/mod2', source='fail'", s.getvalue(),
+            "failed to acquire name with 'modname_source_to_target', "
+            "reason: source cannot fail, "
+            "where modname='ex/mod2', source='fail'", s.getvalue(),
         )
 
         self.assertEqual(result, [
@@ -400,8 +401,9 @@ class NullToolchainTestCase(unittest.TestCase):
 
         self.assertIn("INFO", s.getvalue())
         self.assertIn(
-            "toolchain purposely skipping on 'modname_source_to_target' where "
-            "modname='skip', source='skip'", s.getvalue(),
+            "toolchain purposely skipping on 'modname_source_to_target', "
+            "reason: skipping source, "
+            "where modname='skip', source='skip'", s.getvalue(),
         )
 
     def test_null_toolchain_transpile_sources(self):
