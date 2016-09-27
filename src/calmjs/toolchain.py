@@ -198,7 +198,7 @@ class Toolchain(BaseDriver):
 
         third element being the write key for first return value of the
         method, it will be suffixed with the path_suffix, defaults to
-        `_path`.
+        `_paths`.
 
         The method referenced SHOULD NOT assign values to the spec, and
         it must produce and return a 2-tuple:
@@ -290,7 +290,13 @@ class Toolchain(BaseDriver):
         return bundled_paths, module_names
 
     # The naming methods, which are needed by certain toolchains that
-    # need to generate specific names to maintain compatibility.
+    # need to generate specific names to maintain compatibility.  The
+    # intended use case for this set of methods is to provide a rigidly
+    # defined name handling ruleset for a given implementation of a
+    # toolchain, but for toolchains that have its own custom naming
+    # schemes per whatever value combination, further handling can be
+    # done within each of the compile_* methods that are registered for
+    # use for that particular toolchain.
 
     def modname_source_to_modname(self, spec, modname, source):
         """

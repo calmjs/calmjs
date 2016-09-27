@@ -274,7 +274,7 @@ class ToolchainTestCase(unittest.TestCase):
         spec = Spec(
             build_dir=build_dir,
             transpile_source_map={
-                # lol ``.`` being valid namespace in node
+                # lol ``.`` being valid char for namespace in node
                 '../source': join(source, 'source'),
             },
         )
