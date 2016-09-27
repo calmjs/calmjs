@@ -281,6 +281,39 @@ class ToolchainTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.toolchain(spec)
 
+    def test_toolchain_compile_bundle(self):
+        """
+        Test out the compile bundle being actually flexible for variety
+        of cases.
+        """
+
+        build_dir = mkdtemp(self)
+        src_dir = mkdtemp(self)
+        src = join(src_dir, 'mod.js')
+
+        spec = {'build_dir': build_dir}
+
+        with open(src, 'w') as fd:
+            fd.write('module.export = function () {};')
+
+        # prepare targets
+        target1 = 'mod1.js'
+        target2 = join('namespace', 'mod2.js')
+        target3 = join('nested', 'namespace', 'mod3.js')
+        target4 = 'namespace.mod4.js'
+
+        self.toolchain.compile_bundle(spec, [
+            ('mod1', src, target1, 'mod1'),
+            ('mod2', src, target2, 'mod2'),
+            ('mod3', src, target3, 'mod3'),
+            ('mod4', src, target4, 'mod4'),
+        ])
+
+        self.assertTrue(exists(join(build_dir, target1)))
+        self.assertTrue(exists(join(build_dir, target2)))
+        self.assertTrue(exists(join(build_dir, target3)))
+        self.assertTrue(exists(join(build_dir, target4)))
+
 
 class NullToolchainTestCase(unittest.TestCase):
     """

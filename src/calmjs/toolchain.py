@@ -280,6 +280,8 @@ class Toolchain(BaseDriver):
             if isfile(source):
                 module_names.append(modname)
                 copy_target = join(spec['build_dir'], target)
+                if not exists(dirname(copy_target)):
+                    makedirs(dirname(copy_target))
                 shutil.copy(source, copy_target)
             elif isdir(source):
                 copy_target = join(spec['build_dir'], modname)
