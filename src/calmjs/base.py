@@ -182,6 +182,10 @@ class BaseModuleRegistry(BaseRegistry):
                     "applying new records on top.",
                     module_name, self.registry_name,
                 )
+                logger.debug("overwriting keys: %s", sorted(
+                    set(self.records[module_name].keys()) &
+                    set(records.keys())
+                ))
                 self.records[module_name].update(records)
             else:
                 logger.debug(
@@ -437,12 +441,17 @@ class BaseDriver(object):
 
         if self.working_dir:
             logger.debug(
-                "instance 'working_dir' set to '%s'", self.working_dir)
+                "'%s' instance 'working_dir' set to '%s' for join_cwd",
+                type(self).__name__, self.working_dir,
+            )
             cwd = self.working_dir
         else:
             cwd = getcwd()
             logger.debug(
-                "instance 'working_dir' unset; default to process '%s'", cwd)
+                "'%s' instance 'working_dir' unset; "
+                "default to process '%s' for join_cwd",
+                type(self).__name__, cwd,
+            )
 
         if path:
             return join(cwd, path)

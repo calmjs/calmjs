@@ -165,6 +165,16 @@ class BaseModuleRegistryTestCase(unittest.TestCase):
         record2 = registry.get_record('calmjs.testing.module1')
         self.assertIsNot(record1, record2)
 
+    def test_dupe_register(self):
+        # returned records should clones.
+        working_set = mocks.WorkingSet({__name__: [
+            'calmjs.testing.module1 = calmjs.testing',
+            'calmjs.testing.module2 = calmjs.testing',
+        ]})
+        with pretty_logging(stream=mocks.StringIO()) as s:
+            DummyModuleRegistry(__name__, _working_set=working_set)
+        self.assertIn("overwriting keys: ['calmjs.testing']", s.getvalue())
+
 
 class BaseDriverClassTestCase(unittest.TestCase):
     """
