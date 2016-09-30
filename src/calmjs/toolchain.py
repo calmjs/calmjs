@@ -48,6 +48,18 @@ def _opener(*a):
     return codecs.open(*a, encoding='utf-8')
 
 
+def _check_key_exists(spec, keys):
+    for key in keys:
+        if key not in spec:
+            continue
+        logger.error(
+            "attempted to write '%s' to spec but key already exists; "
+            "not overwriting, skipping", key
+        )
+        return True
+    return False
+
+
 def null_transpiler(spec, reader, writer):
     writer.write(reader.read())
 
@@ -170,7 +182,8 @@ class Toolchain(BaseDriver):
 
         self.compile_prefix = 'compile_'
         self.sourcemap_suffix = '_source_map'
-        self.path_suffix = '_paths'
+        self.modpath_suffix = '_modpaths'
+        self.target_suffix = '_targets'
 
     def setup_compile_entries(self):
         """
@@ -198,8 +211,8 @@ class Toolchain(BaseDriver):
         the sourcemap_suffix, default being `_source_map`.
 
         third element being the write key for first return value of the
-        method, it will be suffixed with the path_suffix, defaults to
-        `_paths`.
+        method, it will be suffixed with the modpath_suffix, defaults to
+        `_modpaths`, and the target_suffix, default to `_targets`.
 
         The method referenced SHOULD NOT assign values to the spec, and
         it must produce and return a 2-tuple:
@@ -213,7 +226,7 @@ class Toolchain(BaseDriver):
         """
 
         return (
-            # compile_*, *_source_map, *_paths
+            # compile_*, *_source_map, (*_modpaths, *_targets)
             ('transpile', 'transpile', 'transpiled'),
             ('bundle', 'bundle', 'bundled'),
         )
@@ -252,17 +265,19 @@ class Toolchain(BaseDriver):
 
         # Contains a mapping of the module name to the compiled file's
         # relative path starting from the base build_dir.
-        transpiled_paths = {}
+        transpiled_modpaths = {}
+        transpiled_targets = {}
         # List of exported module names, should be equal to all keys of
         # the compiled and bundled sources.
         module_names = []
 
         for modname, source, target, modpath in entries:
-            transpiled_paths[modname] = modpath
+            transpiled_modpaths[modname] = modpath
+            transpiled_targets[modname] = target
             module_names.append(modname)
             self.transpile_modname_source_target(spec, modname, source, target)
 
-        return transpiled_paths, module_names
+        return transpiled_modpaths, transpiled_targets, module_names
 
     def compile_bundle(self, spec, entries):
         """
@@ -272,13 +287,15 @@ class Toolchain(BaseDriver):
 
         # Contains a mapping of the bundled name to the bundled file's
         # relative path starting from the base build_dir.
-        bundled_paths = {}
+        bundled_modpaths = {}
+        bundled_targets = {}
         # List of exported module names, should be equal to all keys of
         # the compiled and bundled sources.
         module_names = []
 
         for modname, source, target, modpath in entries:
-            bundled_paths[modname] = modpath
+            bundled_modpaths[modname] = modpath
+            bundled_targets[modname] = target
             if isfile(source):
                 module_names.append(modname)
                 copy_target = join(spec['build_dir'], target)
@@ -289,7 +306,7 @@ class Toolchain(BaseDriver):
                 copy_target = join(spec['build_dir'], modname)
                 shutil.copytree(source, copy_target)
 
-        return bundled_paths, module_names
+        return bundled_modpaths, bundled_targets, module_names
 
     # The naming methods, which are needed by certain toolchains that
     # need to generate specific names to maintain compatibility.  The
@@ -466,22 +483,27 @@ class Toolchain(BaseDriver):
                     continue
 
             spec_read_key = read_key + self.sourcemap_suffix
-            spec_write_key = store_key + self.path_suffix
+            spec_modpath_key = store_key + self.modpath_suffix
+            spec_target_key = store_key + self.target_suffix
 
-            if spec_write_key in spec:
+            if _check_key_exists(spec, [spec_modpath_key, spec_target_key]):
                 logger.error(
-                    "compile map entry %r attempting to write to to key '%s' "
-                    "which already exists in spec; not overwriting, skipping",
-                    entry, spec_write_key,
+                    "aborting compile step %r due to existing key", entry,
                 )
                 continue
 
             source_map = spec.get(spec_read_key, {})
             entries = self._gen_modname_source_target_modpath(spec, source_map)
-            spec[spec_write_key], new_module_names = method(spec, entries)
+            (spec[spec_modpath_key], spec[spec_target_key],
+                new_module_names) = method(spec, entries)
             logger.debug(
-                "entry %r wrote %d entries to spec[%r], added %d module_names",
-                entry, len(spec[spec_write_key]), spec_write_key,
+                "entry %r "
+                "wrote %d entries to spec[%r], "
+                "wrote %d entries to spec[%r], "
+                "added %d module_names",
+                entry,
+                len(spec[spec_modpath_key]), spec_modpath_key,
+                len(spec[spec_target_key]), spec_target_key,
                 len(new_module_names),
             )
             module_names.extend(new_module_names)

@@ -149,19 +149,25 @@ class ToolchainTestCase(unittest.TestCase):
     def test_toolchain_standard_compile(self):
         spec = Spec()
         self.toolchain.compile(spec)
-        self.assertEqual(spec['transpiled_paths'], {})
-        self.assertEqual(spec['bundled_paths'], {})
+        self.assertEqual(spec['transpiled_modpaths'], {})
+        self.assertEqual(spec['bundled_modpaths'], {})
+        self.assertEqual(spec['transpiled_targets'], {})
+        self.assertEqual(spec['bundled_targets'], {})
         self.assertEqual(spec['module_names'], [])
 
     def test_toolchain_standard_compile_existing_values(self):
         # Test that in the case where existing path maps will block, and
         # the existing module_names will be kept
-        transpiled_paths = {}
-        bundled_paths = {}
+        transpiled_modpaths = {}
+        bundled_modpaths = {}
+        transpiled_targets = {}
+        bundled_targets = {}
         module_names = ['fake_names']
         spec = Spec(
-            transpiled_paths=transpiled_paths,
-            bundled_paths=bundled_paths,
+            transpiled_modpaths=transpiled_modpaths,
+            bundled_modpaths=bundled_modpaths,
+            transpiled_targets=transpiled_targets,
+            bundled_targets=bundled_targets,
             module_names=module_names,
         )
 
@@ -169,12 +175,54 @@ class ToolchainTestCase(unittest.TestCase):
             self.toolchain.compile(spec)
 
         msg = s.getvalue()
-        self.assertIn("attempting to write to to key 'transpiled_paths'", msg)
-        self.assertIn("attempting to write to to key 'bundled_paths'", msg)
+        self.assertIn("attempted to write 'transpiled_modpaths' to spec", msg)
+        self.assertIn("attempted to write 'bundled_modpaths' to spec", msg)
+        # These are absent due to early abort
+        self.assertNotIn("attempted to write 'transpiled_targets'", msg)
+        self.assertNotIn("attempted to write 'bundled_targets'", msg)
 
-        self.assertIs(spec['transpiled_paths'], transpiled_paths)
-        self.assertIs(spec['bundled_paths'], bundled_paths)
+        # compile step error messages
+        self.assertIn(
+            ("aborting compile step %r due to existing key" % (
+                ('transpile', 'transpile', 'transpiled'),)), msg)
+        self.assertIn(
+            ("aborting compile step %r due to existing key" % (
+                ('bundle', 'bundle', 'bundled'),)), msg)
+
+        # All should be same identity
+        self.assertIs(spec['transpiled_modpaths'], transpiled_modpaths)
+        self.assertIs(spec['bundled_modpaths'], bundled_modpaths)
+        self.assertIs(spec['transpiled_targets'], transpiled_targets)
+        self.assertIs(spec['bundled_targets'], bundled_targets)
         self.assertIs(spec['module_names'], module_names)
+
+    def test_toolchain_standard_compile_existing_values_altarnate(self):
+        # Test that in the case where existing path maps will block, and
+        # the existing module_names will be kept
+        transpiled_targets = {}
+        bundled_targets = {}
+        spec = Spec(
+            transpiled_targets=transpiled_targets,
+            bundled_targets=bundled_targets,
+        )
+
+        with pretty_logging(stream=StringIO()) as s:
+            self.toolchain.compile(spec)
+
+        msg = s.getvalue()
+        # These are filtered first
+        self.assertIn(
+            "attempted to write 'transpiled_targets' to spec but key already "
+            "exists; not overwriting, skipping", msg)
+        self.assertIn(
+            "attempted to write 'bundled_targets' to spec but key already "
+            "exists; not overwriting, skipping", msg)
+
+        # These first couple won't be written since code never hit it
+        self.assertNotIn('transpiled_modpaths', spec)
+        self.assertNotIn('bundled_modpaths', spec)
+        self.assertIs(spec['bundled_targets'], bundled_targets)
+        self.assertIs(spec['transpiled_targets'], transpiled_targets)
 
     def test_toolchain_standard_compile_bad_module_names_type(self):
         module_names = {}
@@ -187,16 +235,19 @@ class ToolchainTestCase(unittest.TestCase):
         # Not a standard way to override this, but good enough as a
         # demo.
         def compile_faked(spec, entries):
-            return {'fake': 'nothing-here'}, ['fake']
+            return {'fake': 'nothing'}, {'fake': 'nothing.js'}, ['fake']
 
         self.toolchain.compile_entries = ((compile_faked, 'fake', 'faked'),)
         spec = Spec()
 
         self.toolchain.compile(spec)
 
-        self.assertNotIn('transpiled_paths', spec)
-        self.assertNotIn('bundled_paths', spec)
-        self.assertEqual(spec['faked_paths'], {'fake': 'nothing-here'})
+        self.assertNotIn('transpiled_modpaths', spec)
+        self.assertNotIn('bundled_modpaths', spec)
+        self.assertNotIn('transpiled_targets', spec)
+        self.assertNotIn('bundled_targets', spec)
+        self.assertEqual(spec['faked_modpaths'], {'fake': 'nothing'})
+        self.assertEqual(spec['faked_targets'], {'fake': 'nothing.js'})
         self.assertEqual(spec['module_names'], ['fake'])
 
     def test_toolchain_standard_compile_alternate_entries_not_callable(self):
@@ -211,8 +262,10 @@ class ToolchainTestCase(unittest.TestCase):
         msg = s.getvalue()
         self.assertIn("'very_not_here' not a callable attribute for", msg)
 
-        self.assertNotIn('transpiled_paths', spec)
-        self.assertNotIn('bundled_paths', spec)
+        self.assertNotIn('transpiled_modpaths', spec)
+        self.assertNotIn('bundled_modpaths', spec)
+        self.assertNotIn('transpiled_targets', spec)
+        self.assertNotIn('bundled_targets', spec)
 
     def test_toolchain_standard_good(self):
         # good, with a mock
@@ -474,9 +527,13 @@ class NullToolchainTestCase(unittest.TestCase):
                 'namespace.dummy.source': source_file,
             },
 
-            'bundled_paths': {},
-            'transpiled_paths': {
+            'bundled_modpaths': {},
+            'bundled_targets': {},
+            'transpiled_modpaths': {
                 'namespace.dummy.source': 'namespace.dummy.source',
+            },
+            'transpiled_targets': {
+                'namespace.dummy.source': 'namespace.dummy.source.js',
             },
             'module_names': ['namespace.dummy.source'],
             'prepare': 'prepared',
@@ -515,11 +572,16 @@ class NullToolchainTestCase(unittest.TestCase):
                 'bundle2': bundle_dir,
             },
 
-            'bundled_paths': {
+            'bundled_modpaths': {
                 'bundle1': 'bundle1',
                 'bundle2': 'bundle2',
             },
-            'transpiled_paths': {},
+            'bundled_targets': {
+                'bundle1': 'bundle1.js',
+                'bundle2': 'bundle2.js',
+            },
+            'transpiled_modpaths': {},
+            'transpiled_targets': {},
             'module_names': ['bundle1'],
             'prepare': 'prepared',
             'assemble': 'assembled',
@@ -562,9 +624,13 @@ class NullToolchainTestCase(unittest.TestCase):
                 'namespace/dummy/source': source_file,
             },
 
-            'bundled_paths': {},
-            'transpiled_paths': {
+            'bundled_modpaths': {},
+            'bundled_targets': {},
+            'transpiled_modpaths': {
                 'namespace/dummy/source': 'namespace/dummy/source',
+            },
+            'transpiled_targets': {
+                'namespace/dummy/source': 'namespace/dummy/source.js',
             },
             'module_names': ['namespace/dummy/source'],
             'prepare': 'prepared',
