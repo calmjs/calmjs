@@ -10,6 +10,19 @@ Changelog
 - The compile method now reads from an instance specific list of methods
   which allow very customizable compilation steps.
 - Specific ways for a toolchain to skip specific names based.
+- Fixed copying of bundle sources to targets nested in subdirectories.
+- The ``Spec`` callback system is now renamed to events and more
+  comprehensively implemented; every process within the toolchain will
+  trigger a before and after event.  These events are formalized as
+  constants that can be imported from the ``calmjs.toolchain`` module.
+- A couple spec keys were formalized, which are BUILD_DIR and
+  CONFIG_JS_FILES, reserved for the build directory and marking out
+  configuration JavaScript files.
+- On a successful toolchain call, all events registered to the spec
+  under the key ``calmjs.toolchain.SUCCESS`` will now be invoked.
+- Dedicated runtime provided for ``Toolchain`` subclasses, joining the
+  ranks of a few other ``BaseDriver`` subclasses.  This is implemented
+  as ``calmjs.runtime.ToolchainRuntime``.
 
 1.0.3 (2016-09-07)
 ------------------

@@ -31,15 +31,18 @@ with the JavaScript/Node.js ecosystem from within a Python environment.
 Introduction
 ------------
 
-In essence, |calmjs| defines a framework and provide a set of tools that
-enable Python packages to declare their what JavaScript package or
-sources they require for their complete functionality.  This common
-framework will ensure the accessibility of these metadata under a common
-protocol, instead of being otherwise scattered across different tools or
-locations.  Ultimately, this permits better `Node.js`_ integration with a
-given Python environment, lowering the amount of effort needed to
-achieve continuous integration and/or delivery of Python packages in
-conjunction with Node.js/JavaScript packages in a reproducible manner.
+In essence, |calmjs| defines an extensible framework that enables Python
+packages to declare dependencies on JavaScript package or sources that
+are required for their complete functionality, and a set of tools to
+work with these declarations in order to generate the build and
+execution environment for them.  This common framework will ensure the
+accessibility of these metadata under a common protocol, instead of
+being otherwise scattered across different tools or locations or be
+duplicated between the working environments.  Ultimately, this permits
+better `Node.js`_ integration with a given Python environment, lowering
+the amount of effort needed to achieve continuous integration and/or
+delivery of Python packages in conjunction with Node.js/JavaScript
+packages in a reproducible manner.
 
 In order to achieve this, the calmjs framework provides a set of
 extension to |setuptools|_ that assists with the tracking and management
@@ -51,7 +54,8 @@ JavaScript code and related assets into the deployment artifacts that an
 application server may use, or to generate test harnesses to ensure
 correctness under both the development and production environment.
 These extra functionalities will be provided by other Python packages
-under the |calmjs| namespace.
+under the |calmjs| namespace in order to realize this modular
+architecture.
 
 The name |calmjs| was originally derived from the steps in the first
 iteration of the toolchain which involves the steps compile, assemble,
