@@ -142,6 +142,7 @@ class Toolchain(BaseDriver):
         self.setup_transpiler()
         self.setup_prefix_suffix()
         self.setup_compile_entries()
+        self.callback_keys = []
 
     # Setup related methods
 
@@ -212,6 +213,7 @@ class Toolchain(BaseDriver):
         """
 
         return (
+            # compile_*, *_source_map, *_paths
             ('transpile', 'transpile', 'transpiled'),
             ('bundle', 'bundle', 'bundled'),
         )
@@ -557,6 +559,7 @@ class Toolchain(BaseDriver):
 
         try:
             self._calf(spec)
+            spec.do_callbacks('success')
         finally:
             spec.do_callbacks('cleanup')
 

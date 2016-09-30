@@ -134,6 +134,18 @@ class ToolchainTestCase(unittest.TestCase):
         # Also that it got deleted properly.
         self.assertFalse(exists(spec['build_dir']))
 
+    def test_toolchain_call_standard_failure_callback(self):
+        cleanup, success = [], []
+        spec = Spec()
+        spec.add_callback('cleanup', cleanup.append, True)
+        spec.add_callback('success', success.append, True)
+
+        with self.assertRaises(NotImplementedError):
+            self.toolchain(spec)
+
+        self.assertEqual(len(cleanup), 1)
+        self.assertEqual(len(success), 0)
+
     def test_toolchain_standard_compile(self):
         spec = Spec()
         self.toolchain.compile(spec)
@@ -561,3 +573,12 @@ class NullToolchainTestCase(unittest.TestCase):
         })
         self.assertTrue(exists(join(
             build_dir, 'namespace', 'dummy', 'source.js')))
+
+    def test_null_toolchain_call_standard_success_callback(self):
+        cleanup, success = [], []
+        spec = Spec()
+        spec.add_callback('cleanup', cleanup.append, True)
+        spec.add_callback('success', success.append, True)
+        self.toolchain(spec)
+        self.assertEqual(len(cleanup), 1)
+        self.assertEqual(len(success), 1)
