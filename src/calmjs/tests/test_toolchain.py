@@ -16,9 +16,23 @@ from calmjs.toolchain import Spec
 from calmjs.toolchain import Toolchain
 from calmjs.toolchain import NullToolchain
 
+from calmjs.toolchain import CLEANUP
+from calmjs.toolchain import SUCCESS
+from calmjs.toolchain import AFTER_FINALIZE
+from calmjs.toolchain import BEFORE_FINALIZE
+from calmjs.toolchain import AFTER_LINK
+from calmjs.toolchain import BEFORE_LINK
+from calmjs.toolchain import AFTER_ASSEMBLE
+from calmjs.toolchain import BEFORE_ASSEMBLE
+from calmjs.toolchain import AFTER_COMPILE
+from calmjs.toolchain import BEFORE_COMPILE
+from calmjs.toolchain import AFTER_PREPARE
+from calmjs.toolchain import BEFORE_PREPARE
+
 from calmjs.testing.mocks import StringIO
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import fake_error
+from calmjs.testing.utils import stub_stdouts
 
 
 class SpecTestCase(unittest.TestCase):
@@ -40,50 +54,50 @@ class SpecTestCase(unittest.TestCase):
         spec.update_selected({'abcd': 123, 'defg': 321, 'c': 4}, ['defg', 'c'])
         self.assertEqual(spec, {'a': 1, 'b': 2, 'c': 4, 'defg': 321})
 
-    def test_spec_callback(self):
+    def test_spec_event(self):
         def cb(sideeffect, *a, **kw):
             sideeffect.append((a, kw))
 
         check = []
 
         spec = Spec()
-        spec.add_callback('cleanup', cb, check, 1, keyword='foo')
-        spec.add_callback('cleanup', cb, check, 2, keyword='bar')
+        spec.on_event(CLEANUP, cb, check, 1, keyword='foo')
+        spec.on_event(CLEANUP, cb, check, 2, keyword='bar')
 
-        spec.do_callbacks('foo')
+        spec.do_events('foo')
         self.assertEqual(check, [])
 
-        spec.do_callbacks('cleanup')
+        spec.do_events(CLEANUP)
         # cleanup done lifo
         self.assertEqual(check, [
             ((2,), {'keyword': 'bar'}),
             ((1,), {'keyword': 'foo'}),
         ])
 
-    def test_spec_callback_malformed(self):
+    def test_spec_event_malformed(self):
         def cb(sideeffect, *a, **kw):
             sideeffect.append((a, kw))
 
         check = []
 
         spec = Spec()
-        spec.add_callback('cleanup', cb, check, 1, keyword='foo')
+        spec.on_event(CLEANUP, cb, check, 1, keyword='foo')
         # malformed data shouldn't be added, but just in case.
-        spec._callbacks['cleanup'].append((cb,))
-        spec._callbacks['cleanup'].append((cb, [], []))
-        spec._callbacks['cleanup'].append((cb, {}, {}))
-        spec._callbacks['cleanup'].append((None, [], {}))
+        spec._events[CLEANUP].append((cb,))
+        spec._events[CLEANUP].append((cb, [], []))
+        spec._events[CLEANUP].append((cb, {}, {}))
+        spec._events[CLEANUP].append((None, [], {}))
 
-        spec.do_callbacks('cleanup')
+        spec.do_events(CLEANUP)
         self.assertEqual(check, [
             ((1,), {'keyword': 'foo'}),
         ])
 
-    def test_spec_callback_broken(self):
+    def test_spec_event_broken(self):
         spec = Spec()
-        spec.add_callback('cleanup', fake_error(Exception))
+        spec.on_event(CLEANUP, fake_error(Exception))
         with pretty_logging(stream=StringIO()) as s:
-            spec.do_callbacks('cleanup')
+            spec.do_events(CLEANUP)
         self.assertIn('Traceback', s.getvalue())
 
 
@@ -134,11 +148,11 @@ class ToolchainTestCase(unittest.TestCase):
         # Also that it got deleted properly.
         self.assertFalse(exists(spec['build_dir']))
 
-    def test_toolchain_call_standard_failure_callback(self):
+    def test_toolchain_call_standard_failure_event(self):
         cleanup, success = [], []
         spec = Spec()
-        spec.add_callback('cleanup', cleanup.append, True)
-        spec.add_callback('success', success.append, True)
+        spec.on_event(CLEANUP, cleanup.append, True)
+        spec.on_event(SUCCESS, success.append, True)
 
         with self.assertRaises(NotImplementedError):
             self.toolchain(spec)
@@ -640,11 +654,40 @@ class NullToolchainTestCase(unittest.TestCase):
         self.assertTrue(exists(join(
             build_dir, 'namespace', 'dummy', 'source.js')))
 
-    def test_null_toolchain_call_standard_success_callback(self):
+    def test_null_toolchain_call_standard_success_event(self):
         cleanup, success = [], []
         spec = Spec()
-        spec.add_callback('cleanup', cleanup.append, True)
-        spec.add_callback('success', success.append, True)
+        spec.on_event(CLEANUP, cleanup.append, True)
+        spec.on_event(SUCCESS, success.append, True)
         self.toolchain(spec)
         self.assertEqual(len(cleanup), 1)
         self.assertEqual(len(success), 1)
+
+    def test_null_toolchain_no_event(self):
+        cleanup, success = [], []
+        spec = Spec()
+        spec.on_event(CLEANUP, cleanup.append, True)
+        spec.on_event(SUCCESS, success.append, True)
+        # no events done through the private call
+        self.toolchain._calf(spec)
+        self.assertEqual(len(cleanup), 0)
+        self.assertEqual(len(success), 0)
+
+    def test_null_toolchain_all_events(self):
+        # These are ordered in the same order as they should be called
+        stub_stdouts(self)
+        events = (
+            BEFORE_PREPARE, AFTER_PREPARE, BEFORE_COMPILE, AFTER_COMPILE,
+            BEFORE_ASSEMBLE, AFTER_ASSEMBLE, BEFORE_LINK, AFTER_LINK,
+            BEFORE_FINALIZE, AFTER_FINALIZE, SUCCESS, CLEANUP,
+        )
+        spec = Spec()
+        results = []
+        for event in events:
+            spec.on_event(event, results.append, event)
+
+        self.toolchain._calf(spec)
+        self.assertEqual(len(results), 0)
+
+        self.toolchain(spec)
+        self.assertEqual(tuple(results), events)

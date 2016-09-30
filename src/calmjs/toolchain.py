@@ -41,7 +41,27 @@ from calmjs.utils import raise_os_error
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['Spec', 'Toolchain', 'null_transpiler']
+__all__ = [
+    'Spec', 'Toolchain', 'null_transpiler', 'CLEANUP', 'SUCCESS',
+    'AFTER_FINALIZE', 'BEFORE_FINALIZE', 'AFTER_LINK', 'BEFORE_LINK',
+    'AFTER_ASSEMBLE', 'BEFORE_ASSEMBLE', 'AFTER_COMPILE', 'BEFORE_COMPILE',
+    'AFTER_PREPARE', 'BEFORE_PREPARE',
+]
+
+# define these as reserved event names
+
+CLEANUP = 'cleanup'
+SUCCESS = 'success'
+AFTER_FINALIZE = 'after_finalize'
+BEFORE_FINALIZE = 'before_finalize'
+AFTER_LINK = 'after_link'
+BEFORE_LINK = 'before_link'
+AFTER_ASSEMBLE = 'after_assemble'
+BEFORE_ASSEMBLE = 'before_assemble'
+AFTER_COMPILE = 'after_compile'
+BEFORE_COMPILE = 'before_compile'
+AFTER_PREPARE = 'after_prepare'
+BEFORE_PREPARE = 'before_prepare'
 
 
 def _opener(*a):
@@ -72,7 +92,7 @@ class Spec(dict):
 
     def __init__(self, *a, **kw):
         super(Spec, self).__init__(*a, **kw)
-        self._callbacks = {}
+        self._events = {}
 
     def update_selected(self, other, selected):
         """
@@ -81,14 +101,14 @@ class Spec(dict):
 
         self.update({k: other[k] for k in selected})
 
-    def add_callback(self, name, f, *a, **kw):
+    def on_event(self, name, f, *a, **kw):
         """
-        Add a callback that can be called by do_callbacks.
+        Add a event that can be called by do_events.
 
         Arguments:
 
         name
-            The name of the callback group
+            The name of the event group
         f
             A callable method or function.
 
@@ -96,40 +116,40 @@ class Spec(dict):
         keyword arguments to f when it's invoked.
         """
 
-        self._callbacks[name] = self._callbacks.get(name, [])
-        self._callbacks[name].append((f, a, kw))
+        self._events[name] = self._events.get(name, [])
+        self._events[name].append((f, a, kw))
 
-    def do_callbacks(self, name):
+    def do_events(self, name):
         """
-        Do all the callbacks
+        Do all the events
 
         Arguments:
 
         name
-            The name of the callback group.  All the callables
+            The name of the events group.  All the callables
             registered to this group will be invoked, last-in-first-out
             style.
         """
 
-        callbacks = self._callbacks.get(name, [])
-        while callbacks:
+        events = self._events.get(name, [])
+        while events:
             try:
                 # cleanup basically done lifo (last in first out)
-                values = callbacks.pop()
-                callback, a, kw = values
-                if not ((callable(callback)) and
+                values = events.pop()
+                event, a, kw = values
+                if not ((callable(event)) and
                         isinstance(a, tuple) and
                         isinstance(kw, dict)):
                     raise TypeError
             except ValueError:
-                logger.info('Spec callback extraction error: got %s', values)
+                logger.info('Spec event extraction error: got %s', values)
             except TypeError:
                 logger.info('Spec malformed: got %s', values)
             else:
                 try:
-                    callback(*a, **kw)
+                    event(*a, **kw)
                 except Exception:
-                    logger.exception('Spec callback execution: got %s', values)
+                    logger.exception('Spec event execution: got %s', values)
 
 
 class Toolchain(BaseDriver):
@@ -154,7 +174,7 @@ class Toolchain(BaseDriver):
         self.setup_transpiler()
         self.setup_prefix_suffix()
         self.setup_compile_entries()
-        self.callback_keys = []
+        self.event_keys = []
 
     # Setup related methods
 
@@ -543,6 +563,8 @@ class Toolchain(BaseDriver):
     def _calf(self, spec):
         """
         The main call, assuming the base spec is prepared.
+
+        Also, no events will be triggered.
         """
 
         self.prepare(spec)
@@ -564,7 +586,7 @@ class Toolchain(BaseDriver):
 
         if not spec.get('build_dir'):
             tempdir = realpath(mkdtemp())
-            spec.add_callback('cleanup', shutil.rmtree, tempdir)
+            spec.on_event(CLEANUP, shutil.rmtree, tempdir)
             build_dir = join(tempdir, 'build')
             mkdir(build_dir)
             spec['build_dir'] = build_dir
@@ -580,10 +602,14 @@ class Toolchain(BaseDriver):
                 )
 
         try:
-            self._calf(spec)
-            spec.do_callbacks('success')
+            process = ('prepare', 'compile', 'assemble', 'link', 'finalize')
+            for p in process:
+                spec.do_events('before_' + p)
+                getattr(self, p)(spec)
+                spec.do_events('after_' + p)
+            spec.do_events(SUCCESS)
         finally:
-            spec.do_callbacks('cleanup')
+            spec.do_events(CLEANUP)
 
     def __call__(self, spec):
         """
