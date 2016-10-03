@@ -12,6 +12,7 @@ import pkg_resources
 from calmjs import cli
 from calmjs import dist
 from calmjs import runtime
+from calmjs import toolchain
 from calmjs.utils import pretty_logging
 from calmjs.utils import which
 
@@ -52,6 +53,46 @@ class BaseRuntimeTestCase(unittest.TestCase):
         self.assertEqual(runtime.norm_args(None), ['-h'])
         self.assertEqual(runtime.norm_args([]), [])
         self.assertEqual(runtime.norm_args(['arg']), ['arg'])
+
+
+class ToolchainRuntimeTestCase(unittest.TestCase):
+    """
+    Test cases for the toolchain runtime.
+    """
+
+    def test_toolchain_runtime_basic_config(self):
+        tc = toolchain.NullToolchain()
+        rt = runtime.ToolchainRuntime(tc)
+        text = rt.argparser.format_help()
+        self.assertIn(
+            "--build-dir", text,
+        )
+
+        self.assertTrue(isinstance(rt.create_spec(), toolchain.Spec))
+
+    def test_standard_run(self):
+        tc = toolchain.NullToolchain()
+        rt = runtime.ToolchainRuntime(tc)
+
+        err = mocks.StringIO()
+        with pretty_logging(logger='calmjs.runtime', level=DEBUG, stream=err):
+            result = rt.run()
+        self.assertTrue(isinstance(result, toolchain.Spec))
+        # prove that it did at least run
+        self.assertIn('build_dir', result)
+
+    def test_basic_execution(self):
+        stub_stdouts(self)
+        tc = toolchain.NullToolchain()
+        rt = runtime.ToolchainRuntime(tc)
+        result = rt([])
+        # as result returned not defined for these lower level runtimes
+        # not registered as console entry points, any result can be
+        # returned.
+        self.assertTrue(isinstance(result, toolchain.Spec))
+        # prove that it did at least run
+        self.assertIn('build_dir', result)
+        self.assertEqual(result['link'], 'linked')
 
 
 class PackageManagerDriverTestCase(unittest.TestCase):

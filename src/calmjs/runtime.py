@@ -18,6 +18,7 @@ from argparse import SUPPRESS
 from pkg_resources import Requirement
 from pkg_resources import working_set as default_working_set
 
+from calmjs.toolchain import Spec
 from calmjs.utils import pretty_logging
 from calmjs.utils import pdb_post_mortem
 
@@ -441,6 +442,42 @@ class DriverRuntime(BaseRuntime):
     def __init__(self, cli_driver, action_key=DEST_ACTION, *a, **kw):
         self.cli_driver = cli_driver
         super(DriverRuntime, self).__init__(action_key=action_key, *a, **kw)
+
+
+class ToolchainRuntime(DriverRuntime):
+    """
+    Specizlied runtime for toolchain.
+    """
+
+    @property
+    def toolchain(self):
+        return self.cli_driver
+
+    def init_argparser(self, argparser):
+        argparser.add_argument(
+            '--build-dir', default=None,
+            dest='build_dir',
+            help='the build directory, where all sources will be copied to '
+                 'as part of the build process; if left unspecified, the '
+                 'default behavior is to create a new temporary directory '
+                 'that will be removed upon conclusion of the build; if '
+                 'specified, it must be an existing directory and all files '
+                 'for the build will be copied there instead, with no cleanup '
+                 'done after.'
+        )
+
+    def create_spec(self, **kwargs):
+        """
+        Subclasses should extend this if they take actual parameters.
+        It must produce a ``Spec`` from the given keyword arguments.
+        """
+
+        return Spec(**kwargs)
+
+    def run(self, **kwargs):
+        spec = self.create_spec(**kwargs)
+        self.toolchain(spec)
+        return spec
 
 
 class PackageManagerAction(Action):
