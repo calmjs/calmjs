@@ -45,13 +45,14 @@ __all__ = [
     'Spec', 'Toolchain', 'null_transpiler', 'CLEANUP', 'SUCCESS',
     'AFTER_FINALIZE', 'BEFORE_FINALIZE', 'AFTER_LINK', 'BEFORE_LINK',
     'AFTER_ASSEMBLE', 'BEFORE_ASSEMBLE', 'AFTER_COMPILE', 'BEFORE_COMPILE',
-    'AFTER_PREPARE', 'BEFORE_PREPARE',
+    'AFTER_PREPARE', 'BEFORE_PREPARE', 'AFTER_TEST', 'BEFORE_TEST',
 ]
 
 # define these as reserved event names
-
 CLEANUP = 'cleanup'
 SUCCESS = 'success'
+AFTER_TEST = 'after_test'  # reserved however unused in this module
+BEFORE_TEST = 'before_test'  # reserved however unused in this module
 AFTER_FINALIZE = 'after_finalize'
 BEFORE_FINALIZE = 'before_finalize'
 AFTER_LINK = 'after_link'
