@@ -50,7 +50,7 @@ if sys.version_info < (3,):  # pragma: no cover
 lower = str.lower
 
 
-def _get_bin_version(bin_path, version_flag='-v', kw={}):
+def get_bin_version(bin_path, version_flag='-v', kw={}):
     try:
         prog = _get_exec_binary(bin_path, kw)
         version_str = version_expr.search(
@@ -68,6 +68,8 @@ def _get_bin_version(bin_path, version_flag='-v', kw={}):
         return None
     logger.info("found '%s' version '%s'", bin_path, version_str)
     return version
+
+_get_bin_version = get_bin_version  # BBB backward compat
 
 
 def generate_merge_dict(keys, *dicts):
