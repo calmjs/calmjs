@@ -46,6 +46,9 @@ __all__ = [
     'AFTER_FINALIZE', 'BEFORE_FINALIZE', 'AFTER_LINK', 'BEFORE_LINK',
     'AFTER_ASSEMBLE', 'BEFORE_ASSEMBLE', 'AFTER_COMPILE', 'BEFORE_COMPILE',
     'AFTER_PREPARE', 'BEFORE_PREPARE', 'AFTER_TEST', 'BEFORE_TEST',
+    'BUILD_DIR',
+    'CALMJS_MODULE_REGISTRY_NAMES', 'CALMJS_TEST_REGISTRY_NAMES',
+    'CONFIG_JS_FILES', 'EXPORT_TARGET', 'WORKING_DIR',
 ]
 
 # define these as reserved event names
@@ -63,6 +66,20 @@ AFTER_COMPILE = 'after_compile'
 BEFORE_COMPILE = 'before_compile'
 AFTER_PREPARE = 'after_prepare'
 BEFORE_PREPARE = 'before_prepare'
+
+# define these as reserved spec keys
+# build directory
+BUILD_DIR = 'build_dir'
+# source registries that have been used
+CALMJS_MODULE_REGISTRY_NAMES = 'calmjs_module_registry_names'
+CALMJS_TEST_REGISTRY_NAMES = 'calmjs_test_registry_names'
+# configuration file for enabling execution of code in build directory
+CONFIG_JS_FILES = 'config_js_files'
+# the container for the export target; either a file or directory; this
+# should not be changed after the prepare step.
+EXPORT_TARGET = 'export_target'
+# the working directory
+WORKING_DIR = 'working_dir'
 
 
 def _opener(*a):
@@ -175,7 +192,6 @@ class Toolchain(BaseDriver):
         self.setup_transpiler()
         self.setup_prefix_suffix()
         self.setup_compile_entries()
-        self.event_keys = []
 
     # Setup related methods
 
@@ -260,7 +276,7 @@ class Toolchain(BaseDriver):
         Essentially validate that the target is inside the build_dir.
         """
 
-        if not realpath(target).startswith(spec['build_dir']):
+        if not realpath(target).startswith(spec[BUILD_DIR]):
             raise ValueError('build_target %s is outside build_dir' % target)
 
     def transpile_modname_source_target(self, spec, modname, source, target):
@@ -268,7 +284,7 @@ class Toolchain(BaseDriver):
         The function that gets called by
         """
 
-        bd_target = join(spec['build_dir'], target)
+        bd_target = join(spec[BUILD_DIR], target)
         self._validate_build_target(spec, bd_target)
         logger.info('Transpiling %s to %s', source, bd_target)
         if not exists(dirname(bd_target)):
@@ -319,12 +335,12 @@ class Toolchain(BaseDriver):
             bundled_targets[modname] = target
             if isfile(source):
                 module_names.append(modname)
-                copy_target = join(spec['build_dir'], target)
+                copy_target = join(spec[BUILD_DIR], target)
                 if not exists(dirname(copy_target)):
                     makedirs(dirname(copy_target))
                 shutil.copy(source, copy_target)
             elif isdir(source):
-                copy_target = join(spec['build_dir'], modname)
+                copy_target = join(spec[BUILD_DIR], modname)
                 shutil.copytree(source, copy_target)
 
         return bundled_modpaths, bundled_targets, module_names
@@ -585,18 +601,18 @@ class Toolchain(BaseDriver):
         if not isinstance(spec, Spec):
             raise TypeError('spec must be of type Spec')
 
-        if not spec.get('build_dir'):
+        if not spec.get(BUILD_DIR):
             tempdir = realpath(mkdtemp())
             spec.on_event(CLEANUP, shutil.rmtree, tempdir)
             build_dir = join(tempdir, 'build')
             mkdir(build_dir)
-            spec['build_dir'] = build_dir
+            spec[BUILD_DIR] = build_dir
         else:
-            if not exists(spec['build_dir']):
+            if not exists(spec[BUILD_DIR]):
                 raise_os_error(errno.ENOTDIR)
-            check = realpath(spec['build_dir'])
-            if check != spec['build_dir']:
-                spec['build_dir'] = check
+            check = realpath(spec[BUILD_DIR])
+            if check != spec[BUILD_DIR]:
+                spec[BUILD_DIR] = check
                 logger.warning(
                     "realpath of build_dir resolved to '%s', spec is updated",
                     check
