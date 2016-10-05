@@ -95,6 +95,7 @@ def generate_integration_environment(
             'calmjs.extras_keys',
             '%s = enabled' % extras_calmjs_key,
         )),
+        ('calmjs_module_registry.txt', registry_id),
     ), 'calmjs.simulated', '420', working_dir=working_dir)
 
     make_dummy_dist(None, (
@@ -105,6 +106,7 @@ def generate_integration_environment(
     make_dummy_dist(None, (
         ('requires.txt', '\n'.join([
             'security',
+            'calmjs.simulated',
         ])),
         (pkgman_filename, json.dumps({
             'dependencies': {

@@ -366,7 +366,7 @@ so in the ``setup.py`` file:
         ...
         [calmjs.module]
         example.package = example.package
-        """
+        """,
         ...
     )
 
@@ -394,22 +394,30 @@ like so:
         ...
         [calmjs.registry]
         example.module = example.package.registry:ExampleModuleRegistry
-        """
+        """,
         ...
     )
 
-Then to use simply replace ``calmjs.module`` with the name of the
-registry that was just declared.
+Do note that while the names permitted for an entry point name is quite
+unrestricted, these registry names should be of a standard dotted
+namespace format to ensure maximum tool compatibility, as these can be
+specified from the command line through tools that utilizes this system.
+
+Once the registry was declared, simply replace ``calmjs.module`` with
+the name of that, along with a ``calmjs_module_registry`` attribute that
+declare this ``example.module`` registry is the default registry to use
+with this package.
 
 .. code:: python
 
     setup(
         ...
+        calmjs_module_registry=['example.package'],
         entry_points="""
         ...
         [example.module]
         example.package = example.package
-        """
+        """,
         ...
     )
 
@@ -426,7 +434,7 @@ declared like so:
         ...
         [calmjs.module.pythonic]
         example.package = example.package
-        """
+        """,
         ...
     )
 

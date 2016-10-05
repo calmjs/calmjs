@@ -135,6 +135,33 @@ class DistTestCase(unittest.TestCase):
             "'default_json' JSON decoding error:"
         ))
 
+    def test_validate_line_list_good(self):
+        self.assertTrue(calmjs_dist.validate_line_list(
+            self.dist, self.optname, ['this', 'value']))
+        self.assertTrue(calmjs_dist.validate_line_list(
+            self.dist, self.optname, 'this\nvalue'))
+        self.assertTrue(calmjs_dist.validate_line_list(
+            self.dist, self.optname, ['this']))
+        self.assertTrue(calmjs_dist.validate_line_list(
+            self.dist, self.optname, 'this'))
+        self.assertTrue(calmjs_dist.validate_line_list(
+            self.dist, self.optname, ('this', 'value')))
+
+    def test_validate_line_list_bad(self):
+        with self.assertRaises(DistutilsSetupError) as e:
+            calmjs_dist.validate_line_list(self.dist, 'items', [
+                'in valid', 'value'])
+        self.assertTrue(str(e.exception).startswith(
+            "'items' must be a list of valid identifiers"))
+
+        with self.assertRaises(DistutilsSetupError) as e:
+            calmjs_dist.validate_line_list(self.dist, 'items', [
+                'this', object()])
+
+        with self.assertRaises(DistutilsSetupError) as e:
+            calmjs_dist.validate_line_list(self.dist, 'items', [
+                'this', object()])
+
     def test_write_json_file(self):
         self.dist.default_json = '{}'
         ei = Mock_egg_info(self.dist)
@@ -159,6 +186,27 @@ class DistTestCase(unittest.TestCase):
             'default_json', ei, self.pkgname, self.pkgname)
         # However since the top level method was stubbed out, just check
         # that it's been called...
+        self.assertEqual(ei.called[self.pkgname], None)
+
+    def test_write_line_list(self):
+        self.dist.field = ['module', 'tests']
+        ei = Mock_egg_info(self.dist)
+        ei.initialize_options()
+        calmjs_dist.write_line_list('field', ei, self.pkgname, self.pkgname)
+        self.assertEqual(ei.called[self.pkgname], 'module\ntests')
+
+    def test_write_line_list_str(self):
+        self.dist.field = 'module\ntests'
+        ei = Mock_egg_info(self.dist)
+        ei.initialize_options()
+        calmjs_dist.write_line_list('field', ei, self.pkgname, self.pkgname)
+        self.assertEqual(ei.called[self.pkgname], 'module\ntests')
+
+    def test_write_line_list_delete(self):
+        self.dist.field = None
+        ei = Mock_egg_info(self.dist)
+        ei.initialize_options()
+        calmjs_dist.write_line_list('field', ei, self.pkgname, self.pkgname)
         self.assertEqual(ei.called[self.pkgname], None)
 
     def test_find_pkg_dist(self):
@@ -618,10 +666,10 @@ class DistTestCase(unittest.TestCase):
 
     def test_module_registry_dependencies_failure_no_reg(self):
         self.assertEqual(calmjs_dist.flatten_module_registry_dependencies(
-            ['calmjs'], registry_key='calmjs.no_reg',), {})
+            ['calmjs'], registry_name='calmjs.no_reg',), {})
 
         self.assertEqual(calmjs_dist.get_module_registry_dependencies(
-            ['calmjs'], registry_key='calmjs.no_reg',), {})
+            ['calmjs'], registry_name='calmjs.no_reg',), {})
 
     def test_module_registry_dependencies_success(self):
         from calmjs.registry import _inst
@@ -699,7 +747,7 @@ class DistTestCase(unittest.TestCase):
         }
 
         site = calmjs_dist.flatten_module_registry_dependencies(
-            ['site'], registry_key=dummy_regid, working_set=working_set)
+            ['site'], registry_name=dummy_regid, working_set=working_set)
         self.assertEqual(site, {
             'site/config': '/home/src/site/config.js',
             'widget/ui': '/home/src/widget/ui.js',
@@ -709,13 +757,13 @@ class DistTestCase(unittest.TestCase):
         })
 
         service = calmjs_dist.flatten_module_registry_dependencies(
-            ['service'], registry_key=dummy_regid, working_set=working_set)
+            ['service'], registry_name=dummy_regid, working_set=working_set)
         self.assertEqual(service, {
             'service/lib': '/home/src/forms/lib.js',
         })
 
         forms = calmjs_dist.flatten_module_registry_dependencies(
-            ['forms'], registry_key=dummy_regid, working_set=working_set)
+            ['forms'], registry_name=dummy_regid, working_set=working_set)
         self.assertEqual(forms, {
             'forms/ui': '/home/src/forms/ui.js',
             'widget/ui': '/home/src/widget/ui.js',
@@ -724,7 +772,7 @@ class DistTestCase(unittest.TestCase):
 
         # merger
         merged = calmjs_dist.flatten_module_registry_dependencies(
-            ['forms', 'service'], registry_key=dummy_regid,
+            ['forms', 'service'], registry_name=dummy_regid,
             working_set=working_set)
         self.assertEqual(merged, {
             'forms/ui': '/home/src/forms/ui.js',
@@ -735,26 +783,95 @@ class DistTestCase(unittest.TestCase):
 
         # no declared exports/registry entries in security.
         security = calmjs_dist.flatten_module_registry_dependencies(
-            ['security'], registry_key=dummy_regid, working_set=working_set)
+            ['security'], registry_name=dummy_regid, working_set=working_set)
         self.assertEqual(security, {})
 
         # package not even in working set
         missing_pkg = calmjs_dist.flatten_module_registry_dependencies(
-            ['missing_pkg'], registry_key=dummy_regid, working_set=working_set)
+            ['missing_pkg'], registry_name=dummy_regid,
+            working_set=working_set)
         self.assertEqual(missing_pkg, {})
 
         # singlular methods
         self.assertEqual(calmjs_dist.get_module_registry_dependencies(
-            ['site'], registry_key=dummy_regid, working_set=working_set), {
+            ['site'], registry_name=dummy_regid, working_set=working_set), {
             'site/config': '/home/src/site/config.js'})
 
         self.assertEqual(calmjs_dist.get_module_registry_dependencies(
             ['security'],
-            registry_key=dummy_regid, working_set=working_set), {})
+            registry_name=dummy_regid, working_set=working_set), {})
 
         self.assertEqual(calmjs_dist.get_module_registry_dependencies(
             ['missing'],
-            registry_key=dummy_regid, working_set=working_set), {})
+            registry_name=dummy_regid, working_set=working_set), {})
+
+    def test_read_dist_line_list(self):
+        # We will mock up a Distribution object with some fake metadata.
+        mock_provider = MockProvider({
+            'list.txt': 'reg1\nreg2',
+        })
+        mock_dist = pkg_resources.Distribution(
+            metadata=mock_provider, project_name='dummydist', version='0.0.0')
+        results = calmjs_dist.read_dist_line_list(mock_dist, 'list.txt')
+        self.assertEqual(results, ['reg1', 'reg2'])
+
+    def test_read_dist_line_io_error(self):
+        # We will mock up a Distribution object with some fake metadata.
+        stub_stdouts(self)
+        mock_provider = MockProvider({
+            'list.txt': None  # the MockProvider emulates IOError
+        })
+        mock_dist = pkg_resources.Distribution(
+            metadata=mock_provider, project_name='dummydist', version='0.0.0')
+        results = calmjs_dist.read_dist_line_list(mock_dist, 'list.txt')
+        self.assertEqual(results, [])
+
+    def test_module_module_registry_names_no_reg(self):
+        working_set = pkg_resources.WorkingSet()
+        self.assertEqual(calmjs_dist.flatten_module_registry_names(
+            ['nothing'], working_set=working_set), [])
+        self.assertEqual(calmjs_dist.get_module_registry_names(
+            ['nothing'], working_set=working_set), [])
+
+    def test_module_module_registry_names_success(self):
+        base = make_dummy_dist(self, (
+            ('requires.txt', ''),
+        ), 'base', '1.0.0')
+
+        lib = make_dummy_dist(self, (
+            ('requires.txt', 'base>=1.0.0'),
+            (calmjs_dist.CALMJS_MODULE_REGISTRY_TXT,
+                '\n'.join(['reg1', 'reg2'])),
+        ), 'lib', '1.0.0')
+
+        app = make_dummy_dist(self, (
+            ('requires.txt', 'lib>=1.0.0'),
+            (calmjs_dist.CALMJS_MODULE_REGISTRY_TXT,
+                '\n'.join(['reg2', 'reg3'])),
+        ), 'app', '2.0')
+
+        working_set = pkg_resources.WorkingSet()
+        working_set.add(base, self._calmjs_testing_tmpdir)
+        working_set.add(lib, self._calmjs_testing_tmpdir)
+        working_set.add(app, self._calmjs_testing_tmpdir)
+
+        self.assertEqual(calmjs_dist.get_module_registry_names(
+            ['base'], working_set=working_set), [])
+        self.assertEqual(calmjs_dist.get_module_registry_names(
+            ['lib'], working_set=working_set), ['reg1', 'reg2'])
+        self.assertEqual(calmjs_dist.get_module_registry_names(
+            ['app'], working_set=working_set), ['reg2', 'reg3'])
+        self.assertEqual(calmjs_dist.get_module_registry_names(
+            ['nothing'], working_set=working_set), [])
+
+        self.assertEqual(calmjs_dist.flatten_module_registry_names(
+            ['base'], working_set=working_set), [])
+        self.assertEqual(calmjs_dist.flatten_module_registry_names(
+            ['lib'], working_set=working_set), ['reg1', 'reg2'])
+        self.assertEqual(calmjs_dist.flatten_module_registry_names(
+            ['app'], working_set=working_set), ['reg1', 'reg2', 'reg3'])
+        self.assertEqual(calmjs_dist.flatten_module_registry_names(
+            ['nothing'], working_set=working_set), [])
 
 
 class DistIntegrationTestCase(unittest.TestCase):
@@ -787,6 +904,7 @@ class DistIntegrationTestCase(unittest.TestCase):
                             'jquery': 'jquery/dist/jquery.js',
                         },
                     },
+                    calmjs_module_registry=['reg1', 'reg2'],
                     zip_safe=False,
                 )
             '''),
@@ -815,6 +933,7 @@ class DistIntegrationTestCase(unittest.TestCase):
         stdout = stdout.decode(locale)
         self.assertIn('writing package_json', stdout)
         self.assertIn('writing extras_calmjs', stdout)
+        self.assertIn('writing calmjs_module_registry', stdout)
 
         egg_root = join(self.pkg_root, 'dummy_pkg.egg-info')
 
@@ -831,3 +950,6 @@ class DistIntegrationTestCase(unittest.TestCase):
                     'jquery': 'jquery/dist/jquery.js',
                 },
             })
+
+        with open(join(egg_root, 'calmjs_module_registry.txt')) as fd:
+            self.assertEqual(fd.read().split(), ['reg1', 'reg2'])

@@ -23,6 +23,9 @@ Changelog
 - Dedicated runtime provided for ``Toolchain`` subclasses, joining the
   ranks of a few other ``BaseDriver`` subclasses.  This is implemented
   as ``calmjs.runtime.ToolchainRuntime``.
+- Provide a way for packages to declare the primary module registry or
+  registries it declared packages for through a new setup keyword
+  ``calmjs_module_registry``, if required and desired.
 
 1.0.3 (2016-09-07)
 ------------------

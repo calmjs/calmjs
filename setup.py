@@ -53,10 +53,13 @@ setup(
         'distutils.setup_keywords': [
             'package_json = calmjs.dist:validate_json_field',
             'extras_calmjs = calmjs.dist:validate_json_field',
+            'calmjs_module_registry = calmjs.dist:validate_line_list',
         ],
         'egg_info.writers': [
             'package.json = calmjs.npm:write_package_json',
             'extras_calmjs.json = calmjs.dist:write_extras_calmjs',
+            ('calmjs_module_registry.txt = '
+                'calmjs.dist:write_module_registry_names'),
         ],
         'calmjs.extras_keys': [
             'node_modules = enabled',

@@ -23,6 +23,8 @@ from calmjs.base import BaseModuleRegistry
 logger = getLogger(__name__)
 
 # default package definition filename.
+CALMJS_MODULE_REGISTRY_FIELD = 'calmjs_module_registry'
+CALMJS_MODULE_REGISTRY_TXT = 'calmjs_module_registry.txt'
 DEFAULT_JSON = 'default.json'
 EXTRAS_CALMJS_FIELD = 'extras_calmjs'
 EXTRAS_CALMJS_JSON = 'extras_calmjs.json'
@@ -71,6 +73,25 @@ def validate_json_field(dist, attr, value):
     return True
 
 
+def validate_line_list(dist, attr, value):
+    """
+    Validate that the value is compatible
+    """
+
+    # does not work as reliably in Python 2.
+    if isinstance(value, str):
+        value = value.split()
+    value = list(value)
+
+    try:
+        check = (' '.join(value)).split()
+        if check == value:
+            return True
+    except Exception:
+        pass
+    raise DistutilsSetupError("%r must be a list of valid identifiers" % attr)
+
+
 def write_json_file(argname, cmd, basename, filename):
     """
     Write JSON captured from the defined argname into the package's
@@ -84,6 +105,17 @@ def write_json_file(argname, cmd, basename, filename):
             value, indent=4, sort_keys=True, separators=(',', ': '))
 
     cmd.write_or_delete_file(argname, filename, value, force=True)
+
+
+def write_line_list(argname, cmd, basename, filename):
+    """
+    Write out the retrieved value as list of lines.
+    """
+
+    values = getattr(cmd.distribution, argname, None)
+    if isinstance(values, list):
+        values = '\n'.join(values)
+    cmd.write_or_delete_file(argname, filename, values, force=True)
 
 
 def find_pkg_dist(pkg_name, working_set=None):
@@ -174,6 +206,21 @@ def read_egginfo_json(pkg_name, filename=DEFAULT_JSON, working_set=None):
     working_set = working_set or default_working_set
     dist = find_pkg_dist(pkg_name, working_set=working_set)
     return read_dist_egginfo_json(dist, filename)
+
+
+def read_dist_line_list(dist, filename):
+    if not dist.has_metadata(filename):
+        return []
+
+    try:
+        result = dist.get_metadata(filename)
+    except IOError:
+        # not as critical as egginfo json, as typical usage these can
+        # be easily overridden
+        logger.warning("I/O error on reading of '%s' for '%s'", filename, dist)
+        return []
+
+    return result.split()
 
 
 def flatten_dist_egginfo_json(
@@ -295,14 +342,14 @@ write_extras_calmjs = partial(write_json_file, EXTRAS_CALMJS_FIELD)
 
 
 def get_module_registry_dependencies(
-        pkg_names, registry_key='calmjs.module', working_set=None):
+        pkg_names, registry_name='calmjs.module', working_set=None):
     """
     For the given packages 'pkg_names' and the registry identified by
-    'registry_key', resolve the exported location for just the package.
+    'registry_name', resolve the exported location for just the package.
     """
 
     working_set = working_set or default_working_set
-    registry = get(registry_key)
+    registry = get(registry_name)
     if not isinstance(registry, BaseModuleRegistry):
         return {}
     result = {}
@@ -312,15 +359,15 @@ def get_module_registry_dependencies(
 
 
 def flatten_module_registry_dependencies(
-        pkg_names, registry_key='calmjs.module', working_set=None):
+        pkg_names, registry_name='calmjs.module', working_set=None):
     """
     For the given packages 'pkg_names' and the registry identified by
-    'registry_key', resolve and flatten all the exported locations.
+    'registry_name', resolve and flatten all the exported locations.
     """
 
     working_set = working_set or default_working_set
     result = {}
-    registry = get(registry_key)
+    registry = get(registry_name)
     if not isinstance(registry, BaseModuleRegistry):
         return result
 
@@ -330,3 +377,37 @@ def flatten_module_registry_dependencies(
         result.update(registry.get_records_for_package(dist.project_name))
 
     return result
+
+
+def _uniq(items):
+    check = set()
+    return [i for i in items if not (i in check or check.add(i))]
+
+
+def get_module_registry_names(pkg_names, working_set=None):
+    """
+    For the given packages 'pkg_names', retrieve the list of module
+    registries explicitly declared for usage.
+    """
+
+    ws = working_set or default_working_set
+    result = []
+    for dist in pkg_names_to_dists(pkg_names, working_set=ws):
+        result.extend(read_dist_line_list(dist, CALMJS_MODULE_REGISTRY_TXT))
+    return _uniq(result)
+
+
+def flatten_module_registry_names(pkg_names, working_set=None):
+    """
+    For the given packages 'pkg_names' and its dependencies, retrieve
+    the list of module registries explicitly declared for usage.
+    """
+
+    ws = working_set or default_working_set
+    result = []
+    for dist in find_packages_requirements_dists(pkg_names, working_set=ws):
+        result.extend(read_dist_line_list(dist, CALMJS_MODULE_REGISTRY_TXT))
+    return _uniq(result)
+
+write_module_registry_names = partial(
+    write_line_list, CALMJS_MODULE_REGISTRY_FIELD)
