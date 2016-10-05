@@ -70,3 +70,22 @@ class Version(Action):
         for i in results:
             sys.stdout.write(i)
         sys.exit(0)
+
+
+class StoreDelimitedList(Action):
+
+    def __init__(self, option_strings, dest, sep=',', **kw):
+        self.sep = sep
+        kw['nargs'] = 1
+        kw['const'] = None
+        default = kw.get('default')
+        if default is not None and not isinstance(default, (tuple, list)):
+            raise ValueError(
+                'provided default for store delimited list must be a list or '
+                'tuple.'
+            )
+        super(StoreDelimitedList, self).__init__(
+            option_strings=option_strings, dest=dest, **kw)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, self.dest, values[0].split(self.sep))
