@@ -120,10 +120,8 @@ def convert_package_names(package_names):
 
 def pkg_names_to_dists(pkg_names, working_set=None):
     working_set = working_set or default_working_set
-    return [
-        find_pkg_dist(pkg_name, working_set=working_set)
-        for pkg_name in pkg_names
-    ]
+    return [dist for dist in (find_pkg_dist(
+        pkg_name, working_set=working_set) for pkg_name in pkg_names) if dist]
 
 
 def find_packages_requirements_dists(pkg_names, working_set=None):

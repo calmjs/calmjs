@@ -191,6 +191,13 @@ class DistTestCase(unittest.TestCase):
         self.assertEqual(result, ['setuptools', 'calmjs [dev]'])
         self.assertEqual(error, ['[dev]'])
 
+    def test_pkg_names_to_dists(self):
+        base = make_dummy_dist(self, (('requires.txt', ''),), 'base', '1.0.0')
+        working_set = pkg_resources.WorkingSet()
+        working_set.add(base, self._calmjs_testing_tmpdir)
+        self.assertEqual(calmjs_dist.pkg_names_to_dists(
+            ['nothing', 'base'], working_set=working_set), [base])
+
     def test_get_pkg_json_integrated_live(self):
         # Try reading a fake package.json from setuptools package
         # directly and see that it will just return nothing while not
