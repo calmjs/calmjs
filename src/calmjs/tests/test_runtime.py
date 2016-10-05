@@ -9,6 +9,7 @@ from logging import DEBUG
 
 import pkg_resources
 
+from calmjs import argparse as calmjs_argparse
 from calmjs import cli
 from calmjs import dist
 from calmjs import runtime
@@ -699,9 +700,10 @@ class MainIntegrationTestCase(unittest.TestCase):
 
     def test_calmjs_main_console_version_broken(self):
         stub_stdouts(self)
+        working_set = pkg_resources.WorkingSet([mkdtemp(self)])
+        stub_item_attr_value(self, runtime, 'default_working_set', working_set)
         stub_item_attr_value(
-            self, runtime, 'default_working_set',
-            pkg_resources.WorkingSet([mkdtemp(self)]))
+            self, calmjs_argparse, 'default_working_set', working_set)
         # make sure the bad case doesn't just blow up...
         with self.assertRaises(SystemExit) as e:
             runtime.main(['-V'])

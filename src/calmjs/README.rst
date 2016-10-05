@@ -13,6 +13,10 @@ utils
     inherit from other calmjs modules.  As a result this is safe to be
     imported from any ``test_`` modules.
 
+argparse
+    Extensions to the built-in ``argparse`` module.  Due to this name,
+    ``absolute_import`` must be used.
+
 base
     Module providing Base* classes.  Should only inherit from utils and
     nothing else.
