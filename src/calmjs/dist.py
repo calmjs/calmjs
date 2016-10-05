@@ -29,6 +29,7 @@ DEFAULT_JSON = 'default.json'
 EXTRAS_CALMJS_FIELD = 'extras_calmjs'
 EXTRAS_CALMJS_JSON = 'extras_calmjs.json'
 DEP_KEYS = ('dependencies', 'devDependencies')
+TEST_REGISTRY_NAME_SUFFIX = '.tests'
 
 
 def is_json_compat(value):

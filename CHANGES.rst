@@ -26,6 +26,10 @@ Changelog
 - Provide a way for packages to declare the primary module registry or
   registries it declared packages for through a new setup keyword
   ``calmjs_module_registry``, if required and desired.
+- The default set of module registry names have been changed.  Registry
+  ``calmjs.pythonic`` is renamed to ``calmjs.py.module``; the related
+  testing related registry is renamed to include the full name of its
+  implied target.
 
 1.0.3 (2016-09-07)
 ------------------

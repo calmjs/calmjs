@@ -432,7 +432,7 @@ declared like so:
         ...
         entry_points="""
         ...
-        [calmjs.module.pythonic]
+        [calmjs.py.module]
         example.package = example.package
         """,
         ...
@@ -446,6 +446,31 @@ generally deal with ``.`` without issues so using those may end up
 resulting in somewhat more Python-like feel when dealing with imports
 while using JavaScript, though at a slight cost of whatever standards
 compliance with it.
+
+By default, another registry with the ``.tests`` suffix is also declared
+as a compliment to the previously introduced registries, which packages
+can make use of to declare JavaScript test code that accompanies the
+respective modules that have been declared.  For example:
+
+.. code:: python
+
+    setup(
+        ...
+        entry_points="""
+        ...
+        [calmjs.module]
+        example.package = example.package
+
+        [calmjs.module.tests]
+        example.package = example.package.tests
+        """,
+        ...
+    )
+
+Much like the first example, this declares ``example.package`` as a
+Python namespace module that exports JavaScript code, with the
+declaration following that declaring the module that contains the tests
+that accompanies that.
 
 Integration with |npm| through ``calmjs npm``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
