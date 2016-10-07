@@ -5,6 +5,7 @@ import os
 import sys
 from argparse import ArgumentParser
 from os.path import join
+from os.path import exists
 from logging import DEBUG
 
 import pkg_resources
@@ -527,6 +528,175 @@ class ArgumentHandlingTestCase(unittest.TestCase):
         err = sys.stderr.getvalue().splitlines()[-1].strip()
         # exact message differs between py2 and py3
         self.assertIn("calmjs cmd: error: ", err)
+
+
+class PackageManagerRuntimeAlternativeIntegrationTestCase(unittest.TestCase):
+    """
+    A comprehensive integration based on a customized environment for
+    testing functionality requirements between changes in 1.0 and 2.0,
+    where the cli interactive stuff is moved to runtime.  This series of
+    tests is based on what were cli unit tests but now those features
+    are provided by the runtime.
+    """
+
+    def setup_runtime(self):
+        stub_stdouts(self)
+        remember_cwd(self)
+        cwd = mkdtemp(self)
+        os.chdir(cwd)
+        make_dummy_dist(self, (
+            ('requirements.json', json.dumps({
+                'name': 'calmpy.pip',
+                'require': {
+                    'setuptools': '25.1.6',
+                },
+            })),
+        ), 'calmpy.pip', '2.0')
+
+        make_dummy_dist(self, (
+            ('requires.txt', '[dev]\ncalmpy.pip'),
+        ), 'site', '1.0')
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+
+        # Stub out the underlying data needed for the cli for the tests
+        # to test against our custom data for reproducibility.
+        stub_item_attr_value(self, dist, 'default_working_set', working_set)
+        stub_mod_check_interactive(self, [cli], True)
+        driver = cli.PackageManagerDriver(
+            pkg_manager_bin='mgr', pkgdef_filename='requirements.json',
+            dep_keys=('require',),
+        )
+        return cwd, runtime.PackageManagerRuntime(driver)
+
+    # do note: the runtime is not registered to the root runtime
+    # directly, but this is a good enough emulation on how this would
+    # behave under real circumstances, as each of these runtime can and
+    # should be able to operate as independent entities.
+
+    def test_pkg_manager_view(self):
+        cwd, runtime = self.setup_runtime()
+        result = runtime.cli_driver.pkg_manager_view('calmpy.pip')
+        self.assertEqual(result, {
+            "require": {"setuptools": "25.1.6"},
+            "name": "calmpy.pip",
+        })
+        runtime(['calmpy.pip'])
+        result2 = json.loads(sys.stdout.getvalue().strip())
+        self.assertEqual(result, result2)
+
+    def test_pkg_manager_init(self):
+        cwd, runtime = self.setup_runtime()
+        runtime(['--init', 'calmpy.pip'])
+        target = join(cwd, 'requirements.json')
+        self.assertTrue(exists(target))
+        with open(target) as fd:
+            result = json.load(fd)
+        self.assertEqual(result, {
+            "require": {"setuptools": "25.1.6"},
+            "name": "calmpy.pip",
+        })
+
+    def test_pkg_manager_init_exists_and_overwrite(self):
+        cwd, runtime = self.setup_runtime()
+        target = join(cwd, 'requirements.json')
+
+        with open(target, 'w') as fd:
+            result = json.dump({"require": {"unrelated": "1.2.3"}}, fd)
+
+        runtime(['--init', 'calmpy.pip'])
+        stderr = sys.stderr.getvalue()
+
+        self.assertIn('not overwriting existing ', stderr)
+        self.assertIn('requirements.json', stderr)
+
+        with open(target) as fd:
+            result = json.load(fd)
+        self.assertNotEqual(result, {"require": {"setuptools": "25.1.6"}})
+
+        runtime(['--init', 'calmpy.pip', '--overwrite'])
+        with open(target) as fd:
+            result = json.load(fd)
+        self.assertEqual(result, {
+            "require": {"setuptools": "25.1.6"},
+            "name": "calmpy.pip",
+        })
+
+    def test_pkg_manager_init_overwrite_interactive(self):
+        cwd, runtime = self.setup_runtime()
+        target = join(cwd, 'requirements.json')
+        with open(target, 'w') as fd:
+            result = json.dump({"require": {"unrelated": "1.2.3"}}, fd)
+
+        stub_stdin(self, u'n\n')
+        runtime(['--init', 'calmpy.pip', '-i'])
+        stdout = sys.stdout.getvalue()
+        self.assertIn("differs with ", stdout)
+        self.assertIn("Overwrite", stdout)
+        self.assertIn("requirements.json'?", stdout)
+        with open(target) as fd:
+            result = json.load(fd)
+        self.assertNotEqual(result, {
+            "require": {"setuptools": "25.1.6"},
+            "name": "calmpy.pip",
+        })
+
+        stub_stdin(self, u'y\n')
+        runtime(['--init', 'calmpy.pip', '-i'])
+        stdout = sys.stdout.getvalue()
+        self.assertIn("differs with ", stdout)
+        self.assertIn("Overwrite", stdout)
+        self.assertIn("requirements.json'?", stdout)
+        with open(target) as fd:
+            result = json.load(fd)
+        self.assertEqual(result, {
+            "require": {"setuptools": "25.1.6"},
+            "name": "calmpy.pip",
+        })
+
+    def test_pkg_manager_init_merge_interactive(self):
+        cwd, runtime = self.setup_runtime()
+        target = join(cwd, 'requirements.json')
+        with open(target, 'w') as fd:
+            result = json.dump({"require": {"unrelated": "1.2.3"}}, fd)
+
+        stub_stdin(self, u'y\n')
+        runtime(['--init', 'calmpy.pip', '-i', '-m'])
+        stdout = sys.stdout.getvalue()
+        self.assertIn("differs with ", stdout)
+        self.assertIn("Overwrite", stdout)
+        self.assertIn("requirements.json'?", stdout)
+        with open(target) as fd:
+            result = json.load(fd)
+        self.assertEqual(result, {
+            "require": {"setuptools": "25.1.6", "unrelated": "1.2.3"},
+            "name": "calmpy.pip",
+        })
+
+    def test_pkg_manager_view_extras(self):
+        cwd, runtime = self.setup_runtime()
+        runtime(['site'])
+        result = json.loads(sys.stdout.getvalue().strip())
+        self.assertEqual(result, {
+            "require": {},
+            "name": "site",
+        })
+
+        stub_stdouts(self)
+        runtime(['site[dev]'])
+        result = json.loads(sys.stdout.getvalue().strip())
+        self.assertEqual(result, {
+            "require": {"setuptools": "25.1.6"},
+            "name": "site[dev]",
+        })
+
+    def test_pkg_manager_view_malformed(self):
+        cwd, runtime = self.setup_runtime()
+        runtime(['[dev]'])
+        self.assertIn(
+            'ValueError: malformed package name(s) specified: [dev]',
+            sys.stderr.getvalue(),
+        )
 
 
 class RuntimeIntegrationTestCase(unittest.TestCase):

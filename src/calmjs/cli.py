@@ -498,7 +498,13 @@ class PackageManagerDriver(NodeDriver):
 
         # TODO the interactive portions should really be in the runtime
         # and the command class (the setuptools bridge) should make use
-        # of that instead.
+        # of that instead.  A reason why this is not migrated yet is
+        # simply due to how the original design did not define runtime
+        # being the location to do interactive mode, and how the merge
+        # option is done in a way that is (needlessly) coupled to the
+        # interaction with existing files.  Fortunately, copious amounts
+        # of tests are available, but they all need to be vetted when
+        # this portion is changed.
 
         if interactive is None:
             interactive = self.interactive
