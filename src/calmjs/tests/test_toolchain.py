@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 import unittest
 import tempfile
+from inspect import currentframe
 from os import makedirs
 from os.path import basename
 from os.path import exists
@@ -11,6 +12,7 @@ from os.path import pardir
 from os.path import realpath
 
 from calmjs.exc import ValueSkip
+from calmjs import toolchain as calmjs_toolchain
 from calmjs.utils import pretty_logging
 from calmjs.toolchain import Spec
 from calmjs.toolchain import Toolchain
@@ -32,9 +34,11 @@ from calmjs.toolchain import AFTER_PREPARE
 from calmjs.toolchain import BEFORE_PREPARE
 
 from calmjs.testing.mocks import StringIO
+from calmjs.testing.spec import create_spec_event_fault
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import fake_error
 from calmjs.testing.utils import stub_stdouts
+from calmjs.testing.utils import stub_item_attr_value
 
 
 class SpecTestCase(unittest.TestCase):
@@ -101,6 +105,49 @@ class SpecTestCase(unittest.TestCase):
         with pretty_logging(stream=StringIO()) as s:
             spec.do_events(CLEANUP)
         self.assertIn('Traceback', s.getvalue())
+
+    def test_spec_event_fault_standard(self):
+        spec = Spec()
+        with pretty_logging(stream=StringIO()) as s:
+            create_spec_event_fault(spec, 'broken')
+        self.assertNotIn("on_event 'broken' invoked by ", s.getvalue())
+        self.assertNotIn("spec.py:11", s.getvalue())
+
+    def test_spec_event_fault_debug_1_emulate_no_currentframe(self):
+        stub_item_attr_value(
+            self, calmjs_toolchain, 'currentframe', lambda: None)
+        spec = Spec(debug=1)
+        with pretty_logging(stream=StringIO()) as s:
+            create_spec_event_fault(spec, 'broken')
+        self.assertIn("currentframe() failed to return frame", s.getvalue())
+
+    @unittest.skipIf(currentframe() is None, 'stack frame not supported')
+    def test_spec_event_fault_debug_1(self):
+        spec = Spec(debug=1)
+        with pretty_logging(stream=StringIO()) as s:
+            create_spec_event_fault(spec, 'broken')
+
+        self.assertIn("on_event 'broken' invoked by ", s.getvalue())
+        self.assertIn("spec.py:11", s.getvalue())
+
+        with pretty_logging(stream=StringIO()) as s:
+            spec.do_events('broken')
+        self.assertIn('Traceback', s.getvalue())
+        self.assertNotIn('Traceback for original event', s.getvalue())
+
+    @unittest.skipIf(currentframe() is None, 'stack frame not supported')
+    def test_spec_event_fault_debug_2(self):
+        spec = Spec(debug=2)
+        with pretty_logging(stream=StringIO()) as s:
+            create_spec_event_fault(spec, 'broken')
+
+        self.assertIn("on_event 'broken' invoked by ", s.getvalue())
+        self.assertIn("spec.py:11", s.getvalue())
+
+        with pretty_logging(stream=StringIO()) as s:
+            spec.do_events('broken')
+        self.assertIn('Traceback for original event', s.getvalue())
+        self.assertIn('line 15, in create_spec_event_fault', s.getvalue())
 
 
 class ToolchainTestCase(unittest.TestCase):

@@ -25,6 +25,8 @@ import logging
 import shutil
 import sys
 from functools import partial
+from inspect import currentframe
+from traceback import format_stack
 from os import mkdir
 from os import makedirs
 from os.path import join
@@ -43,13 +45,17 @@ from calmjs.utils import raise_os_error
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    'Spec', 'Toolchain', 'null_transpiler', 'CLEANUP', 'SUCCESS',
+    'Spec', 'Toolchain', 'null_transpiler',
+
+    'CLEANUP', 'SUCCESS',
+
     'AFTER_FINALIZE', 'BEFORE_FINALIZE', 'AFTER_LINK', 'BEFORE_LINK',
     'AFTER_ASSEMBLE', 'BEFORE_ASSEMBLE', 'AFTER_COMPILE', 'BEFORE_COMPILE',
     'AFTER_PREPARE', 'BEFORE_PREPARE', 'AFTER_TEST', 'BEFORE_TEST',
+
     'BUILD_DIR',
     'CALMJS_MODULE_REGISTRY_NAMES', 'CALMJS_TEST_REGISTRY_NAMES',
-    'CONFIG_JS_FILES',
+    'CONFIG_JS_FILES', 'DEBUG',
     'EXPORT_TARGET', 'EXPORT_TARGET_OVERWRITE', 'WORKING_DIR',
 ]
 
@@ -77,6 +83,8 @@ CALMJS_MODULE_REGISTRY_NAMES = 'calmjs_module_registry_names'
 CALMJS_TEST_REGISTRY_NAMES = 'calmjs_test_registry_names'
 # configuration file for enabling execution of code in build directory
 CONFIG_JS_FILES = 'config_js_files'
+# for debug level
+DEBUG = 'debug'
 # the container for the export target; either a file or directory; this
 # should not be changed after the prepare step.
 EXPORT_TARGET = 'export_target'
@@ -129,6 +137,7 @@ class Spec(dict):
     def __init__(self, *a, **kw):
         super(Spec, self).__init__(*a, **kw)
         self._events = {}
+        self._frames = {}
 
     def update_selected(self, other, selected):
         """
@@ -152,8 +161,27 @@ class Spec(dict):
         keyword arguments to f when it's invoked.
         """
 
+        event = (f, a, kw)
         self._events[name] = self._events.get(name, [])
-        self._events[name].append((f, a, kw))
+        self._events[name].append(event)
+
+        debug = self.get(DEBUG)
+        if not debug:
+            return
+
+        frame = currentframe()
+        if frame is None:
+            logger.debug('currentframe() failed to return frame')
+            return
+
+        logger.debug(
+            "on_event '%s' invoked by %s:%d",
+            name, frame.f_back.f_code.co_filename, frame.f_back.f_lineno,
+        )
+
+        if debug > 1:
+            # use the memory address of the tuple which should be stable
+            self._frames[id(event)] = ''.join(format_stack(frame.f_back))
 
     def do_events(self, name):
         """
@@ -183,7 +211,17 @@ class Spec(dict):
                 logger.info('Spec event malformed: got %s', values)
             else:
                 try:
-                    event(*a, **kw)
+                    try:
+                        event(*a, **kw)
+                    except Exception as e:
+                        # get that back by the id.
+                        frame = self._frames.get(id(values))
+                        if frame:
+                            logger.info('Spec event exception: %r', e)
+                            logger.info(
+                                'Traceback for original event:\n%s', frame)
+                        # continue on for the normal exception
+                        raise
                 except ToolchainCancel:
                     raise
                 except ToolchainAbort as e:
