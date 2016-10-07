@@ -26,6 +26,7 @@ from calmjs.testing.utils import stub_item_attr_value
 from calmjs.testing.utils import stub_base_which
 from calmjs.testing.utils import stub_mod_call
 from calmjs.testing.utils import stub_mod_check_interactive
+from calmjs.testing.utils import stub_stdin
 from calmjs.testing.utils import stub_stdouts
 
 which_npm = which('npm')
@@ -77,7 +78,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
 
         err = mocks.StringIO()
         with pretty_logging(logger='calmjs.runtime', level=DEBUG, stream=err):
-            result = rt.run()
+            result = rt.run(export_target='dummy')
         self.assertTrue(isinstance(result, toolchain.Spec))
         # prove that it did at least run
         self.assertIn('build_dir', result)
@@ -86,7 +87,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         stub_stdouts(self)
         tc = toolchain.NullToolchain()
         rt = runtime.ToolchainRuntime(tc)
-        result = rt([])
+        result = rt(['--export-target=dummy'])
         # as result returned not defined for these lower level runtimes
         # not registered as console entry points, any result can be
         # returned.
@@ -94,6 +95,140 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         # prove that it did at least run
         self.assertIn('build_dir', result)
         self.assertEqual(result['link'], 'linked')
+
+    def test_prompt_export_target_export_target_undefined(self):
+        stub_stdouts(self)
+        spec = toolchain.Spec()
+        rt = runtime.ToolchainRuntime(toolchain.NullToolchain())
+        with self.assertRaises(toolchain.ToolchainAbort):
+            rt.prompt_export_target_check(spec)
+
+    def test_prompt_export_target_check_not_exists(self):
+        stub_stdouts(self)
+        target_dir = mkdtemp(self)
+        export_target = join(target_dir, 'export_file')
+        spec = toolchain.Spec(export_target=export_target)
+        rt = runtime.ToolchainRuntime(toolchain.NullToolchain())
+        rt.prompt_export_target_check(spec)
+        self.assertEqual(sys.stdout.getvalue(), '')
+
+    def test_prompt_export_target_check_exists_no(self):
+        stub_stdouts(self)
+        stub_stdin(self, u'n\n')
+        target_dir = mkdtemp(self)
+        export_target = join(target_dir, 'export_file')
+        open(export_target, 'w').close()  # write an empty file
+        spec = toolchain.Spec(export_target=export_target)
+        rt = runtime.ToolchainRuntime(toolchain.NullToolchain())
+        with self.assertRaises(toolchain.ToolchainCancel):
+            rt.prompt_export_target_check(spec)
+        self.assertIn('already exists, overwrite?', sys.stdout.getvalue())
+
+    def test_prompt_export_target_check_exists_yes(self):
+        stub_stdouts(self)
+        stub_stdin(self, u'y\n')
+        target_dir = mkdtemp(self)
+        export_target = join(target_dir, 'export_file')
+        open(export_target, 'w').close()  # write an empty file
+        spec = toolchain.Spec(export_target=export_target)
+        rt = runtime.ToolchainRuntime(toolchain.NullToolchain())
+        rt.prompt_export_target_check(spec)
+        self.assertIn('already exists, overwrite?', sys.stdout.getvalue())
+
+    def test_prompted_execution_exists(self):
+        stub_stdouts(self)
+        stub_stdin(self, u'y\n')
+
+        target_dir = mkdtemp(self)
+        export_target = join(target_dir, 'export_file')
+        open(export_target, 'w').close()  # write an empty file
+
+        tc = toolchain.NullToolchain()
+        rt = runtime.ToolchainRuntime(tc)
+        result = rt(['--export-target', export_target])
+        self.assertIn(
+            "export target '%s' already exists, overwrite? " % export_target,
+            sys.stdout.getvalue()
+        )
+        self.assertNotIn('CRITICAL', sys.stdout.getvalue())
+        self.assertTrue(isinstance(result, toolchain.Spec))
+        # prove that it did at least run
+        self.assertIn('build_dir', result)
+        self.assertEqual(result['link'], 'linked')
+
+    def test_prompted_execution_exists_overwrite(self):
+        stub_stdouts(self)
+        stub_stdin(self, u'y\n')
+
+        target_dir = mkdtemp(self)
+        export_target = join(target_dir, 'export_file')
+        open(export_target, 'w').close()  # write an empty file
+
+        tc = toolchain.NullToolchain()
+        rt = runtime.ToolchainRuntime(tc)
+        result = rt(['--export-target', export_target, '-w'])
+        self.assertNotIn(
+            "export target '%s' already exists, overwrite? " % export_target,
+            sys.stdout.getvalue()
+        )
+        self.assertNotIn('CRITICAL', sys.stdout.getvalue())
+        self.assertTrue(isinstance(result, toolchain.Spec))
+        # prove that it did at least run
+        self.assertIn('build_dir', result)
+        self.assertEqual(result['link'], 'linked')
+
+    def test_prompted_execution_exists_cancel(self):
+        stub_stdouts(self)
+        stub_stdin(self, u'n\n')
+
+        target_dir = mkdtemp(self)
+        export_target = join(target_dir, 'export_file')
+        open(export_target, 'w').close()  # write an empty file
+
+        tc = toolchain.NullToolchain()
+        rt = runtime.ToolchainRuntime(tc)
+        result = rt(['--export-target', export_target])
+        self.assertIn(
+            "export target '%s' already exists, overwrite? " % export_target,
+            sys.stdout.getvalue()
+        )
+        self.assertNotIn('CRITICAL', sys.stdout.getvalue())
+        self.assertTrue(isinstance(result, toolchain.Spec))
+        # prove that the cancel really happened.
+        self.assertIn('build_dir', result)
+        self.assertNotIn('link', result)
+
+        # Should not have unexpected error logged.
+        stderr = sys.stderr.getvalue()
+        self.assertNotIn(
+            "an event in group 'after_prepare' triggered an abort: "
+            "EXPORT_TARGET should be specified by this stage", stderr,
+        )
+        self.assertNotIn(
+            "terminating due to expected unrecoverable condition",
+            stderr,
+        )
+
+    def test_excution_missing_export_file(self):
+        # as the null toolchain does not automatically provide one
+        stub_stdouts(self)
+        rt = runtime.ToolchainRuntime(toolchain.NullToolchain())
+        result = rt([])
+        self.assertEqual('', sys.stdout.getvalue())
+        stderr = sys.stderr.getvalue()
+        self.assertIn('CRITICAL', stderr)
+        # no direct error message logged by the BaseRuntime.__call__
+        self.assertNotIn('CRITICAL: ToolchainAbort:', stderr)
+        self.assertIn(
+            "an event in group 'after_prepare' triggered an abort: "
+            "EXPORT_TARGET should be specified by this stage", stderr,
+        )
+        self.assertIn(
+            "terminating due to expected unrecoverable condition",
+            stderr,
+        )
+
+        self.assertFalse(result)
 
 
 class PackageManagerDriverTestCase(unittest.TestCase):
@@ -620,12 +755,13 @@ class RuntimeIntegrationTestCase(unittest.TestCase):
         # ensure the binary is not found.
         stub_mod_call(self, cli, fake_error(IOError))
         rt(['-d', 'foo', '--install', 'example.package2'])
-        self.assertIn("ERROR", sys.stderr.getvalue())
+        stderr = sys.stderr.getvalue()
+        self.assertIn("ERROR", stderr)
         self.assertIn(
-            "invocation of the 'npm' binary failed;", sys.stderr.getvalue())
-        self.assertIn("terminating due to exception", sys.stderr.getvalue())
-        self.assertIn("Traceback ", sys.stderr.getvalue())
-        self.assertNotIn("(Pdb)", sys.stdout.getvalue())
+            "invocation of the 'npm' binary failed;", stderr)
+        self.assertIn("terminating due to unexpected exception", stderr)
+        self.assertIn("Traceback ", stderr)
+        self.assertNotIn("(Pdb)", stderr)
 
     def test_npm_binary_not_found_debugger(self):
         from calmjs import utils
@@ -645,15 +781,16 @@ class RuntimeIntegrationTestCase(unittest.TestCase):
         stub_item_attr_value(self, utils, 'post_mortem', fake_post_mortem)
         rt(['-dd', 'foo', '--install', 'example.package2'])
 
-        self.assertIn("ERROR", sys.stderr.getvalue())
+        stderr = sys.stderr.getvalue()
+        self.assertIn("ERROR", stderr)
         self.assertIn(
-            "invocation of the 'npm' binary failed;", sys.stderr.getvalue())
-        self.assertIn("terminating due to exception", sys.stderr.getvalue())
-        self.assertIn("Traceback ", sys.stderr.getvalue())
+            "invocation of the 'npm' binary failed;", stderr)
+        self.assertIn("terminating due to unexpected exception", stderr)
+        self.assertIn("Traceback ", stderr)
         self.assertIn("(Pdb)", sys.stdout.getvalue())
 
         stub_stdouts(self)
-        self.assertNotIn("(Pdb)", sys.stdout.getvalue())
+        self.assertNotIn("(Pdb)", stderr)
         rt(['foo', '--install', 'example.package2', '--debugger'])
         self.assertIn("(Pdb)", sys.stdout.getvalue())
 

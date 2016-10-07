@@ -13,15 +13,22 @@ from argparse import Action
 from argparse import ArgumentParser
 from argparse import HelpFormatter
 from argparse import SUPPRESS
+from os.path import exists
 
 from pkg_resources import working_set as default_working_set
 
 from calmjs.argparse import Version
 from calmjs.argparse import ATTR_ROOT_PKG
 from calmjs.argparse import ATTR_RT_DIST
+from calmjs.cli import prompt
+from calmjs.exc import RuntimeAbort
 from calmjs.toolchain import Spec
+from calmjs.toolchain import ToolchainAbort
+from calmjs.toolchain import ToolchainCancel
+from calmjs.toolchain import AFTER_PREPARE
 from calmjs.toolchain import BUILD_DIR
 from calmjs.toolchain import EXPORT_TARGET
+from calmjs.toolchain import EXPORT_TARGET_OVERWRITE
 from calmjs.toolchain import WORKING_DIR
 from calmjs.utils import pretty_logging
 from calmjs.utils import pdb_post_mortem
@@ -228,20 +235,24 @@ class BaseRuntime(BootstrapRuntime):
             except KeyboardInterrupt:
                 logger.critical('termination requested; aborted.')
             except Exception as e:
-                if not self.debug:
+                if self.debug:
+                    # ensure debug is handled completely
+                    logger.critical(
+                        'terminating due to unexpected exception', exc_info=1)
+                    if self.debug > 1:
+                        pdb_post_mortem(sys.exc_info()[2])
+                elif isinstance(e, RuntimeAbort):
+                    logger.critical(
+                        'terminating due to expected unrecoverable condition')
+                elif not self.debug:
                     logger.critical(
                         '%s: %s', type(e).__name__, e)
                     logger.critical(
-                        'terminating due to a critical error; for details '
-                        'please refer to previous log entries, or by retrying '
-                        'with more verbosity (-v) and/or enable debug/'
-                        'traceback output (-d).'
+                        'terminating due to unexpected critical error; for '
+                        'details please refer to previous log entries, or by '
+                        'retrying with more verbosity (-v) and/or enable '
+                        'debug/traceback output (-d)'
                     )
-                else:
-                    logger.critical(
-                        'terminating due to exception', exc_info=1)
-                    if self.debug > 1:
-                        pdb_post_mortem(sys.exc_info()[2])
             return False
 
 
@@ -408,7 +419,8 @@ class ToolchainRuntime(DriverRuntime):
             ):
         """
         Subclass could override this by providing alternative keyword
-        arguments.
+        arguments and call this as its super.  It should not reimplement
+        this completely.
 
         Arguments
 
@@ -422,6 +434,12 @@ class ToolchainRuntime(DriverRuntime):
             '--export-target', dest=EXPORT_TARGET,
             default=default,
             help=help,
+        )
+
+        argparser.add_argument(
+            '-w', '--overwrite', dest=EXPORT_TARGET_OVERWRITE,
+            default=default, action='store_true',
+            help='overwrite the export target without any confirmation',
         )
 
     def init_argparser_working_dir(
@@ -458,8 +476,8 @@ class ToolchainRuntime(DriverRuntime):
                  'default behavior is to create a new temporary directory '
                  'that will be removed upon conclusion of the build; if '
                  'specified, it must be an existing directory and all files '
-                 'for the build will be copied there instead, with no cleanup '
-                 'done after.'
+                 'for the build will be copied there instead, overwriting any '
+                 'existing file, with no cleanup done after.'
         )
 
         # it is possible for subclasses to fully override this, but if
@@ -477,8 +495,28 @@ class ToolchainRuntime(DriverRuntime):
 
         return Spec(**kwargs)
 
+    def prompt_export_target_check(self, spec):
+        export_target = spec.get(EXPORT_TARGET)
+        if not export_target:
+            raise ToolchainAbort(
+                'EXPORT_TARGET should be specified by this stage')
+        if not exists(export_target) or spec.get(EXPORT_TARGET_OVERWRITE):
+            return  # continue normally
+        overwrite = prompt(
+            u"export target '%(export_target)s' already exists, overwrite? " %
+            {'export_target': export_target},
+            choices=(
+                (u'Yes', True),
+                (u'No', False),
+            ),
+            default_key=1,
+        )
+        if not overwrite:
+            raise ToolchainCancel('cancelation initiated by user')
+
     def run(self, **kwargs):
         spec = self.create_spec(**kwargs)
+        spec.on_event(AFTER_PREPARE, self.prompt_export_target_check, spec)
         self.toolchain(spec)
         return spec
 

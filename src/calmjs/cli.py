@@ -496,6 +496,10 @@ class PackageManagerDriver(NodeDriver):
         Returns False otherwise.
         """
 
+        # TODO the interactive portions should really be in the runtime
+        # and the command class (the setuptools bridge) should make use
+        # of that instead.
+
         if interactive is None:
             interactive = self.interactive
         # both autodetection AND manual specification must be true.

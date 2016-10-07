@@ -37,6 +37,7 @@ from tempfile import mkdtemp
 
 from calmjs.base import BaseDriver
 from calmjs.exc import ValueSkip
+from calmjs.exc import RuntimeAbort
 from calmjs.utils import raise_os_error
 
 logger = logging.getLogger(__name__)
@@ -48,7 +49,8 @@ __all__ = [
     'AFTER_PREPARE', 'BEFORE_PREPARE', 'AFTER_TEST', 'BEFORE_TEST',
     'BUILD_DIR',
     'CALMJS_MODULE_REGISTRY_NAMES', 'CALMJS_TEST_REGISTRY_NAMES',
-    'CONFIG_JS_FILES', 'EXPORT_TARGET', 'WORKING_DIR',
+    'CONFIG_JS_FILES',
+    'EXPORT_TARGET', 'EXPORT_TARGET_OVERWRITE', 'WORKING_DIR',
 ]
 
 # define these as reserved event names
@@ -78,6 +80,8 @@ CONFIG_JS_FILES = 'config_js_files'
 # the container for the export target; either a file or directory; this
 # should not be changed after the prepare step.
 EXPORT_TARGET = 'export_target'
+# specify that export target is safe to be overwritten.
+EXPORT_TARGET_OVERWRITE = 'export_target_overwrite'
 # the working directory
 WORKING_DIR = 'working_dir'
 
@@ -102,7 +106,7 @@ def null_transpiler(spec, reader, writer):
     writer.write(reader.read())
 
 
-class ToolchainAbort(RuntimeError):
+class ToolchainAbort(RuntimeAbort):
     """
     Events can raise this to abort a toolchain execution if a condition
     required this to be done.
@@ -176,7 +180,7 @@ class Spec(dict):
             except ValueError:
                 logger.info('Spec event extraction error: got %s', values)
             except TypeError:
-                logger.info('Spec malformed: got %s', values)
+                logger.info('Spec event malformed: got %s', values)
             else:
                 try:
                     event(*a, **kw)
@@ -184,7 +188,7 @@ class Spec(dict):
                     raise
                 except ToolchainAbort as e:
                     logger.critical(
-                        'an event registered to %s triggered an abort: %s',
+                        "an event in group '%s' triggered an abort: %s",
                         name, str(e)
                     )
                     raise
@@ -211,9 +215,15 @@ class Toolchain(BaseDriver):
     BUILD_DIR
         The build directory.  This can be manually specified, or be a
         temporary directory automatically created and destroyed.
+    CALMJS_MODULE_REGISTRY_NAMES
+        For recording the list of calmjs modules it has used, so other
+        parts of the framework can make use of this, such as inferring
+        which test modules it should use.
     EXPORT_TARGET
         A path on the filesystem that this toolchain will ultimately
         generate its output to.
+    EXPORT_TARGET_OVERWRITE
+        Signifies that the export target can be safely overwritten.
     WORKING_DIR
         The working directory where the relative paths will be based
         from.
