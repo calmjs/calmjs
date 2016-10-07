@@ -20,6 +20,9 @@ from calmjs.argparse import Version
 from calmjs.argparse import ATTR_ROOT_PKG
 from calmjs.argparse import ATTR_RT_DIST
 from calmjs.toolchain import Spec
+from calmjs.toolchain import BUILD_DIR
+from calmjs.toolchain import EXPORT_TARGET
+from calmjs.toolchain import WORKING_DIR
 from calmjs.utils import pretty_logging
 from calmjs.utils import pdb_post_mortem
 
@@ -395,12 +398,61 @@ class ToolchainRuntime(DriverRuntime):
 
     @property
     def toolchain(self):
+        # mostly serving as an alias
         return self.cli_driver
+
+    def init_argparser_export_target(
+            self, argparser,
+            default=None,
+            help='the export target',
+            ):
+        """
+        Subclass could override this by providing alternative keyword
+        arguments.
+
+        Arguments
+
+        default
+            The default value.
+        help
+            The help text.
+        """
+
+        argparser.add_argument(
+            '--export-target', dest=EXPORT_TARGET,
+            default=default,
+            help=help,
+        )
+
+    def init_argparser_working_dir(
+            self, argparser,
+            explanation='',
+            help_template=(
+                'the working directory; %(explanation)s'
+                'default is current working directory (%(cwd)s)'),
+            ):
+        """
+        Subclass could an extra expanation on how this is used.
+
+        Arguments
+
+        explanation
+            Explanation text for the default help template
+        help_template
+            A standard help message for this option.
+        """
+
+        cwd = self.toolchain.join_cwd()
+        argparser.add_argument(
+            '--working-dir', dest=WORKING_DIR,
+            default=cwd,
+            help=help_template % {'explanation': explanation, 'cwd': cwd},
+        )
 
     def init_argparser(self, argparser):
         argparser.add_argument(
             '--build-dir', default=None,
-            dest='build_dir',
+            dest=BUILD_DIR,
             help='the build directory, where all sources will be copied to '
                  'as part of the build process; if left unspecified, the '
                  'default behavior is to create a new temporary directory '
@@ -409,6 +461,13 @@ class ToolchainRuntime(DriverRuntime):
                  'for the build will be copied there instead, with no cleanup '
                  'done after.'
         )
+
+        # it is possible for subclasses to fully override this, but if
+        # they are using this as the runtime to drive the toolchain they
+        # should be prepared to follow the layout, but if they omit them
+        # it should only result in the spec omitting these arguments.
+        self.init_argparser_export_target(argparser)
+        self.init_argparser_working_dir(argparser)
 
     def create_spec(self, **kwargs):
         """

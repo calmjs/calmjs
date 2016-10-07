@@ -179,6 +179,20 @@ class Toolchain(BaseDriver):
     from the BaseDriver class.  This means having the same foundation
     and also the ability to reuse a number of useful utility methods
     for talking to those scripts and binaries.
+
+    This also involves some standardized processes within the calmjs
+    framework, naming the definition of the following items that every
+    subclass and implementation must support.
+
+    BUILD_DIR
+        The build directory.  This can be manually specified, or be a
+        temporary directory automatically created and destroyed.
+    EXPORT_TARGET
+        A path on the filesystem that this toolchain will ultimately
+        generate its output to.
+    WORKING_DIR
+        The working directory where the relative paths will be based
+        from.
     """
 
     def __init__(self, *a, **kw):
