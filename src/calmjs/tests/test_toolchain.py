@@ -14,6 +14,8 @@ from calmjs.exc import ValueSkip
 from calmjs.utils import pretty_logging
 from calmjs.toolchain import Spec
 from calmjs.toolchain import Toolchain
+from calmjs.toolchain import ToolchainAbort
+from calmjs.toolchain import ToolchainCancel
 from calmjs.toolchain import NullToolchain
 
 from calmjs.toolchain import CLEANUP
@@ -691,3 +693,64 @@ class NullToolchainTestCase(unittest.TestCase):
 
         self.toolchain(spec)
         self.assertEqual(tuple(results), events)
+
+    def test_null_toolchain_event_abort(self):
+        def abort():
+            raise ToolchainAbort('forced abort')
+
+        events = []
+        spec = Spec()
+        spec.on_event(BEFORE_ASSEMBLE, abort)
+        spec.on_event(CLEANUP, events.append, CLEANUP)
+        spec.on_event(SUCCESS, events.append, SUCCESS)
+        with self.assertRaises(ToolchainAbort):
+            with pretty_logging(stream=StringIO()) as s:
+                self.toolchain(spec)
+
+        self.assertIn(
+            'an event registered to before_assemble triggered an abort: '
+            'forced abort', s.getvalue()
+        )
+
+        # ensure cleanup is executed regardless, and success is not.
+        self.assertEqual(events, [CLEANUP])
+
+    def test_null_toolchain_event_cancel(self):
+        def cancel():
+            raise ToolchainCancel('toolchain cancel')
+
+        events = []
+        spec = Spec()
+        spec.on_event(BEFORE_ASSEMBLE, cancel)
+        spec.on_event(CLEANUP, events.append, CLEANUP)
+        spec.on_event(SUCCESS, events.append, SUCCESS)
+        with pretty_logging(stream=StringIO()) as s:
+            self.toolchain(spec)
+
+        self.assertNotIn(
+            'an event registered to before_assemble triggered an abort',
+            s.getvalue(),
+        )
+
+        # ensure cleanup is executed regardless, and success is not.
+        self.assertEqual(events, [CLEANUP])
+
+    def test_null_toolchain_event_keyboard_interrupt(self):
+        def interrupt():
+            raise KeyboardInterrupt()
+
+        events = []
+        spec = Spec()
+        spec.on_event(BEFORE_ASSEMBLE, interrupt)
+        spec.on_event(CLEANUP, events.append, CLEANUP)
+        spec.on_event(SUCCESS, events.append, SUCCESS)
+        with pretty_logging(stream=StringIO()) as s:
+            self.toolchain(spec)
+
+        self.assertNotIn(
+            'an event registered to before_assemble triggered an abort',
+            s.getvalue(),
+        )
+
+        # ensure cleanup is executed regardless, and success is not.
+        self.assertEqual(events, [CLEANUP])

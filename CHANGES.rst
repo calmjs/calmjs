@@ -15,6 +15,8 @@ Changelog
   comprehensively implemented; every process within the toolchain will
   trigger a before and after event.  These events are formalized as
   constants that can be imported from the ``calmjs.toolchain`` module.
+- The event system has dedicated exceptions which can be raised to
+  signal an abort or cleanly stop a run.
 - A couple spec keys were formalized, which are BUILD_DIR and
   CONFIG_JS_FILES, reserved for the build directory and marking out
   configuration JavaScript files.

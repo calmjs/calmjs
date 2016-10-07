@@ -102,6 +102,20 @@ def null_transpiler(spec, reader, writer):
     writer.write(reader.read())
 
 
+class ToolchainAbort(RuntimeError):
+    """
+    Events can raise this to abort a toolchain execution if a condition
+    required this to be done.
+    """
+
+
+class ToolchainCancel(ToolchainAbort):
+    """
+    Events that interact with user input during a toolchain execution
+    may raise this to signify user cancellation.
+    """
+
+
 class Spec(dict):
     """
     Instances of these will track the progress through a Toolchain
@@ -166,6 +180,16 @@ class Spec(dict):
             else:
                 try:
                     event(*a, **kw)
+                except ToolchainCancel:
+                    raise
+                except ToolchainAbort as e:
+                    logger.critical(
+                        'an event registered to %s triggered an abort: %s',
+                        name, str(e)
+                    )
+                    raise
+                except KeyboardInterrupt:
+                    raise ToolchainCancel('interrupted')
                 except Exception:
                     logger.exception('Spec event execution: got %s', values)
 
@@ -639,6 +663,9 @@ class Toolchain(BaseDriver):
                 getattr(self, p)(spec)
                 spec.do_events('after_' + p)
             spec.do_events(SUCCESS)
+        except ToolchainCancel:
+            # quietly handle the issue and move on out of here.
+            pass
         finally:
             spec.do_events(CLEANUP)
 
