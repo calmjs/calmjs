@@ -4,6 +4,7 @@ import json
 import os
 import sys
 from argparse import ArgumentParser
+from inspect import currentframe
 from os.path import join
 from os.path import exists
 from logging import DEBUG
@@ -268,6 +269,33 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         rt = runtime.Runtime(working_set=working_set, prog='calmjs')
         result = rt(['tool', '--export-target', 'dummy', '-d'])
         self.assertEqual(result['debug'], 1)
+
+    @unittest.skipIf(currentframe() is None, 'stack frame not supported')
+    def test_spec_debugged_via_cmdline_target_exists_export_cancel(self):
+        stub_item_attr_value(
+            self, mocks, 'dummy',
+            runtime.ToolchainRuntime(toolchain.NullToolchain()),
+        )
+        working_set = mocks.WorkingSet({
+            'calmjs.runtime': [
+                'tool = calmjs.testing.mocks:dummy',
+            ],
+        })
+        tmpdir = mkdtemp(self)
+        target = join(tmpdir, 'target')
+        open(target, 'w').close()
+        rt = runtime.Runtime(working_set=working_set, prog='calmjs')
+        stub_stdouts(self)
+        stub_stdin(self, u'n\n')
+        result = rt(['tool', '--export-target', target, '-dd', '-vv'])
+        self.assertEqual(result['debug'], 2)
+        # This is an integration test of sort for the debug event output
+        self.assertIn("on_event 'cleanup' invoked by", sys.stderr.getvalue())
+        self.assertIn("toolchain.py", sys.stderr.getvalue())
+        self.assertIn(
+            'on_event(AFTER_PREPARE, self.prompt_export_target_check, spec)',
+            sys.stderr.getvalue(),
+        )
 
 
 class PackageManagerDriverTestCase(unittest.TestCase):
