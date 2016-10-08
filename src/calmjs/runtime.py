@@ -27,6 +27,7 @@ from calmjs.toolchain import ToolchainAbort
 from calmjs.toolchain import ToolchainCancel
 from calmjs.toolchain import AFTER_PREPARE
 from calmjs.toolchain import BUILD_DIR
+from calmjs.toolchain import DEBUG
 from calmjs.toolchain import EXPORT_TARGET
 from calmjs.toolchain import EXPORT_TARGET_OVERWRITE
 from calmjs.toolchain import WORKING_DIR
@@ -48,6 +49,28 @@ levels = {
 }
 
 valid_command_name = re.compile('^[0-9a-zA-Z]*$')
+_global_runtime_attrs = {}
+
+
+def _reset_global_runtime_attrs():
+    _global_runtime_attrs.update({
+        'debug': 0,
+        'log_level': 0,
+        'verbosity': 0,
+    })
+
+_reset_global_runtime_attrs()
+
+
+def _initialize_global_runtime_attrs(**kwargs):
+    debug = kwargs.pop('debug')
+    verbosity = min(max(kwargs.pop('verbose') - kwargs.pop('quiet'), -2), 2)
+    log_level = levels.get(verbosity)
+    _global_runtime_attrs.update({
+        'debug': debug,
+        'log_level': log_level,
+        'verbosity': verbosity,
+    })
 
 
 def norm_args(args):
@@ -68,11 +91,8 @@ class BootstrapRuntime(object):
 
     argparser = None
 
-    def __init__(self, prog=None, debug=0, log_level=0):
+    def __init__(self, prog=None):
         self.prog = prog
-        self.debug = debug
-        self.log_level = log_level
-        self.verbosity = 0
         self.init()
 
     def init(self):
@@ -99,11 +119,20 @@ class BootstrapRuntime(object):
             help="be more verbose")
 
     def prepare_keywords(self, kwargs):
-        self.debug = kwargs.pop('debug')
-        v = min(max(
-            self.verbosity + kwargs.pop('verbose') - kwargs.pop('quiet'),
-            -2), 2)
-        self.log_level = levels.get(v)
+        _initialize_global_runtime_attrs(**kwargs)
+
+    # should be able to not duplicate all these property definitions
+    @property
+    def debug(self):
+        return _global_runtime_attrs.get('debug')
+
+    @property
+    def log_level(self):
+        return _global_runtime_attrs.get('log_level')
+
+    @property
+    def verbosity(self):
+        return _global_runtime_attrs.get('verbosity')
 
     def run(self, **kwargs):
         self.prepare_keywords(kwargs)
@@ -198,8 +227,6 @@ class BaseRuntime(BootstrapRuntime):
         # Also, remember that we need to strip off all the args that
         # the bootstrap knows, only process any leftovers.
         args = bootstrap(args)
-        self.log_level = bootstrap.log_level
-        self.debug = bootstrap.debug
 
         # NOT using parse_args directly because argparser is dumb when
         # it comes to bad keywords in a subparser - it doesn't invoke
@@ -404,7 +431,7 @@ class DriverRuntime(BaseRuntime):
 
 class ToolchainRuntime(DriverRuntime):
     """
-    Specizlied runtime for toolchain.
+    Specialized runtime for toolchain.
     """
 
     @property
@@ -468,6 +495,14 @@ class ToolchainRuntime(DriverRuntime):
         )
 
     def init_argparser(self, argparser):
+        """
+        Other runtimes (or users of ArgumentParser) can pass their
+        subparser into here to collect the arguments here for a
+        subcommand.
+        """
+
+        super(ToolchainRuntime, self).init_argparser(argparser)
+
         argparser.add_argument(
             '--build-dir', default=None,
             dest=BUILD_DIR,
@@ -516,6 +551,7 @@ class ToolchainRuntime(DriverRuntime):
 
     def run(self, **kwargs):
         spec = self.create_spec(**kwargs)
+        spec[DEBUG] = self.debug
         spec.on_event(AFTER_PREPARE, self.prompt_export_target_check, spec)
         self.toolchain(spec)
         return spec

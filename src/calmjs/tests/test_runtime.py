@@ -7,6 +7,7 @@ from argparse import ArgumentParser
 from os.path import join
 from os.path import exists
 from logging import DEBUG
+from logging import INFO
 
 import pkg_resources
 
@@ -56,6 +57,17 @@ class BaseRuntimeTestCase(unittest.TestCase):
         self.assertEqual(runtime.norm_args(None), ['-h'])
         self.assertEqual(runtime.norm_args([]), [])
         self.assertEqual(runtime.norm_args(['arg']), ['arg'])
+
+    def test_global_flags(self):
+        stub_stdouts(self)
+        bt = runtime.BaseRuntime()
+        bt(['-vvv', '-qq', '-d'])
+
+        # should be a global state.
+        rt = runtime.BaseRuntime()
+        self.assertEqual(rt.verbosity, 1)
+        self.assertEqual(rt.debug, 1)
+        self.assertEqual(rt.log_level, INFO)
 
 
 class ToolchainRuntimeTestCase(unittest.TestCase):
@@ -230,6 +242,32 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         )
 
         self.assertFalse(result)
+
+    def test_spec_nodebug(self):
+        tc = toolchain.NullToolchain()
+        rt = runtime.ToolchainRuntime(tc)
+        result = rt(['--export-target', 'dummy'])
+        self.assertEqual(result['debug'], 0)
+
+    def test_spec_debugged(self):
+        tc = toolchain.NullToolchain()
+        rt = runtime.ToolchainRuntime(tc)
+        result = rt(['-dd', '--export-target', 'dummy'])
+        self.assertEqual(result['debug'], 2)
+
+    def test_spec_debugged_via_cmdline(self):
+        stub_item_attr_value(
+            self, mocks, 'dummy',
+            runtime.ToolchainRuntime(toolchain.NullToolchain()),
+        )
+        working_set = mocks.WorkingSet({
+            'calmjs.runtime': [
+                'tool = calmjs.testing.mocks:dummy',
+            ],
+        })
+        rt = runtime.Runtime(working_set=working_set, prog='calmjs')
+        result = rt(['tool', '--export-target', 'dummy', '-d'])
+        self.assertEqual(result['debug'], 1)
 
 
 class PackageManagerDriverTestCase(unittest.TestCase):

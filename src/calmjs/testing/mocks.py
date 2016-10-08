@@ -8,6 +8,7 @@ from pkg_resources import EmptyProvider
 from setuptools.command.egg_info import egg_info
 
 _dist = Distribution()
+dummy = object()
 
 
 class WorkingSet(object):
