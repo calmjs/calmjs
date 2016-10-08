@@ -765,6 +765,7 @@ class PackageManagerRuntimeAlternativeIntegrationTestCase(unittest.TestCase):
         )
 
 
+@unittest.skipIf(which_npm is None, 'npm not found.')
 class RuntimeIntegrationTestCase(unittest.TestCase):
 
     def setup_runtime(self):

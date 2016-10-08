@@ -62,6 +62,7 @@ class NpmTestCase(unittest.TestCase):
     # response we got above with the real function, to better mimic the
     # expected output.
 
+    @unittest.skipIf(which_npm is None, 'npm not found.')
     def test_npm_install_package_json(self):
         stub_mod_call(self, cli)
         stub_base_which(self, which_npm)
@@ -78,6 +79,7 @@ class NpmTestCase(unittest.TestCase):
         self.assertEqual(self.call_args, (([which_npm, 'install'],), {}))
         self.assertFalse(exists(join(tmpdir, 'package.json')))
 
+    @unittest.skipIf(which_npm is None, 'npm not found.')
     def test_npm_install_package_json_no_overwrite_interactive(self):
         """
         Most of these package_json testing will be done in the next test
@@ -127,6 +129,7 @@ class NpmTestCase(unittest.TestCase):
         # This should remain unchanged as no to overwrite is default.
         self.assertEqual(result, '{}')
 
+    @unittest.skipIf(which_npm is None, 'npm not found.')
     def test_npm_install_package_json_overwrite_interactive(self):
         # Testing the implied init call
         stub_mod_call(self, cli)
@@ -757,6 +760,7 @@ class DistCommandTestCase(unittest.TestCase):
             'devDependencies': {'sinon': '~1.17.0'},
         })
 
+    @unittest.skipIf(which_npm is None, 'npm not found.')
     def test_install_no_init(self):
         # install implies init
         stub_mod_call(self, cli)
@@ -783,6 +787,7 @@ class DistCommandTestCase(unittest.TestCase):
         })
         self.assertEqual(self.call_args, (([which_npm, 'install'],), {}))
 
+    @unittest.skipIf(which_npm is None, 'npm not found.')
     def test_install_init_install(self):
         stub_mod_call(self, cli)
         stub_base_which(self, which_npm)
@@ -859,6 +864,7 @@ class DistCommandTestCase(unittest.TestCase):
         # written to stdout with the correct indentation level.
         self.assertIn('\n        "jquery": "~1.11.0"', sys.stdout.getvalue())
 
+    @unittest.skipIf(which_npm is None, 'npm not found.')
     def test_install_view(self):
         stub_mod_call(self, cli)
         stub_base_which(self, which_npm)
