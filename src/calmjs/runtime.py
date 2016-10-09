@@ -20,7 +20,6 @@ from pkg_resources import working_set as default_working_set
 from calmjs.argparse import Version
 from calmjs.argparse import ATTR_ROOT_PKG
 from calmjs.argparse import ATTR_RT_DIST
-from calmjs.cli import prompt
 from calmjs.exc import RuntimeAbort
 from calmjs.toolchain import Spec
 from calmjs.toolchain import ToolchainAbort
@@ -31,6 +30,7 @@ from calmjs.toolchain import DEBUG
 from calmjs.toolchain import EXPORT_TARGET
 from calmjs.toolchain import EXPORT_TARGET_OVERWRITE
 from calmjs.toolchain import WORKING_DIR
+from calmjs.ui import prompt
 from calmjs.utils import pretty_logging
 from calmjs.utils import pdb_post_mortem
 
