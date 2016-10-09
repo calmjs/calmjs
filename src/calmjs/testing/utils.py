@@ -534,25 +534,33 @@ def stub_mod_check_output(testcase_inst, mod, f=None):
     check_output, mod.check_output = mod.check_output, f
 
 
-def stub_mod_check_interactive(testcase_inst, modules, result):
+def stub_check_interactive(testcase_inst, result):
     """
     Replace the check_interactive function for the target module so that
     it will return result.
     """
 
-    from calmjs import cli
-
-    original_check_interactive = cli.check_interactive
+    from calmjs import ui
 
     def check_interactive():
         return result
 
-    def restore(module):
-        module.check_interactive = original_check_interactive
+    ui.check_interactive, original_check_interactive = (
+        check_interactive, ui.check_interactive)
 
-    for module in modules:
-        testcase_inst.addCleanup(restore, module)
-        module.check_interactive = check_interactive
+    def restore():
+        ui.check_interactive = original_check_interactive
+
+    testcase_inst.addCleanup(restore)
+
+
+def stub_mod_check_interactive(testcase_inst, module, result):
+    """
+    Deprecated: given that all previous invocations pretty much has the
+    module argument as [cli], we can safely ignore that.
+    """
+
+    return stub_check_interactive(testcase_inst, result)
 
 
 def stub_mod_working_set(testcase_inst, modules, working_set):

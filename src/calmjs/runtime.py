@@ -9,6 +9,7 @@ import logging
 import re
 import sys
 import textwrap
+from functools import partial
 from argparse import Action
 from argparse import ArgumentParser
 from argparse import HelpFormatter
@@ -30,6 +31,7 @@ from calmjs.toolchain import DEBUG
 from calmjs.toolchain import EXPORT_TARGET
 from calmjs.toolchain import EXPORT_TARGET_OVERWRITE
 from calmjs.toolchain import WORKING_DIR
+from calmjs.ui import prompt_overwrite_json
 from calmjs.ui import prompt
 from calmjs.utils import pretty_logging
 from calmjs.utils import pdb_post_mortem
@@ -678,7 +680,7 @@ class PackageManagerRuntime(DriverRuntime):
             metavar='package_names', nargs='+',
         )
 
-    def run(self, **kwargs):
+    def run(self, interactive=False, **kwargs):
         # Run the underlying package manager.  As the arguments in this
         # subparser is constructed in a way that maps directly with the
         # underlying actions, it can be invoked directly.
@@ -688,6 +690,9 @@ class PackageManagerRuntime(DriverRuntime):
         else:
             action = self.default_action
             kwargs['stream'] = sys.stdout
+        if interactive:
+            kwargs['callback'] = partial(
+                prompt_overwrite_json, dumps=self.cli_driver.dumps)
         return action(**kwargs)
 
 

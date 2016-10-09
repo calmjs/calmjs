@@ -8,11 +8,18 @@ from os.path import join
 from calmjs import ui
 from calmjs.testing.utils import fake_error
 from calmjs.testing.utils import mkdtemp
+from calmjs.testing.utils import stub_check_interactive
+from calmjs.testing.utils import stub_stdin
+from calmjs.testing.utils import stub_stdouts
 
 isatty = sys.stdin.isatty()
 
 
 class CliCheckInteractiveTestCase(unittest.TestCase):
+
+    def test_check_interactive_coverage(self):
+        # at least call it.
+        ui.check_interactive()
 
     def test_check_interactive_fail(self):
         self.assertFalse(ui._check_interactive(
@@ -82,26 +89,28 @@ class MakeChoiceValidatorTestCase(unittest.TestCase):
         self.assertEqual(ui.null_validator('test'), 'test')
 
 
-class CliPromptTestCase(unittest.TestCase):
+class PromptTestCase(unittest.TestCase):
 
     def setUp(self):
         self.stdout = StringIO()
 
-    def prompt(self, question, answer,
-               validator=None, choices=None,
-               default_key=None, normalizer=None):
+    def do_prompt(
+            self, question, answer, validator=None, choices=None,
+            default_key=NotImplemented, normalizer=None):
         stdin = StringIO(answer)
         return ui.prompt(
             question, validator, choices, default_key,
             _stdin=stdin, _stdout=self.stdout)
 
     def test_prompt_basic(self):
-        result = self.prompt('How are you?', 'I am fine thank you.\n')
+        stub_check_interactive(self, True)
+        result = self.do_prompt('How are you?', 'I am fine thank you.\n')
         self.assertEqual(result, 'I am fine thank you.')
 
     def test_prompt_basic_choice_overridden(self):
         # Extra choices with a specific validator will not work
-        result = self.prompt(
+        stub_check_interactive(self, True)
+        result = self.do_prompt(
             'How are you?', 'I am fine thank you.\n', choices=(
                 ('a', 'A'),
                 ('b', 'B'),
@@ -115,7 +124,8 @@ class CliPromptTestCase(unittest.TestCase):
 
     def test_prompt_choices_only(self):
         # Extra choices with a specific validator will not work
-        result = self.prompt(
+        stub_check_interactive(self, True)
+        result = self.do_prompt(
             'Nice day today.\nHow are you?', 'I am fine thank you.\n',
             choices=(
                 ('a', 'A'),
@@ -135,9 +145,66 @@ class CliPromptTestCase(unittest.TestCase):
 
     def test_prompt_choices_canceled(self):
         # Extra choices with a specific validator will not work
-        result = self.prompt(
+        stub_check_interactive(self, True)
+        result = self.do_prompt(
             'How are you?', '', validator=fake_error(KeyboardInterrupt))
         self.assertIsNone(result, None)
         self.assertEqual(
             self.stdout.getvalue(),
             'How are you? Aborted.\n')
+
+    def test_prompt_non_interactive_null(self):
+        stub_stdouts(self)
+        stub_check_interactive(self, False)
+        result = self.do_prompt(
+            'How are you?', 'I am fine thank you.\n', choices=(
+                ('a', 'A'),
+                ('b', 'B'),
+                ('c', 'C'),
+            ),
+            # explicit validator negates the choices
+            validator=ui.null_validator,
+        )
+        self.assertIs(result, None)
+        self.assertEqual(self.stdout.getvalue(), 'How are you? Aborted.\n')
+
+    def test_prompt_non_interactive_choices(self):
+        stub_stdouts(self)
+        stub_check_interactive(self, False)
+        result = self.do_prompt(
+            'What are you?', 'c', choices=(
+                ('a', 'A'),
+                ('b', 'B'),
+                ('c', 'C'),
+            ),
+            default_key=0,
+        )
+        self.assertEqual(result, 'A')
+        self.assertEqual(self.stdout.getvalue(), 'What are you? a\n')
+
+
+class JsonPromptTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.tmpdir = mkdtemp(self)
+        self.tmpjson = join(self.tmpdir, 'test.json')
+        stub_check_interactive(self, True)
+
+    def test_prompt_basic(self):
+        stub_stdouts(self)
+        stub_stdin(self, 'n')
+        result = ui.prompt_overwrite_json(
+            {'a': 1, 'b': 1}, {'a': 1, 'b': 2}, self.tmpjson)
+        self.assertFalse(result)
+        stdout = sys.stdout.getvalue()
+        self.assertIn("'test.json'", stdout)
+        self.assertIn(self.tmpjson, stdout)
+        self.assertIn('-     "b": 1', stdout)
+        self.assertIn('+     "b": 2', stdout)
+
+    def test_prompt_true(self):
+        stub_stdouts(self)
+        stub_stdin(self, 'y')
+        result = ui.prompt_overwrite_json(
+            {'a': 1, 'b': 1}, {'a': 1, 'b': 2}, self.tmpjson)
+        self.assertTrue(result)

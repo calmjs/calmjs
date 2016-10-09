@@ -8,17 +8,25 @@ interfacing interactions.
 
 from __future__ import unicode_literals
 
+import difflib
+import logging
 import sys
+from functools import partial
+from json import dumps
 from locale import getpreferredencoding
 from os import fstat
+from os.path import basename
 from stat import S_ISCHR
 
 locale = getpreferredencoding()
+logger = logging.getLogger(__name__)
 
 if sys.version_info < (3,):  # pragma: no cover
     str = unicode  # noqa: F821
 
 lower = str.lower
+
+json_dumps = partial(dumps, indent=4, sort_keys=True, separators=(',', ': '))
 
 
 def _check_interactive(*descriptors):
@@ -129,6 +137,20 @@ def prompt(question, validator=None,
     _stdout.write(question)
     _stdout.write(' ')
 
+    if not check_interactive():
+        if choices and default_key is not NotImplemented:
+            display, answer = choices[default_key]
+            logger.warning(
+                'non-interactive mode; auto-selecting default option [%s]',
+                display)
+            _stdout.write(display)
+            _stdout.write('\n')
+            return answer
+        logger.warning(
+            'interactive code triggered within non-interactive session')
+        _stdout.write('Aborted.\n')
+        return None
+
     choice_keys = []
 
     if validator is None:
@@ -162,3 +184,33 @@ def prompt(question, validator=None,
             answer = None
 
     return answer
+
+
+def prompt_overwrite_json(original, new, target_path, dumps=json_dumps):
+    """
+    Prompt end user with a diff of original and new json that may
+    overwrite the file at the target_path.  This function only displays
+    a confirmation prompt and it is up to the caller to implement the
+    actual functionality.  Optionally, a custom json.dumps method can
+    also be passed in for output generation.
+    """
+
+    # generate compacted ndiff output.
+    diff = '\n'.join(l for l in (
+        line.rstrip() for line in difflib.ndiff(
+            json_dumps(original).splitlines(),
+            json_dumps(new).splitlines(),
+        ))
+        if l[:1] in '?+-' or l[-1:] in '{}' or l[-2:] == '},')
+    basename_target = basename(target_path)
+    return prompt(
+        "Generated '%(basename_target)s' differs with '%(target_path)s'.\n\n"
+        "The following is a compacted list of changes required:\n"
+        "%(diff)s\n\n"
+        "Overwrite '%(target_path)s'?" % locals(),
+        choices=(
+            ('Yes', True),
+            ('No', False),
+        ),
+        default_key=1,
+    )

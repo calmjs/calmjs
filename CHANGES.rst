@@ -32,6 +32,7 @@ Changelog
   ``calmjs.pythonic`` is renamed to ``calmjs.py.module``; the related
   testing related registry is renamed to include the full name of its
   implied target.
+- Corrected interactive-mode detection.
 
 1.0.3 (2016-09-07)
 ------------------

@@ -210,6 +210,16 @@ class BaseDriverClassTestCase(unittest.TestCase):
         # no binary, no nothing.
         self.assertIsNone(driver.which())
 
+    def test_dump(self):
+        driver = base.BaseDriver()
+        stream = mocks.StringIO()
+        driver.dump({'a': 1}, stream)
+        self.assertEqual(stream.getvalue(), '{\n    "a": 1\n}')
+
+    def test_dumps(self):
+        driver = base.BaseDriver()
+        self.assertEqual(driver.dumps({'a': 1}), '{\n    "a": 1\n}')
+
     def test_get_exec_binary_no_binary(self):
         with self.assertRaises(OSError):
             base._get_exec_binary('no_such_binary_hopefully', {})

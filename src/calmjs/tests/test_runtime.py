@@ -27,8 +27,8 @@ from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import remember_cwd
 from calmjs.testing.utils import stub_item_attr_value
 from calmjs.testing.utils import stub_base_which
+from calmjs.testing.utils import stub_check_interactive
 from calmjs.testing.utils import stub_mod_call
-from calmjs.testing.utils import stub_mod_check_interactive
 from calmjs.testing.utils import stub_stdin
 from calmjs.testing.utils import stub_stdouts
 
@@ -127,6 +127,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         self.assertEqual(sys.stdout.getvalue(), '')
 
     def test_prompt_export_target_check_exists_no(self):
+        stub_check_interactive(self, True)
         stub_stdouts(self)
         stub_stdin(self, u'n\n')
         target_dir = mkdtemp(self)
@@ -139,6 +140,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         self.assertIn('already exists, overwrite?', sys.stdout.getvalue())
 
     def test_prompt_export_target_check_exists_yes(self):
+        stub_check_interactive(self, True)
         stub_stdouts(self)
         stub_stdin(self, u'y\n')
         target_dir = mkdtemp(self)
@@ -149,7 +151,26 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         rt.prompt_export_target_check(spec)
         self.assertIn('already exists, overwrite?', sys.stdout.getvalue())
 
+    def test_prompt_export_target_check_exists_non_interactive(self):
+        stub_check_interactive(self, False)
+        stub_stdouts(self)
+        stub_stdin(self, u'y\n')
+        target_dir = mkdtemp(self)
+        export_target = join(target_dir, 'export_file')
+        open(export_target, 'w').close()  # write an empty file
+        spec = toolchain.Spec(export_target=export_target)
+        rt = runtime.ToolchainRuntime(toolchain.NullToolchain())
+        with pretty_logging(
+                logger='calmjs', level=DEBUG, stream=mocks.StringIO()) as err:
+            with self.assertRaises(toolchain.ToolchainCancel):
+                rt.prompt_export_target_check(spec)
+        self.assertIn(
+            'non-interactive mode; auto-selecting default option [No]',
+            err.getvalue()
+        )
+
     def test_prompted_execution_exists(self):
+        stub_check_interactive(self, True)
         stub_stdouts(self)
         stub_stdin(self, u'y\n')
 
@@ -171,6 +192,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         self.assertEqual(result['link'], 'linked')
 
     def test_prompted_execution_exists_overwrite(self):
+        stub_check_interactive(self, True)
         stub_stdouts(self)
         stub_stdin(self, u'y\n')
 
@@ -192,6 +214,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         self.assertEqual(result['link'], 'linked')
 
     def test_prompted_execution_exists_cancel(self):
+        stub_check_interactive(self, True)
         stub_stdouts(self)
         stub_stdin(self, u'n\n')
 
@@ -287,6 +310,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         rt = runtime.Runtime(working_set=working_set, prog='calmjs')
         stub_stdouts(self)
         stub_stdin(self, u'n\n')
+        stub_check_interactive(self, True)
         result = rt(['tool', '--export-target', target, '-dd', '-vv'])
         self.assertEqual(result['debug'], 2)
         # This is an integration test of sort for the debug event output
@@ -628,7 +652,7 @@ class PackageManagerRuntimeAlternativeIntegrationTestCase(unittest.TestCase):
         # Stub out the underlying data needed for the cli for the tests
         # to test against our custom data for reproducibility.
         stub_item_attr_value(self, dist, 'default_working_set', working_set)
-        stub_mod_check_interactive(self, [cli], True)
+        stub_check_interactive(self, True)
         driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', pkgdef_filename='requirements.json',
             dep_keys=('require',),
@@ -804,7 +828,7 @@ class RuntimeIntegrationTestCase(unittest.TestCase):
         # Stub out the underlying data needed for the cli for the tests
         # to test against our custom data for reproducibility.
         stub_item_attr_value(self, dist, 'default_working_set', working_set)
-        stub_mod_check_interactive(self, [cli], True)
+        stub_check_interactive(self, True)
 
         # Of course, apply a mock working set for the runtime instance
         # so it can use the npm runtime, however we will use a different

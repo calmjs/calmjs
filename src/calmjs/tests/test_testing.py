@@ -237,16 +237,28 @@ class TestingUtilsTestCase(unittest.TestCase):
         self.assertIs(base.which(_marker), _alternative)
         self.doCleanups()
 
-    def test_stub_mod_check_interactive(self):
-        from calmjs import cli
-        original = cli.check_interactive
-        self.assertIs(cli.check_interactive, original)
-        utils.stub_mod_check_interactive(self, [cli], None)
-        self.assertIsNot(cli.check_interactive, original)
+    def test_stub_check_interactive(self):
+        from calmjs import ui
+        original = ui.check_interactive
+        self.assertIs(ui.check_interactive, original)
+        utils.stub_check_interactive(self, None)
+        self.assertIsNot(ui.check_interactive, original)
         # it now returns this typically invalid result for testing
-        self.assertIsNone(cli.check_interactive())
+        self.assertIsNone(ui.check_interactive())
         self.doCleanups()
-        self.assertIs(cli.check_interactive, original)
+        self.assertIs(ui.check_interactive, original)
+
+    def test_stub_mod_check_interactive(self):
+        from calmjs import ui
+        from calmjs import cli
+        original = ui.check_interactive
+        self.assertIs(ui.check_interactive, original)
+        utils.stub_mod_check_interactive(self, [cli], None)
+        self.assertIsNot(ui.check_interactive, original)
+        # it now returns this typically invalid result for testing
+        self.assertIsNone(ui.check_interactive())
+        self.doCleanups()
+        self.assertIs(ui.check_interactive, original)
 
     def test_stub_mod_working_set(self):
         from calmjs import base

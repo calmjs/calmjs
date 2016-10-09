@@ -15,6 +15,7 @@ from pkg_resources import WorkingSet
 from calmjs import npm
 from calmjs import cli
 from calmjs import dist
+from calmjs.ui import prompt_overwrite_json
 from calmjs.utils import pretty_logging
 from calmjs.utils import which
 
@@ -24,8 +25,8 @@ from calmjs.testing.utils import make_dummy_dist
 from calmjs.testing.utils import remember_cwd
 from calmjs.testing.utils import stub_item_attr_value
 from calmjs.testing.utils import stub_base_which
+from calmjs.testing.utils import stub_check_interactive
 from calmjs.testing.utils import stub_mod_call
-from calmjs.testing.utils import stub_mod_check_interactive
 from calmjs.testing.utils import stub_os_environ
 from calmjs.testing.utils import stub_stdin
 from calmjs.testing.utils import stub_stdouts
@@ -38,12 +39,7 @@ class NpmTestCase(unittest.TestCase):
     def setUp(self):
         remember_cwd(self)
         stub_os_environ(self)
-        # Forcibly enable interactive mode.
-        self.inst_interactive, npm.npm.cli_driver.interactive = (
-            npm.npm.cli_driver.interactive, True)
-
-    def tearDown(self):
-        npm.npm.cli_driver.interactive = self.inst_interactive
+        stub_check_interactive(self, True)
 
     def test_npm_no_path(self):
         os.environ['PATH'] = ''
@@ -90,7 +86,7 @@ class NpmTestCase(unittest.TestCase):
         stub_mod_call(self, cli)
         stub_stdouts(self)
         stub_stdin(self, 'n\n')
-        stub_mod_check_interactive(self, [cli], True)
+        stub_check_interactive(self, True)
         tmpdir = mkdtemp(self)
         os.chdir(tmpdir)
 
@@ -114,7 +110,7 @@ class NpmTestCase(unittest.TestCase):
         # test harnesses.  Verify that later.
         with pretty_logging(stream=StringIO()) as stderr:
             # This is faked.
-            npm.npm_install('foo')
+            npm.npm_install('foo', callback=prompt_overwrite_json)
 
         self.assertIn(
             "Overwrite '%s'? (Yes/No) [No] " % join(tmpdir, 'package.json'),
@@ -206,19 +202,13 @@ class NpmDriverInitTestCase(unittest.TestCase):
         working_set.add(underscore, self._calmjs_testing_tmpdir)
         working_set.add(named, self._calmjs_testing_tmpdir)
         stub_item_attr_value(self, dist, 'default_working_set', working_set)
-        stub_mod_check_interactive(self, [cli], True)
-        # also save this
-        self.inst_interactive = npm.npm.cli_driver.interactive
-
-    def tearDown(self):
-        # so it can be restored.
-        npm.npm.cli_driver.interactive = self.inst_interactive
+        stub_check_interactive(self, True)
 
     def test_npm_init_new_non_interactive(self):
         tmpdir = mkdtemp(self)
         os.chdir(tmpdir)
 
-        self.assertTrue(npm.npm_init('foo', interactive=False))
+        self.assertTrue(npm.npm_init('foo'))
         with open(join(tmpdir, 'package.json')) as fd:
             result = json.load(fd)
 
@@ -233,7 +223,7 @@ class NpmDriverInitTestCase(unittest.TestCase):
         os.chdir(tmpdir)
 
         self.assertTrue(
-            npm.npm_init(['named', 'underscore'], interactive=False))
+            npm.npm_init(['named', 'underscore']))
         with open(join(tmpdir, 'package.json')) as fd:
             result = json.load(fd)
 
@@ -248,7 +238,7 @@ class NpmDriverInitTestCase(unittest.TestCase):
         os.chdir(tmpdir)
 
         self.assertTrue(
-            npm.npm_init(['invalid', 'underscore'], interactive=False))
+            npm.npm_init(['invalid', 'underscore']))
         with open(join(tmpdir, 'package.json')) as fd:
             result = json.load(fd)
 
@@ -269,7 +259,7 @@ class NpmDriverInitTestCase(unittest.TestCase):
         os.chdir(tmpdir)
 
         with pretty_logging(stream=StringIO()) as stderr:
-            self.assertFalse(npm.npm_init('foo', interactive=False))
+            self.assertFalse(npm.npm_init('foo'))
             self.assertIn(
                 "not overwriting existing '%s'" % target, stderr.getvalue())
 
@@ -291,9 +281,7 @@ class NpmDriverInitTestCase(unittest.TestCase):
             json.dump({'dependencies': {}, 'devDependencies': {}}, fd)
         os.chdir(tmpdir)
 
-        # force autodetected interactivity to be True
-        npm.npm.cli_driver.interactive = True
-        self.assertFalse(npm.npm_init('foo', interactive=True))
+        self.assertFalse(npm.npm_init('foo', callback=prompt_overwrite_json))
 
         with open(join(tmpdir, 'package.json')) as fd:
             result = json.load(fd)
@@ -378,8 +366,10 @@ class NpmDriverInitTestCase(unittest.TestCase):
 
         os.chdir(tmpdir)
         # Overwrite will supercede interactive.
+        # stub regardless, when interactive prompt failed to not trigger
+        stub_stdin(self, 'n')
         self.assertTrue(npm.npm_init(
-            'foo', merge=True, overwrite=True, interactive=True))
+            'foo', merge=True, overwrite=True, callback=prompt_overwrite_json))
 
         with open(join(tmpdir, 'package.json')) as fd:
             with self.assertRaises(ValueError):
@@ -414,7 +404,8 @@ class NpmDriverInitTestCase(unittest.TestCase):
             }, 'name': 'dummy'}, fd, indent=0)
 
         os.chdir(tmpdir)
-        self.assertFalse(npm.npm_init('foo', merge=True, interactive=True))
+        self.assertFalse(npm.npm_init(
+            'foo', merge=True, callback=prompt_overwrite_json))
 
         with open(join(tmpdir, 'package.json')) as fd:
             with self.assertRaises(ValueError):
@@ -504,8 +495,6 @@ class NpmDriverInitTestCase(unittest.TestCase):
         })
 
     def test_npm_init_existing_broken_no_overwrite_non_interactive(self):
-        npm.npm.cli_driver.interactive = False
-
         tmpdir = mkdtemp(self)
         # Broken json
         with open(join(tmpdir, 'package.json'), 'w') as fd:
@@ -576,7 +565,7 @@ class DistCommandTestCase(unittest.TestCase):
         stub_stdouts(self)
         # Force auto-detected interactive mode to True, because this is
         # typically executed within an interactive context.
-        stub_mod_check_interactive(self, [cli], True)
+        stub_check_interactive(self, True)
 
     def test_no_args(self):
         tmpdir = mkdtemp(self)

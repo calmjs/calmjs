@@ -25,7 +25,8 @@ ui
     For functions and classes that provide user interfacing features,
     including constants that are used for rendering output to logs and
     users.  The interactive mode features are typically reserved for
-    usage by the runtime module, however.
+    usage by the runtime module, although often other modules may use
+    provide references to functions here as default callbacks.
 
 registry
     Root registry class.  Inherits from base.  Should not inherit from

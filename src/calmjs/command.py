@@ -13,6 +13,8 @@ import logging
 from distutils.core import Command
 from distutils import log
 
+from calmjs.ui import prompt_overwrite_json
+
 
 class DistutilsLogHandler(logging.Handler):
     """
@@ -82,6 +84,7 @@ class PackageManagerCommand(Command):
         for key in self._opt_keys():
             setattr(self, key, False)
         self.stream = None  # extra output
+        self.callback = None
 
     def do_view(self):
         pkg_name = self.distribution.get_name()
@@ -92,7 +95,7 @@ class PackageManagerCommand(Command):
         self.cli_driver.pkg_manager_init(
             pkg_name,
             overwrite=self.overwrite, merge=self.merge,
-            interactive=self.interactive,
+            callback=self.callback,
             stream=self.stream,
         )
 
@@ -101,7 +104,7 @@ class PackageManagerCommand(Command):
         self.cli_driver.pkg_manager_install(
             pkg_name,
             overwrite=self.overwrite, merge=self.merge,
-            interactive=self.interactive,
+            callback=self.callback,
             stream=self.stream,
         )
 
@@ -112,6 +115,7 @@ class PackageManagerCommand(Command):
             self.view = True
         if self.view or self.dry_run:
             self.stream = sys.stdout
+        self.callback = prompt_overwrite_json if self.interactive else None
 
     def run(self):
         if self.dry_run:

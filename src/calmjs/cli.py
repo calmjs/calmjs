@@ -9,7 +9,6 @@ framework.
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-import difflib
 import logging
 import json
 import re
@@ -30,10 +29,6 @@ from calmjs.base import BaseDriver
 from calmjs.base import _get_exec_binary
 
 from calmjs.ui import locale
-
-# XXX to be removed when code needing these are out
-from calmjs.ui import prompt
-from calmjs.ui import check_interactive
 
 
 __all__ = [
@@ -125,9 +120,8 @@ class PackageManagerDriver(NodeDriver):
     """
 
     def __init__(self, pkg_manager_bin, pkgdef_filename=DEFAULT_JSON,
-                 prompt=prompt, interactive=None, install_cmd='install',
-                 dep_keys=DEP_KEYS, pkg_name_field='name',
-                 *a, **kw):
+                 install_cmd='install', dep_keys=DEP_KEYS,
+                 pkg_name_field='name', *a, **kw):
         """
         Optional Arguments:
 
@@ -136,12 +130,6 @@ class PackageManagerDriver(NodeDriver):
         pkgdef_filename
             The file name of the package manager's definition file -
             defaults to ``package.json``.
-        prompt
-            The interactive prompt function.  See above.
-        interactive
-            Boolean value to determine interactive mode.  Unset by
-            default, which triggers auto-detection and set if the
-            running application has an interactive console.
         install_cmd
             The package manager's command line install command
             Defaults to ``install``.
@@ -153,14 +141,9 @@ class PackageManagerDriver(NodeDriver):
         super(PackageManagerDriver, self).__init__(*a, **kw)
         self.binary = pkg_manager_bin
         self.pkgdef_filename = pkgdef_filename
-        self.prompt = prompt
         self.install_cmd = install_cmd
         self.dep_keys = dep_keys
         self.pkg_name_field = pkg_name_field
-
-        self.interactive = interactive
-        if self.interactive is None:
-            self.interactive = check_interactive()
 
     @property
     def pkg_manager_bin(self):
@@ -309,9 +292,8 @@ class PackageManagerDriver(NodeDriver):
         return pkgdef_json
 
     def pkg_manager_init(
-            self, package_names,
-            interactive=None,
-            overwrite=False, merge=False, **kw):
+            self, package_names, overwrite=False, merge=False,
+            callback=None, **kw):
         """
         Note: default implementation calls for npm and package.json,
         please note that it may not be the case for this instance of
@@ -329,14 +311,9 @@ class PackageManagerDriver(NodeDriver):
             The names of the python packages with their requirements to
             source the package.json from.
 
-        interactive
-            Boolean flag; if set, prompts user on what to do when choice
-            needs to be made.  Defaults to None, which falls back to the
-            default setting for this command line instance.
-
         overwrite
             Boolean flag; if set, overwrite package.json with the newly
-            generated ``package.json``; ignores interactive setting
+            generated ``package.json``;
 
         merge
             Boolean flag; if set, implies overwrite, but does not ignore
@@ -344,25 +321,17 @@ class PackageManagerDriver(NodeDriver):
             in existing ``package.json`` and only merge dependencies /
             devDependencies defined by the specified Python package.
 
+        callback
+            A callable.  If this is passed, the value for overwrite will
+            be derived from its result; it will be called with arguments
+            (original_json, pkgdef_json, pkgdef_path, dumps=self.dumps).
+            Typically the calmjs.ui.prompt_overwrite_json is passed into
+            this argument; refer to its documentation on details.
+
         Returns True if successful; can be achieved by writing a new
         file or that the existing one matches with the expected version.
         Returns False otherwise.
         """
-
-        # TODO the interactive portions should really be in the runtime
-        # and the command class (the setuptools bridge) should make use
-        # of that instead.  A reason why this is not migrated yet is
-        # simply due to how the original design did not define runtime
-        # being the location to do interactive mode, and how the merge
-        # option is done in a way that is (needlessly) coupled to the
-        # interaction with existing files.  Fortunately, copious amounts
-        # of tests are available, but they all need to be vetted when
-        # this portion is changed.
-
-        if interactive is None:
-            interactive = self.interactive
-        # both autodetection AND manual specification must be true.
-        interactive = interactive & check_interactive()
 
         # this will be modified in place
         original_json = {}
@@ -403,42 +372,17 @@ class PackageManagerDriver(NodeDriver):
 
             if original_json == pkgdef_json:
                 # Well, if original existing one is identical with the
-                # generated version, we got it, and we are done here.
-                # This also prevents the interactive prompt from firing.
+                # generated version, we have reached our target.
                 return True
 
-            if not interactive:
+            if not overwrite and callable(callback):
+                overwrite = callback(
+                    original_json, pkgdef_json, pkgdef_path, dumps=self.dumps)
+            else:
                 # here the implied settings due to non-interactive mode
                 # are finally set
                 if merge:
                     overwrite = True
-            elif interactive:
-                if not overwrite:
-                    # generate compacted ndiff output.
-                    diff = '\n'.join(l for l in (
-                        line.rstrip() for line in difflib.ndiff(
-                            self.dumps(original_json).splitlines(),
-                            self.dumps(pkgdef_json).splitlines(),
-                        ))
-                        if l[:1] in '?+-' or l[-1:] in '{}' or l[-2:] == '},')
-                    # set new overwrite value from user input.
-                    overwrite = prompt(
-                        "Generated '%(pkgdef_filename)s' differs with "
-                        "'%(pkgdef_path)s'.\n\n"
-                        "The following is a compacted list of changes "
-                        "required:\n"
-                        "%(diff)s\n\n"
-                        "Overwrite '%(pkgdef_path)s'?" % {
-                            'pkgdef_filename': self.pkgdef_filename,
-                            'pkgdef_path': pkgdef_path,
-                            'diff': diff,
-                        },
-                        choices=(
-                            ('Yes', True),
-                            ('No', False),
-                        ),
-                        default_key=1,
-                    )
 
             if not overwrite:
                 logger.warning("not overwriting existing '%s'", pkgdef_path)
