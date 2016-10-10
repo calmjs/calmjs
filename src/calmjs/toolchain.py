@@ -56,7 +56,11 @@ __all__ = [
     'BUILD_DIR',
     'CALMJS_MODULE_REGISTRY_NAMES', 'CALMJS_TEST_REGISTRY_NAMES',
     'CONFIG_JS_FILES', 'DEBUG',
-    'EXPORT_TARGET', 'EXPORT_TARGET_OVERWRITE', 'WORKING_DIR',
+    'EXPORT_MODULE_NAMES', 'EXPORT_PACKAGE_NAMES',
+    'EXPORT_TARGET', 'EXPORT_TARGET_OVERWRITE',
+    'SOURCE_MODULE_NAMES', 'SOURCE_PACKAGE_NAMES',
+    'TEST_MODULE_NAMES', 'TEST_MODULE_PATHS', 'TEST_PACKAGE_NAMES',
+    'WORKING_DIR',
 ]
 
 # define these as reserved event names
@@ -85,11 +89,30 @@ CALMJS_TEST_REGISTRY_NAMES = 'calmjs_test_registry_names'
 CONFIG_JS_FILES = 'config_js_files'
 # for debug level
 DEBUG = 'debug'
+# the module names that have been exported out
+EXPORT_MODULE_NAMES = 'export_module_names'
+# the package names that have been exported out; not currently supported
+# by any part of the library, but reserved nonetheless.
+EXPORT_PACKAGE_NAMES = 'export_package_names'
 # the container for the export target; either a file or directory; this
 # should not be changed after the prepare step.
 EXPORT_TARGET = 'export_target'
 # specify that export target is safe to be overwritten.
 EXPORT_TARGET_OVERWRITE = 'export_target_overwrite'
+# source module names; currently not supported by any part of the
+# library, but reserved nonetheless
+SOURCE_MODULE_NAMES = 'source_module_names'
+# source Python package names that have been specified for source file
+# extraction before the workflow, or the top level package(s); should
+# not include automatically derived required packages.
+SOURCE_PACKAGE_NAMES = 'source_package_names'
+# for testing
+# name of test modules
+TEST_MODULE_NAMES = 'test_module_names'
+# paths directly to the test file
+TEST_MODULE_PATHS = 'test_module_paths'
+# name of test package
+TEST_PACKAGE_NAMES = 'test_package_names'
 # the working directory
 WORKING_DIR = 'working_dir'
 
@@ -392,15 +415,15 @@ class Toolchain(BaseDriver):
         transpiled_targets = {}
         # List of exported module names, should be equal to all keys of
         # the compiled and bundled sources.
-        module_names = []
+        export_module_names = []
 
         for modname, source, target, modpath in entries:
             transpiled_modpaths[modname] = modpath
             transpiled_targets[modname] = target
-            module_names.append(modname)
+            export_module_names.append(modname)
             self.transpile_modname_source_target(spec, modname, source, target)
 
-        return transpiled_modpaths, transpiled_targets, module_names
+        return transpiled_modpaths, transpiled_targets, export_module_names
 
     def compile_bundle(self, spec, entries):
         """
@@ -414,13 +437,13 @@ class Toolchain(BaseDriver):
         bundled_targets = {}
         # List of exported module names, should be equal to all keys of
         # the compiled and bundled sources.
-        module_names = []
+        export_module_names = []
 
         for modname, source, target, modpath in entries:
             bundled_modpaths[modname] = modpath
             bundled_targets[modname] = target
             if isfile(source):
-                module_names.append(modname)
+                export_module_names.append(modname)
                 copy_target = join(spec[BUILD_DIR], target)
                 if not exists(dirname(copy_target)):
                     makedirs(dirname(copy_target))
@@ -429,7 +452,7 @@ class Toolchain(BaseDriver):
                 copy_target = join(spec[BUILD_DIR], modname)
                 shutil.copytree(source, copy_target)
 
-        return bundled_modpaths, bundled_targets, module_names
+        return bundled_modpaths, bundled_targets, export_module_names
 
     # The naming methods, which are needed by certain toolchains that
     # need to generate specific names to maintain compatibility.  The
@@ -583,11 +606,12 @@ class Toolchain(BaseDriver):
         simple copying.
         """
 
-        spec['module_names'] = module_names = spec.get('module_names', [])
-        if not isinstance(module_names, list):
+        spec[EXPORT_MODULE_NAMES] = export_module_names = spec.get(
+            EXPORT_MODULE_NAMES, [])
+        if not isinstance(export_module_names, list):
             raise TypeError(
-                "spec provided a 'module_names' but it is not of type list "
-                "(got %r instead)" % module_names
+                "spec provided a '%s' but it is not of type list "
+                "(got %r instead)" % (EXPORT_MODULE_NAMES, export_module_names)
             )
 
         for entry in self.compile_entries:
@@ -623,13 +647,13 @@ class Toolchain(BaseDriver):
                 "entry %r "
                 "wrote %d entries to spec[%r], "
                 "wrote %d entries to spec[%r], "
-                "added %d module_names",
+                "added %d export_module_names",
                 entry,
                 len(spec[spec_modpath_key]), spec_modpath_key,
                 len(spec[spec_target_key]), spec_target_key,
                 len(new_module_names),
             )
-            module_names.extend(new_module_names)
+            export_module_names.extend(new_module_names)
 
     def assemble(self, spec):
         """

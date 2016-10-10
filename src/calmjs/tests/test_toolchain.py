@@ -216,7 +216,7 @@ class ToolchainTestCase(unittest.TestCase):
         self.assertEqual(spec['bundled_modpaths'], {})
         self.assertEqual(spec['transpiled_targets'], {})
         self.assertEqual(spec['bundled_targets'], {})
-        self.assertEqual(spec['module_names'], [])
+        self.assertEqual(spec['export_module_names'], [])
 
     def test_toolchain_standard_compile_existing_values(self):
         # Test that in the case where existing path maps will block, and
@@ -225,13 +225,13 @@ class ToolchainTestCase(unittest.TestCase):
         bundled_modpaths = {}
         transpiled_targets = {}
         bundled_targets = {}
-        module_names = ['fake_names']
+        export_module_names = ['fake_names']
         spec = Spec(
             transpiled_modpaths=transpiled_modpaths,
             bundled_modpaths=bundled_modpaths,
             transpiled_targets=transpiled_targets,
             bundled_targets=bundled_targets,
-            module_names=module_names,
+            export_module_names=export_module_names,
         )
 
         with pretty_logging(stream=StringIO()) as s:
@@ -257,11 +257,11 @@ class ToolchainTestCase(unittest.TestCase):
         self.assertIs(spec['bundled_modpaths'], bundled_modpaths)
         self.assertIs(spec['transpiled_targets'], transpiled_targets)
         self.assertIs(spec['bundled_targets'], bundled_targets)
-        self.assertIs(spec['module_names'], module_names)
+        self.assertIs(spec['export_module_names'], export_module_names)
 
     def test_toolchain_standard_compile_existing_values_altarnate(self):
         # Test that in the case where existing path maps will block, and
-        # the existing module_names will be kept
+        # the existing export_module_names will be kept
         transpiled_targets = {}
         bundled_targets = {}
         spec = Spec(
@@ -287,9 +287,9 @@ class ToolchainTestCase(unittest.TestCase):
         self.assertIs(spec['bundled_targets'], bundled_targets)
         self.assertIs(spec['transpiled_targets'], transpiled_targets)
 
-    def test_toolchain_standard_compile_bad_module_names_type(self):
-        module_names = {}
-        spec = Spec(module_names=module_names)
+    def test_toolchain_standard_compile_bad_export_module_names_type(self):
+        export_module_names = {}
+        spec = Spec(export_module_names=export_module_names)
 
         with self.assertRaises(TypeError):
             self.toolchain.compile(spec)
@@ -311,7 +311,7 @@ class ToolchainTestCase(unittest.TestCase):
         self.assertNotIn('bundled_targets', spec)
         self.assertEqual(spec['faked_modpaths'], {'fake': 'nothing'})
         self.assertEqual(spec['faked_targets'], {'fake': 'nothing.js'})
-        self.assertEqual(spec['module_names'], ['fake'])
+        self.assertEqual(spec['export_module_names'], ['fake'])
 
     def test_toolchain_standard_compile_alternate_entries_not_callable(self):
         # Again, this is not the right way, should subclass/define a new
@@ -598,7 +598,7 @@ class NullToolchainTestCase(unittest.TestCase):
             'transpiled_targets': {
                 'namespace.dummy.source': 'namespace.dummy.source.js',
             },
-            'module_names': ['namespace.dummy.source'],
+            'export_module_names': ['namespace.dummy.source'],
             'prepare': 'prepared',
             'assemble': 'assembled',
             'link': 'linked',
@@ -645,7 +645,7 @@ class NullToolchainTestCase(unittest.TestCase):
             },
             'transpiled_modpaths': {},
             'transpiled_targets': {},
-            'module_names': ['bundle1'],
+            'export_module_names': ['bundle1'],
             'prepare': 'prepared',
             'assemble': 'assembled',
             'link': 'linked',
@@ -695,7 +695,7 @@ class NullToolchainTestCase(unittest.TestCase):
             'transpiled_targets': {
                 'namespace/dummy/source': 'namespace/dummy/source.js',
             },
-            'module_names': ['namespace/dummy/source'],
+            'export_module_names': ['namespace/dummy/source'],
             'prepare': 'prepared',
             'assemble': 'assembled',
             'link': 'linked',
