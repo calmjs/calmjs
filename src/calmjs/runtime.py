@@ -162,20 +162,22 @@ class BaseRuntime(BootstrapRuntime):
             The logger to enable for pretty logging.
 
             Default: the calmjs root logger
+
         action_key
             The destination key where the command will be stored.  Under
             this key the target driver runtime will be stored, and it
             will be popped off first before passing rest of kwargs to
             it.
+
         working_set
             The working_set to use for this instance.
 
             Default: pkg_resources.working_set
+
         package_name
             The package name that this instance of runtime is for.  Used
             for the version flag.
 
-            Default: calmjs
         description
             The description for this runtime.
         """
@@ -286,9 +288,55 @@ class BaseRuntime(BootstrapRuntime):
 
 
 class Runtime(BaseRuntime):
+    """
+    The main root runtime class.
+    """
 
-    def __init__(self, package_name=CALMJS, *a, **kw):
+    def __init__(
+            self, entry_point_group=CALMJS_RUNTIME, package_name=CALMJS,
+            *a, **kw):
+        """
+        The init method takes an additional argument.
+
+        entry_point_group
+            The group of entry points that should be checked.
+            default: calmjs.runtime
+
+        package_name is provided a default of 'calmjs'.
+        """
+
+        self.entry_point_group = entry_point_group
         super(Runtime, self).__init__(package_name=package_name, *a, **kw)
+
+    def entry_point_load_validated(self, entry_point):
+        try:
+            # load the runtime instance
+            inst = entry_point.load()
+        except ImportError:
+            logger.error(
+                "bad '%s' entry point '%s' from '%s': ImportError",
+                self.entry_point_group, entry_point, entry_point.dist,
+            )
+            return None
+
+        if not isinstance(inst, DriverRuntime):
+            logger.error(
+                "bad '%s' entry point '%s' from '%s': "
+                "target not a calmjs.runtime.DriverRuntime instance; "
+                "not registering ignored entry point",
+                self.entry_point_group, entry_point, entry_point.dist,
+            )
+            return None
+
+        if not valid_command_name.match(entry_point.name):
+            logger.error(
+                "bad '%s' entry point '%s' from '%s': "
+                "entry point name must be a latin alphanumeric string; "
+                "not registering ignored entry point",
+                self.entry_point_group, entry_point, entry_point.dist,
+            )
+            return None
+        return inst
 
     def init_argparser(self, argparser):
         """
@@ -323,33 +371,10 @@ class Runtime(BaseRuntime):
         commands = argparser.add_subparsers(
             dest=self.action_key, metavar='<command>')
 
-        for entry_point in self.working_set.iter_entry_points(CALMJS_RUNTIME):
-            try:
-                # load the runtime instance
-                inst = entry_point.load()
-            except ImportError:
-                logger.error(
-                    "bad '%s' entry point '%s' from '%s': ImportError",
-                    CALMJS_RUNTIME, entry_point, entry_point.dist,
-                )
-                continue
-
-            if not isinstance(inst, DriverRuntime):
-                logger.error(
-                    "bad '%s' entry point '%s' from '%s': "
-                    "target not a calmjs.runtime.DriverRuntime instance; "
-                    "not registering ignored entry point",
-                    CALMJS_RUNTIME, entry_point, entry_point.dist,
-                )
-                continue
-
-            if not valid_command_name.match(entry_point.name):
-                logger.error(
-                    "bad '%s' entry point '%s' from '%s': "
-                    "entry point name must be a latin alphanumeric string; "
-                    "not registering ignored entry point",
-                    CALMJS_RUNTIME, entry_point, entry_point.dist,
-                )
+        for entry_point in self.working_set.iter_entry_points(
+                self.entry_point_group):
+            inst = self.entry_point_load_validated(entry_point)
+            if not inst:
                 continue
 
             if entry_point.name in self.runtimes:
