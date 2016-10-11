@@ -9,6 +9,7 @@ import logging
 import re
 import sys
 import textwrap
+from collections import namedtuple
 from functools import partial
 from argparse import Action
 from argparse import ArgumentParser
@@ -136,13 +137,13 @@ class BootstrapRuntime(object):
     def verbosity(self):
         return _global_runtime_attrs.get('verbosity')
 
-    def run(self, **kwargs):
+    def run(self, argparser=None, **kwargs):
         self.prepare_keywords(kwargs)
 
     def __call__(self, args):
         parsed, extras = self.argparser.parse_known_args(args)
         kwargs = vars(parsed)
-        self.run(**kwargs)
+        self.run(argparser=self.argparser, **kwargs)
         return extras
 
 
@@ -185,10 +186,7 @@ class BaseRuntime(BootstrapRuntime):
         self.logger = logger
         self.action_key = action_key
         self.working_set = working_set
-        self.runtimes = {}
-        self.entry_points = {}
         self.argparser = None
-        self.subparsers = {}
         self.description = description or self.__doc__
         self.package_name = package_name
         super(BaseRuntime, self).__init__(*a, **kw)
@@ -208,10 +206,20 @@ class BaseRuntime(BootstrapRuntime):
             '-V', '--version', action=Version, default=0,
             help="print version information")
 
-    def run(self, **kwargs):
+    def run(self, argparser=None, **kwargs):
         """
         Subclasses should have their own running method.
         """
+
+    def error(self, argparser, target, message):
+        """
+        This is needed due to how the argparser may fail at deriving the
+        correct subcommand to include.  Although this BaseRuntime does
+        not implement this functionality, this method is reserved for
+        subclasses to handle that.
+        """
+
+        self.argparser.error(message)
 
     def __call__(self, args=None):
         args = norm_args(args)
@@ -247,22 +255,21 @@ class BaseRuntime(BootstrapRuntime):
             # Now, take everything before the target and see that it
             # got consumed
             bootstrap = BootstrapRuntime()
-            check = bootstrap(before)
-
-            # XXX msg generated has no gettext like the default one.
-            if check:
-                # So there exists some issues before the target, we can
-                # fail by default.
-                msg = 'unrecognized arguments: %s' % ' '.join(check)
+            # get arguments that failed the bootstrap stage, if any
+            bootfail = bootstrap(before)
+            # msg has no gettext applied as in argparser module version
+            msg = 'unrecognized arguments: %s' % ' '.join(bootfail or extras)
+            if bootfail:
+                # failed on the root parser, deal with this here now.
                 self.argparser.error(msg)
-            if target:
-                msg = 'unrecognized arguments: %s' % ' '.join(extras)
-                self.subparsers[target].error(msg)
+            else:
+                # let the implementation specific handling deal with it
+                self.error(self.argparser, target, msg)
 
         with pretty_logging(
                 logger=self.logger, level=self.log_level, stream=sys.stderr):
             try:
-                return self.run(**kwargs)
+                return self.run(argparser=self.argparser, **kwargs)
             except KeyboardInterrupt:
                 logger.critical('termination requested; aborted.')
             except Exception as e:
@@ -306,6 +313,9 @@ class Runtime(BaseRuntime):
         """
 
         self.entry_point_group = entry_point_group
+        self.argparser_details = {}
+        self.ArgumentParserDetails = namedtuple('ArgumentParserDetails', [
+            'subparsers', 'runtimes', 'entry_points'])
         super(Runtime, self).__init__(package_name=package_name, *a, **kw)
 
     def entry_point_load_validated(self, entry_point):
@@ -344,11 +354,13 @@ class Runtime(BaseRuntime):
         corrupt tracking data if forced.
         """
 
-        if argparser is not self.argparser:
-            raise RuntimeError(
-                'instances of Runtime will not accept external instances of '
-                'ArgumentParsers'
-            )
+        def prepare_argparser():
+            if argparser in self.argparser_details:
+                return False
+            result = self.argparser_details[
+                argparser] = self.ArgumentParserDetails(
+                    {}, {}, {})
+            return result
 
         def to_module_attr(ep):
             return '%s:%s' % (ep.module_name, '.'.join(ep.attrs))
@@ -361,10 +373,19 @@ class Runtime(BaseRuntime):
             # for version reporting.
             setattr(subparser, ATTR_ROOT_PKG, self.package_name)
             setattr(subparser, ATTR_RT_DIST, entry_point.dist)
-            self.subparsers[name] = subparser
-            self.runtimes[name] = runtime
-            self.entry_points[name] = entry_point
+            subparsers[name] = subparser
+            runtimes[name] = runtime
+            entry_points[name] = entry_point
             runtime.init_argparser(subparser)
+
+        details = prepare_argparser()
+        if not details:
+            logger.debug(
+                'argparser %r has already been initialized against runner %r',
+                argparser, self,
+            )
+            return
+        subparsers, runtimes, entry_points = details
 
         super(Runtime, self).init_argparser(argparser)
 
@@ -377,9 +398,9 @@ class Runtime(BaseRuntime):
             if not inst:
                 continue
 
-            if entry_point.name in self.runtimes:
-                reg_ep = self.entry_points[entry_point.name]
-                reg_rt = self.runtimes[entry_point.name]
+            if entry_point.name in runtimes:
+                reg_ep = entry_points[entry_point.name]
+                reg_rt = runtimes[entry_point.name]
 
                 if reg_rt is inst:
                     # this is fine, multiple packages declared the same
@@ -405,10 +426,10 @@ class Runtime(BaseRuntime):
                 # stable.
                 name = to_module_attr(entry_point)
 
-                if name in self.runtimes:
+                if name in runtimes:
                     # Maybe this is the third time this module is
                     # registered.  Test for its identity.
-                    if self.runtimes[name] is not inst:
+                    if runtimes[name] is not inst:
                         # Okay someone is having a fun time here mucking
                         # with data structures internal to here, likely
                         # (read hopefully) due to testing or random
@@ -439,10 +460,33 @@ class Runtime(BaseRuntime):
 
             register(name, inst, entry_point)
 
-    def run(self, **kwargs):
-        runtime = self.runtimes.get(kwargs.pop(self.action_key))
+    def get_argparser_details(self, argparser):
+        details = self.argparser_details.get(argparser)
+        if details:
+            return details
+        logger.error('provided argparser not registered to this runtime.')
+
+    def error(self, argparser, target, message):
+        """
+        This is needed due to how the argparser may fail at deriving the
+        correct subcommand to include.  Although this BaseRuntime does
+        not implement this functionality, this method is reserved for
+        subclasses to handle that.
+        """
+
+        details = self.get_argparser_details(argparser)
+        argparser = details.subparsers[target] if details else self.argparser
+        argparser.error(message)
+
+    def run(self, argparser=None, **kwargs):
+        details = self.get_argparser_details(argparser)
+        if not details:
+            logger.critical(
+                'runtime cannot continue due to missing argparser details')
+            return
+        runtime = details.runtimes.get(kwargs.pop(self.action_key))
         if runtime:
-            return runtime.run(**kwargs)
+            return runtime.run(argparser=argparser, **kwargs)
         # nothing is going to happen otherwise?
 
 
@@ -576,7 +620,7 @@ class ToolchainRuntime(DriverRuntime):
         if not overwrite:
             raise ToolchainCancel('cancelation initiated by user')
 
-    def run(self, **kwargs):
+    def run(self, argparser=None, **kwargs):
         spec = self.create_spec(**kwargs)
         spec[DEBUG] = self.debug
         spec.on_event(AFTER_PREPARE, self.prompt_export_target_check, spec)
@@ -705,7 +749,7 @@ class PackageManagerRuntime(DriverRuntime):
             metavar='package_names', nargs='+',
         )
 
-    def run(self, interactive=False, **kwargs):
+    def run(self, argpaser=None, interactive=False, **kwargs):
         # Run the underlying package manager.  As the arguments in this
         # subparser is constructed in a way that maps directly with the
         # underlying actions, it can be invoked directly.
