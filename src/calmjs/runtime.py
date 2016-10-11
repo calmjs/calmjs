@@ -15,6 +15,7 @@ from argparse import Action
 from argparse import ArgumentParser
 from argparse import HelpFormatter
 from argparse import SUPPRESS
+from inspect import currentframe
 from os.path import exists
 
 from pkg_resources import working_set as default_working_set
@@ -346,6 +347,16 @@ class Runtime(BaseRuntime):
                 self.entry_point_group, entry_point, entry_point.dist,
             )
             return None
+
+        if isinstance(self, type(inst)):
+            # this avoids later recursion
+            logger.debug(
+                'invalidating entry_point %s from Runtime %r, as the instance '
+                'made available at the entry_point must not be a sibling or '
+                'lower.', entry_point, self,
+            )
+            return None
+
         return inst
 
     def init_argparser(self, argparser):
@@ -358,8 +369,7 @@ class Runtime(BaseRuntime):
             if argparser in self.argparser_details:
                 return False
             result = self.argparser_details[
-                argparser] = self.ArgumentParserDetails(
-                    {}, {}, {})
+                argparser] = self.ArgumentParserDetails({}, {}, {})
             return result
 
         def to_module_attr(ep):
@@ -370,13 +380,37 @@ class Runtime(BaseRuntime):
                 name, help=inst.description,
                 formatter_class=HyphenNoBreakFormatter,
             )
-            # for version reporting.
-            setattr(subparser, ATTR_ROOT_PKG, self.package_name)
-            setattr(subparser, ATTR_RT_DIST, entry_point.dist)
-            subparsers[name] = subparser
-            runtimes[name] = runtime
-            entry_points[name] = entry_point
-            runtime.init_argparser(subparser)
+            try:
+                runtime.init_argparser(subparser)
+            except RuntimeError as e:
+                # assume that we have a recursion error
+                frame = currentframe()
+                if not frame or 'maximum recursion depth' not in str(e.args):
+                    raise
+                # if code change and test indicates that the following
+                # log entry is no longer generated, figure out the
+                # relative frame positions to ensure that this still
+                # works.
+                if frame.f_back.f_back.f_code.co_name == frame.f_code.co_name:
+                    # keep bubbling out until we no longer get a frame
+                    # that looks like this.
+                    raise
+                # okay, so we are probably at a root thing that blew up
+                logger.critical(
+                    "Runtime subclass at entry_point '%s' is implemented "
+                    "without a proper 'entry_point_load_validated' to filter "
+                    "out its higher level Runtime classes; it should at least "
+                    "not override that, or override that with the checking "
+                    "in place.", entry_point
+                )
+                # can't re-raise this one due to excessive spam.
+            else:
+                # for version reporting.
+                setattr(subparser, ATTR_ROOT_PKG, self.package_name)
+                setattr(subparser, ATTR_RT_DIST, entry_point.dist)
+                subparsers[name] = subparser
+                runtimes[name] = runtime
+                entry_points[name] = entry_point
 
         details = prepare_argparser()
         if not details:
@@ -484,9 +518,11 @@ class Runtime(BaseRuntime):
             logger.critical(
                 'runtime cannot continue due to missing argparser details')
             return
-        runtime = details.runtimes.get(kwargs.pop(self.action_key))
+        action_key = kwargs.pop(self.action_key)
+        runtime = details.runtimes.get(action_key)
+        subparser = details.subparsers.get(action_key)
         if runtime:
-            return runtime.run(argparser=argparser, **kwargs)
+            return runtime.run(argparser=subparser, **kwargs)
         # nothing is going to happen otherwise?
 
 

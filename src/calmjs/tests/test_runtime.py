@@ -562,6 +562,54 @@ class PackageManagerDriverTestCase(unittest.TestCase):
         # number of calls to init
         self.assertEqual(len(rt.argparser_details), 3)
 
+    def test_duplication_and_runtime_nested_running(self):
+        """
+        Nested runtime registration running.
+        """
+
+        from calmjs.testing import utils
+        assertIn = self.assertIn
+        msg = 'executed SimpleRuntime.run %d'
+
+        # We need to be sure that the argparser that got passed into a
+        # particular given runtime.run is definitely seen by the given
+        # runtime under standard registration workflow.  Create a dummy
+        # runtime that will do the assertion.
+
+        class SimpleRuntime(runtime.DriverRuntime, runtime.Runtime):
+            def run(self, argparser, **kwargs):
+                assertIn(argparser, self.argparser_details)
+                raise Exception(msg % id(msg))
+
+        class Dummy(runtime.DriverRuntime):
+            # needed here for Python 2 to avoid early quit.
+            pass
+
+        def cleanup():
+            del utils.simple
+            del utils.dummy
+        self.addCleanup(cleanup)
+
+        stub_stdouts(self)
+
+        # create a dummy based
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.runtime]\n'
+            'simple = calmjs.testing.utils:simple\n'
+            'dummy = calmjs.testing.utils:dummy\n'
+        ),), 'example.simple', '1.0')
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+        utils.simple = SimpleRuntime(None, working_set=working_set)
+        utils.dummy = Dummy(None, working_set=working_set)
+
+        rt = runtime.Runtime(working_set=working_set)
+        rt(['simple', 'dummy', '-vvd'])
+        stderr = sys.stderr.getvalue()
+        self.assertIn(msg[:-2], stderr)
+        self.assertIn(str(id(msg)), stderr)
+
     def test_duplication_and_runtime_malformed(self):
         """
         Now for the finale, where we really muck with sanity checking
@@ -621,6 +669,90 @@ class PackageManagerDriverTestCase(unittest.TestCase):
         self.assertIn(
             "Runtime instance has been used or initialized improperly.", msg)
         # Naisu Bakuretsu - Megumin.
+
+    def test_duplication_and_runtime_unchecked_recursion(self):
+        """
+        Nested runtime registration running.
+        """
+
+        from calmjs.testing import utils
+
+        class BadSimpleRuntime(runtime.DriverRuntime, runtime.Runtime):
+            def entry_point_load_validated(self, entry_point):
+                # skip the rest of the checks.
+                try:
+                    return entry_point.load()
+                except ImportError:
+                    return None
+
+        class BadDummy(runtime.DriverRuntime):
+            # again, needed by Python 2...
+            pass
+
+        def cleanup():
+            del utils.badsimple
+            del utils.baddummy
+        self.addCleanup(cleanup)
+
+        stub_stdouts(self)
+
+        # create a dummy based
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.runtime]\n'
+            'badsimple = calmjs.testing.utils:badsimple\n'
+            'baddummy = calmjs.testing.utils:baddummy\n'
+        ),), 'example.badsimple', '1.0')
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+        utils.badsimple = BadSimpleRuntime(None, working_set=working_set)
+        utils.baddummy = BadDummy(None, working_set=working_set)
+
+        with pretty_logging(
+                logger='calmjs.runtime', stream=mocks.StringIO()) as s:
+            runtime.Runtime(working_set=working_set)
+
+        # this is like a slimy recursive frog
+        stderr = s.getvalue()
+        # Yame... YAMEROOOOOOOO
+        self.assertIn("CRITICAL", stderr)
+        self.assertIn(
+            "'badsimple = calmjs.testing.utils:badsimple' is implemented "
+            "without a proper 'entry_point_load_validated'", stderr
+        )
+
+    def test_duplication_and_runtime_not_recursion(self):
+        """
+        Make sure it explodes normally if standard runtime error.
+        """
+
+        from calmjs.testing import utils
+
+        class BadAtInit(runtime.DriverRuntime):
+            def init_argparser(self, argparser):
+                if argparser is not self.argparser:
+                    raise RuntimeError('A fake explosion')
+
+        def cleanup():
+            del utils.badatinit
+        self.addCleanup(cleanup)
+
+        stub_stdouts(self)
+
+        # create a dummy based
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.runtime]\n'
+            'badatinit = calmjs.testing.utils:badatinit\n'
+            'baddummy = calmjs.testing.utils:baddummy\n'
+        ),), 'example.badsimple', '1.0')
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+        utils.badatinit = BadAtInit(None)
+
+        # and here lies the crimson magician, all out of hp.
+        with self.assertRaises(RuntimeError):
+            runtime.Runtime(working_set=working_set)
 
 
 class ArgumentHandlingTestCase(unittest.TestCase):
