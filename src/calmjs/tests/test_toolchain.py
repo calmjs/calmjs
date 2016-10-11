@@ -60,7 +60,7 @@ class SpecTestCase(unittest.TestCase):
         spec.update_selected({'abcd': 123, 'defg': 321, 'c': 4}, ['defg', 'c'])
         self.assertEqual(spec, {'a': 1, 'b': 2, 'c': 4, 'defg': 321})
 
-    def test_spec_event(self):
+    def test_spec_event_standard(self):
         def cb(sideeffect, *a, **kw):
             sideeffect.append((a, kw))
 
@@ -69,6 +69,7 @@ class SpecTestCase(unittest.TestCase):
         spec = Spec()
         spec.on_event(CLEANUP, cb, check, 1, keyword='foo')
         spec.on_event(CLEANUP, cb, check, 2, keyword='bar')
+        self.assertEqual(len(spec._events), 1)
 
         spec.do_events('foo')
         self.assertEqual(check, [])
@@ -79,6 +80,14 @@ class SpecTestCase(unittest.TestCase):
             ((2,), {'keyword': 'bar'}),
             ((1,), {'keyword': 'foo'}),
         ])
+
+    def test_spec_event_blackhole(self):
+        spec = Spec()
+        check = []
+        spec.on_event(None, check.append, 1)
+        self.assertEqual(len(spec._events), 0)
+        spec.do_events(None)
+        self.assertEqual(check, [])
 
     def test_spec_event_malformed(self):
         def cb(sideeffect, *a, **kw):

@@ -184,6 +184,9 @@ class Spec(dict):
         keyword arguments to f when it's invoked.
         """
 
+        if name is None:
+            return
+
         event = (f, a, kw)
         self._events[name] = self._events.get(name, [])
         self._events[name].append(event)
