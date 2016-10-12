@@ -161,6 +161,7 @@ class Spec(dict):
         super(Spec, self).__init__(*a, **kw)
         self._events = {}
         self._frames = {}
+        self._called = set()
 
     def update_selected(self, other, selected):
         """
@@ -242,7 +243,14 @@ class Spec(dict):
             style.
         """
 
-        self.__do_events_frame_protection(currentframe())
+        if name in self._called:
+            logger.warning(
+                "event '%s' has been called for this spec %r", name, self,
+            )
+            # only now ensure checking
+            self.__do_events_frame_protection(currentframe())
+        else:
+            self._called.add(name)
 
         # Get a complete clone, so indirect manipulation done to the
         # reference that others have access to will not have an effect
