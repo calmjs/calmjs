@@ -20,6 +20,9 @@ matrix:
     - language: python
       python: pypy
       addons:
+    - language: python
+      python: pypy3
+      addons:
     # test different versions of Node.js on osx
     - language: node_js
       node_js: 4.5
