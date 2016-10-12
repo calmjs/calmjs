@@ -158,6 +158,81 @@ class SpecTestCase(unittest.TestCase):
         self.assertIn('Traceback for original event', s.getvalue())
         self.assertIn('line 15, in create_spec_event_fault', s.getvalue())
 
+    # infinite loop protection checks.
+
+    @unittest.skipIf(currentframe() is None, 'stack frame not supported')
+    def test_spec_event_block_do_events_further_on_event(self):
+        spec = Spec()
+
+        def on_event():
+            spec.on_event(CLEANUP, add_bad_cleanup, spec)
+
+        def add_bad_cleanup(spec):
+            on_event()
+
+        # can add the event in through any method required
+        with pretty_logging(stream=StringIO()) as s:
+            spec.on_event(CLEANUP, add_bad_cleanup, spec)
+        self.assertEqual(s.getvalue(), '')
+
+        # The failure is raised from within do_events; this case would
+        # have raised an infinite loop.
+        with pretty_logging(stream=StringIO()) as s:
+            spec.do_events(CLEANUP)
+
+        self.assertIn(
+            "indirect invocation of 'on_event' by 'do_events' is forbidden",
+            s.getvalue())
+
+    @unittest.skipIf(currentframe() is None, 'stack frame not supported')
+    def test_spec_event_block_do_events_further_do_events(self):
+        spec = Spec()
+        spec._events[CLEANUP] = []
+
+        def fake_event_add():
+            event = (fake_event_add, (), {})
+            spec._events[CLEANUP].append(event)
+            spec.do_events(CLEANUP)
+
+        with pretty_logging(stream=StringIO()) as s:
+            fake_event_add()
+            spec.do_events(CLEANUP)
+
+        self.assertIn(
+            "indirect invocation of 'do_events' by 'do_events' is forbidden",
+            s.getvalue())
+
+    def test_spec_event_no_infinite_pop(self):
+        spec = Spec(counter=0)
+        spec._events[CLEANUP] = []
+
+        def fake_event_add():
+            event = (fake_event_add, (), {})
+            spec._events[CLEANUP].append(event)
+            spec['counter'] += 1
+
+        with pretty_logging(stream=StringIO()) as s:
+            fake_event_add()
+            self.assertEqual(spec['counter'], 1)
+            spec.do_events(CLEANUP)
+            # ensure that it only got called once.
+            self.assertEqual(spec['counter'], 2)
+        self.assertEqual(s.getvalue(), '')
+
+        # this one can work without frame protection.
+        stub_item_attr_value(
+            self, calmjs_toolchain, 'currentframe', lambda: None)
+        with pretty_logging(stream=StringIO()) as s:
+            spec.do_events(CLEANUP)
+        self.assertEqual(spec['counter'], 4)
+        self.assertIn(
+            'currentframe() returned None; frame protection disabled',
+            s.getvalue())
+
+    # that's all the standard vectors I can cover, if someone wants to
+    # attack this using somewhat more advanced/esoteric methods, I guess
+    # they wanted an EXPLOSION.
+
 
 class ToolchainTestCase(unittest.TestCase):
     """

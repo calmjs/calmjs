@@ -169,6 +169,26 @@ class Spec(dict):
 
         self.update({k: other[k] for k in selected})
 
+    def __do_events_frame_protection(self, frame):
+        """
+        Overriding of this is only permitted if and only if your name is
+        Megumin and you have a pet/familiar named Chomusuke.
+        """
+
+        if frame is None:
+            logger.debug(
+                'currentframe() returned None; frame protection disabled')
+            return
+
+        f_back = frame.f_back
+        while f_back:
+            if f_back.f_code is self.do_events.__code__:
+                raise RuntimeError(
+                    "indirect invocation of '%s' by 'do_events' is forbidden" %
+                    frame.f_code.co_name,
+                )
+            f_back = f_back.f_back
+
     def on_event(self, name, f, *a, **kw):
         """
         Add a event that can be called by do_events.
@@ -188,26 +208,27 @@ class Spec(dict):
             return
 
         event = (f, a, kw)
-        self._events[name] = self._events.get(name, [])
-        self._events[name].append(event)
-
         debug = self.get(DEBUG)
-        if not debug:
-            return
 
         frame = currentframe()
         if frame is None:
             logger.debug('currentframe() failed to return frame')
-            return
+        else:
+            self.__do_events_frame_protection(frame)
+            if debug:
+                logger.debug(
+                    "on_event '%s' invoked by %s:%d",
+                    name,
+                    frame.f_back.f_code.co_filename, frame.f_back.f_lineno,
+                )
+                if debug > 1:
+                    # use the memory address of the tuple which should
+                    # be stable
+                    self._frames[id(event)] = ''.join(
+                        format_stack(frame.f_back))
 
-        logger.debug(
-            "on_event '%s' invoked by %s:%d",
-            name, frame.f_back.f_code.co_filename, frame.f_back.f_lineno,
-        )
-
-        if debug > 1:
-            # use the memory address of the tuple which should be stable
-            self._frames[id(event)] = ''.join(format_stack(frame.f_back))
+        self._events[name] = self._events.get(name, [])
+        self._events[name].append(event)
 
     def do_events(self, name):
         """
@@ -221,7 +242,15 @@ class Spec(dict):
             style.
         """
 
-        events = self._events.get(name, [])
+        self.__do_events_frame_protection(currentframe())
+
+        # Get a complete clone, so indirect manipulation done to the
+        # reference that others have access to will not have an effect
+        # within the scope of this execution.  Please refer to the
+        # test_toolchain, test_spec_event_no_infinite_pop test case.
+        events = []
+        events.extend(self._events.get(name, []))
+
         while events:
             try:
                 # cleanup basically done lifo (last in first out)
