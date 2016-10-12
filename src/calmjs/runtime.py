@@ -629,14 +629,6 @@ class ToolchainRuntime(DriverRuntime):
         self.init_argparser_export_target(argparser)
         self.init_argparser_working_dir(argparser)
 
-    def create_spec(self, **kwargs):
-        """
-        Subclasses should extend this if they take actual parameters.
-        It must produce a ``Spec`` from the given keyword arguments.
-        """
-
-        return Spec(**kwargs)
-
     def prompt_export_target_check(self, spec):
         export_target = spec.get(EXPORT_TARGET)
         if not export_target:
@@ -656,10 +648,36 @@ class ToolchainRuntime(DriverRuntime):
         if not overwrite:
             raise ToolchainCancel('cancelation initiated by user')
 
-    def run(self, argparser=None, **kwargs):
-        spec = self.create_spec(**kwargs)
+    def prepare_spec(self, spec):
+        """
+        Prepare a spec for usage with the generic ToolchainRuntime.
+
+        Subclasses should avoid overriding this; override create_spec
+        instead.
+        """
+
         spec[DEBUG] = self.debug
         spec.on_event(AFTER_PREPARE, self.prompt_export_target_check, spec)
+
+    def create_spec(self, **kwargs):
+        """
+        Subclasses should override this if they take actual parameters.
+        It must produce a ``Spec`` from the given keyword arguments.
+        """
+
+        return Spec(**kwargs)
+
+    def kwargs_to_spec(self, **kwargs):
+        """
+        Turn the provided kwargs into arguments ready for toolchain.
+        """
+
+        spec = self.create_spec(**kwargs)
+        self.prepare_spec(spec)
+        return spec
+
+    def run(self, argparser=None, **kwargs):
+        spec = self.kwargs_to_spec(**kwargs)
         self.toolchain(spec)
         return spec
 
