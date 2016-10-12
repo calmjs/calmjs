@@ -48,10 +48,19 @@ install:
   - python setup.py develop
 script: 
   - flake8 setup.py src
-  - nosetests --with-coverage --cover-package=calmjs --with-doctest
+  # with pypy version >= 2.5.0 (maybe earlier, definitely after 2.2.1),
+  # coverage fails to produce meaningful results running with nose.
+  # Check that and only use nose (which is only somewhat useful only
+  # when errors happen) with CPython.  This happened on the prior
+  # changeset (ee599b4d) where checks and testing with callbacks that
+  # lead to recursive calling of functions were added.
+  - if [[ $TRAVIS_PYTHON_VERSION == pypy* ]]; then
+      coverage run --include=src/* -m unittest calmjs.tests.make_suite ;
+      coverage report -m ;
+    else
+      nosetests --with-coverage --cover-package=calmjs --with-doctest ;
+    fi
 # Alternatively without nose
-#  - coverage run --include=src/* -m unittest calmjs.tests.make_suite
-#  - coverage report -m
 after_success:
   # only submit coverage when testing under linux.
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
