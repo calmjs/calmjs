@@ -611,6 +611,15 @@ class PackageManagerDriverTestCase(unittest.TestCase):
         self.assertIn(msg[:-2], stderr)
         self.assertIn(str(id(msg)), stderr)
 
+        # also take the opportunity to test the nested version output.
+        rt = runtime.Runtime(
+            working_set=working_set, package_name='example.simple')
+        with self.assertRaises(SystemExit):
+            rt(['simple', 'dummy', '-V'])
+
+        stdout = sys.stdout.getvalue()
+        self.assertEqual(3, len(stdout.strip().splitlines()))
+
     def test_duplication_and_runtime_malformed(self):
         """
         Now for the finale, where we really muck with sanity checking

@@ -11,8 +11,8 @@ from argparse import Action
 from pkg_resources import working_set as default_working_set
 from pkg_resources import Requirement
 
+ATTR_INFO = '_calmjs_runtime_info'
 ATTR_ROOT_PKG = '_calmjs_root_pkg_name'
-ATTR_RT_DIST = '_calmjs_runtime_dist'
 
 
 class Version(Action):
@@ -56,10 +56,11 @@ class Version(Action):
             results.append('%s %s from %s' % self.get_dist_info(dist))
             results.append(linesep)
 
-        rt_dist = getattr(parser, ATTR_RT_DIST, None)
-        if rt_dist:
+        infos = getattr(parser, ATTR_INFO, [])
+        for info in infos:
+            prog, rt_dist = info
             results.append(
-                parser.prog + ': %s %s from %s' % self.get_dist_info(rt_dist))
+                prog + ': %s %s from %s' % self.get_dist_info(rt_dist))
             results.append(linesep)
 
         if not results:

@@ -21,8 +21,8 @@ from os.path import exists
 from pkg_resources import working_set as default_working_set
 
 from calmjs.argparse import Version
+from calmjs.argparse import ATTR_INFO
 from calmjs.argparse import ATTR_ROOT_PKG
-from calmjs.argparse import ATTR_RT_DIST
 from calmjs.exc import RuntimeAbort
 from calmjs.toolchain import Spec
 from calmjs.toolchain import ToolchainAbort
@@ -198,8 +198,8 @@ class BaseRuntime(BootstrapRuntime):
                 prog=self.prog, description=self.description,
                 formatter_class=HyphenNoBreakFormatter,
             )
+            setattr(self.argparser, ATTR_ROOT_PKG, self.package_name)
             self.init_argparser(self.argparser)
-        setattr(self.argparser, ATTR_ROOT_PKG, self.package_name)
 
     def init_argparser(self, argparser):
         super(BaseRuntime, self).init_argparser(argparser)
@@ -376,6 +376,15 @@ class Runtime(BaseRuntime):
                 name, help=inst.description,
                 formatter_class=HyphenNoBreakFormatter,
             )
+
+            # Assign values for version reporting system
+            setattr(subparser, ATTR_ROOT_PKG, getattr(
+                argparser, ATTR_ROOT_PKG, self.package_name))
+            subp_info = []
+            subp_info.extend(getattr(argparser, ATTR_INFO, []))
+            subp_info.append((subparser.prog, entry_point.dist))
+            setattr(subparser, ATTR_INFO, subp_info)
+
             try:
                 runtime.init_argparser(subparser)
             except RuntimeError as e:
@@ -392,9 +401,8 @@ class Runtime(BaseRuntime):
                     "in place.", entry_point
                 )
             else:
-                # for version reporting.
-                setattr(subparser, ATTR_ROOT_PKG, self.package_name)
-                setattr(subparser, ATTR_RT_DIST, entry_point.dist)
+                # finally record the completely initialized subparser
+                # into the structure here if successful.
                 subparsers[name] = subparser
                 runtimes[name] = runtime
                 entry_points[name] = entry_point
