@@ -300,24 +300,20 @@ class Runtime(BaseRuntime):
     The main root runtime class.
     """
 
-    def __init__(
-            self, entry_point_group=CALMJS_RUNTIME, package_name=CALMJS,
-            *a, **kw):
+    def __init__(self, entry_point_group=CALMJS_RUNTIME, *a, **kw):
         """
         The init method takes an additional argument.
 
         entry_point_group
             The group of entry points that should be checked.
             default: calmjs.runtime
-
-        package_name is provided a default of 'calmjs'.
         """
 
         self.entry_point_group = entry_point_group
         self.argparser_details = {}
         self.ArgumentParserDetails = namedtuple('ArgumentParserDetails', [
             'subparsers', 'runtimes', 'entry_points'])
-        super(Runtime, self).__init__(package_name=package_name, *a, **kw)
+        super(Runtime, self).__init__(*a, **kw)
 
     def entry_point_load_validated(self, entry_point):
         try:
@@ -515,6 +511,18 @@ class Runtime(BaseRuntime):
         if runtime:
             return runtime.run(argparser=subparser, **kwargs)
         # nothing is going to happen otherwise?
+
+
+class CalmJSRuntime(Runtime):
+
+    def __init__(self, package_name=CALMJS, *a, **kw):
+        """
+        The main CalmJS runtime
+
+        package_name is provided a default of 'calmjs'.
+        """
+
+        super(CalmJSRuntime, self).__init__(package_name=package_name)
 
 
 class DriverRuntime(BaseRuntime):
@@ -825,7 +833,7 @@ def main(args=None):
         with pretty_logging(
                 logger='', level=bootstrap.log_level, stream=sys.stderr):
             # pass in the extra arguments that bootstrap cannot handle.
-            runtime = Runtime()
+            runtime = CalmJSRuntime()
         if runtime(args):
             sys.exit(0)
         else:
