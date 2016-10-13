@@ -387,15 +387,7 @@ class Runtime(BaseRuntime):
                 frame = currentframe()
                 if not frame or 'maximum recursion depth' not in str(e.args):
                     raise
-                # if code change and test indicates that the following
-                # log entry is no longer generated, figure out the
-                # relative frame positions to ensure that this still
-                # works.
-                if frame.f_back.f_back.f_code.co_name == frame.f_code.co_name:
-                    # keep bubbling out until we no longer get a frame
-                    # that looks like this.
-                    raise
-                # okay, so we are probably at a root thing that blew up
+
                 logger.critical(
                     "Runtime subclass at entry_point '%s' is implemented "
                     "without a proper 'entry_point_load_validated' to filter "
@@ -403,7 +395,6 @@ class Runtime(BaseRuntime):
                     "not override that, or override that with the checking "
                     "in place.", entry_point
                 )
-                # can't re-raise this one due to excessive spam.
             else:
                 # for version reporting.
                 setattr(subparser, ATTR_ROOT_PKG, self.package_name)

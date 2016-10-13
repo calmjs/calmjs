@@ -5,6 +5,7 @@ import os
 import sys
 from argparse import ArgumentParser
 from inspect import currentframe
+from inspect import getouterframes
 from os.path import join
 from os.path import exists
 from logging import DEBUG
@@ -670,12 +671,16 @@ class PackageManagerDriverTestCase(unittest.TestCase):
             "Runtime instance has been used or initialized improperly.", msg)
         # Naisu Bakuretsu - Megumin.
 
+    @unittest.skipIf(currentframe() is None, 'stack frame not supported')
     def test_duplication_and_runtime_unchecked_recursion(self):
         """
         Nested runtime registration running.
         """
 
         from calmjs.testing import utils
+
+        # at least minimally greater than expected extra frames
+        recursionlimit = min(sys.getrecursionlimit(), 100) - 3
 
         class BadSimpleRuntime(runtime.DriverRuntime, runtime.Runtime):
             def entry_point_load_validated(self, entry_point):
@@ -684,6 +689,16 @@ class PackageManagerDriverTestCase(unittest.TestCase):
                     return entry_point.load()
                 except ImportError:
                     return None
+
+            def init_argparser(self, argparser):
+                level = len(getouterframes(currentframe()))
+                if level > recursionlimit:
+                    # turns out we need to emulate this to make pypy not
+                    # blow up coverage reporting; also make it die
+                    # quicker, and this emulation works good enough as
+                    # it turns out.
+                    raise RuntimeError('maximum recursion depth exceeded')
+                super(BadSimpleRuntime, self).init_argparser(argparser)
 
         class BadDummy(runtime.DriverRuntime):
             # again, needed by Python 2...
