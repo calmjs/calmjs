@@ -25,6 +25,11 @@ Changelog
 - Dedicated runtime provided for ``Toolchain`` subclasses, joining the
   ranks of a few other ``BaseDriver`` subclasses.  This is implemented
   as ``calmjs.runtime.ToolchainRuntime``.
+- ``calmjs.runtime.Runtime`` can be subclassed and nested as it will now
+  nest all ``BaseRuntime``.  Also the ``init`` method is removed, just
+  use ``__init__`` and standard subclassing ``super`` usage rules.
+- The default ``ArgumentParser`` instance for every ``Runtime`` will no
+  longer be created until accessed, as it is now a property.
 - Provide a way for packages to declare the primary module registry or
   registries it declared packages for through a new setup keyword
   ``calmjs_module_registry``, if required and desired.

@@ -344,17 +344,13 @@ class PackageManagerDriverTestCase(unittest.TestCase):
             "run 'mgr install' with generated 'default.json';", text,
         )
 
-    def test_duplicate_init_no_error(self):
-        driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
-        cmd = runtime.PackageManagerRuntime(driver)
-        cmd.init()
-
     def test_root_runtime_details_dropped(self):
         stub_stdouts(self)
         working_set = mocks.WorkingSet({'calmjs.runtime': [
             'npm = calmjs.npm:npm.runtime',
         ]})
         rt = runtime.Runtime(working_set=working_set)
+        rt.argparser  # populate the argparser
         rt.argparser_details.clear()
         with pretty_logging(
                 logger='calmjs.runtime', stream=mocks.StringIO()) as s:
@@ -393,6 +389,7 @@ class PackageManagerDriverTestCase(unittest.TestCase):
         with pretty_logging(
                 logger='calmjs.runtime', level=DEBUG, stream=stderr):
             rt = runtime.Runtime(working_set=working_set)
+            rt.argparser
         err = stderr.getvalue()
 
         self.assertIn("bad 'calmjs.runtime' entry point", err)
@@ -477,6 +474,7 @@ class PackageManagerDriverTestCase(unittest.TestCase):
         with pretty_logging(
                 logger='calmjs.runtime', level=DEBUG, stream=stderr):
             rt = runtime.Runtime(working_set=working_set)
+            rt.argparser
 
         msg = stderr.getvalue()
         self.assertIn(
@@ -543,13 +541,18 @@ class PackageManagerDriverTestCase(unittest.TestCase):
         stderr = mocks.StringIO()
         with pretty_logging(
                 logger='calmjs.runtime', level=DEBUG, stream=stderr):
-            rt.argparser = None
-            rt.init()  # third init
+            # poking into privates for that actual runtime instance and
+            # blow it up.
+            rt._BootstrapRuntime__argparser = None
+            rt.argparser  # third init
 
         # A forced reinit shouldn't cause a major issue
         msg = stderr.getvalue()
         self.assertNotIn(
             "Runtime instance has been used or initialized improperly.", msg)
+        self.assertNotIn(
+            "Runtime instance has been used or initialized improperly.",
+            sys.stderr.getvalue())
 
         stub_stdouts(self)
         with self.assertRaises(SystemExit):
@@ -598,10 +601,9 @@ class PackageManagerDriverTestCase(unittest.TestCase):
         utils.simple1 = Simple1Runtime(working_set=working_set)
         utils.runtime = runtime.Runtime(working_set=working_set)
 
-        # for usage by entry_point for now surrogate...
-        rt = runtime.Runtime(working_set=working_set)
         with self.assertRaises(SystemExit):
-            rt(['-h'])
+            utils.runtime(['-h'])
+
         stdout = sys.stdout.getvalue()
         self.assertNotIn('runtime\n', stdout)
         self.assertIn('simple1\n', stdout)
@@ -609,7 +611,7 @@ class PackageManagerDriverTestCase(unittest.TestCase):
 
         stub_stdouts(self)
         with self.assertRaises(SystemExit):
-            rt(['simple1', '-h'])
+            utils.runtime(['simple1', '-h'])
         stdout = sys.stdout.getvalue()
         self.assertNotIn('runtime\n', stdout)
         self.assertNotIn('simple1\n', stdout)
@@ -723,7 +725,7 @@ class PackageManagerDriverTestCase(unittest.TestCase):
         stderr = mocks.StringIO()
         with pretty_logging(
                 logger='calmjs.runtime', level=DEBUG, stream=stderr):
-            BadRuntime(working_set=working_set)
+            BadRuntime(working_set=working_set).argparser
 
         # EXPLOSION
         msg = stderr.getvalue()
@@ -746,10 +748,7 @@ class PackageManagerDriverTestCase(unittest.TestCase):
         class BadSimpleRuntime(runtime.DriverRuntime, runtime.Runtime):
             def entry_point_load_validated(self, entry_point):
                 # skip the rest of the checks.
-                try:
-                    return entry_point.load()
-                except ImportError:
-                    return None
+                return entry_point.load()
 
             def init_argparser(self, argparser):
                 level = len(getouterframes(currentframe()))
@@ -786,7 +785,7 @@ class PackageManagerDriverTestCase(unittest.TestCase):
 
         with pretty_logging(
                 logger='calmjs.runtime', stream=mocks.StringIO()) as s:
-            runtime.Runtime(working_set=working_set)
+            runtime.Runtime(working_set=working_set).argparser
 
         # this is like a slimy recursive frog
         stderr = s.getvalue()
@@ -828,7 +827,7 @@ class PackageManagerDriverTestCase(unittest.TestCase):
 
         # and here lies the crimson magician, all out of hp.
         with self.assertRaises(RuntimeError):
-            runtime.Runtime(working_set=working_set)
+            runtime.Runtime(working_set=working_set).argparser
 
 
 class ArgumentHandlingTestCase(unittest.TestCase):

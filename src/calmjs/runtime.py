@@ -93,19 +93,30 @@ class BootstrapRuntime(object):
     calmjs bootstrap runtime.
     """
 
-    argparser = None
-
     def __init__(self, prog=None):
         self.prog = prog
-        self.init()
+        self.__argparser = None
 
-    def init(self):
-        if self.argparser is None:
-            self.argparser = ArgumentParser(
-                prog=self.prog, description=self.__doc__, add_help=False,
-                formatter_class=HyphenNoBreakFormatter,
-            )
-            self.init_argparser(self.argparser)
+    @property
+    def argparser(self):
+        """
+        For setting up the argparser for this instance.
+        """
+
+        if self.__argparser is None:
+            self.__argparser = self.argparser_factory()
+            self.init_argparser(self.__argparser)
+        return self.__argparser
+
+    def argparser_factory(self):
+        """
+        Produces argparser for this type of Runtime.
+        """
+
+        return ArgumentParser(
+            prog=self.prog, description=self.__doc__, add_help=False,
+            formatter_class=HyphenNoBreakFormatter,
+        )
 
     def init_argparser(self, argparser):
         self.global_opts = argparser.add_argument_group('global options')
@@ -187,19 +198,17 @@ class BaseRuntime(BootstrapRuntime):
         self.logger = logger
         self.action_key = action_key
         self.working_set = working_set
-        self.argparser = None
         self.description = description or self.__doc__
         self.package_name = package_name
         super(BaseRuntime, self).__init__(*a, **kw)
 
-    def init(self):
-        if self.argparser is None:
-            self.argparser = ArgumentParser(
-                prog=self.prog, description=self.description,
-                formatter_class=HyphenNoBreakFormatter,
-            )
-            setattr(self.argparser, ATTR_ROOT_PKG, self.package_name)
-            self.init_argparser(self.argparser)
+    def argparser_factory(self):
+        argparser = ArgumentParser(
+            prog=self.prog, description=self.description,
+            formatter_class=HyphenNoBreakFormatter,
+        )
+        setattr(argparser, ATTR_ROOT_PKG, self.package_name)
+        return argparser
 
     def init_argparser(self, argparser):
         super(BaseRuntime, self).init_argparser(argparser)
@@ -755,12 +764,10 @@ class PackageManagerRuntime(DriverRuntime):
             }) for full, s, desc in self._pkg_manager_options
         ]
 
-    def init(self):
+    def __init__(self, *a, **kw):
+        super(PackageManagerRuntime, self).__init__(*a, **kw)
         self.default_action = None
         self.pkg_manager_options = self.make_cli_options()
-        # this will also initialize a local argparser that allow this
-        # to function as a standalone callable, if required.
-        super(PackageManagerRuntime, self).init()
 
     def init_argparser(self, argparser):
         """
