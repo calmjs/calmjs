@@ -563,6 +563,58 @@ class PackageManagerDriverTestCase(unittest.TestCase):
         # number of calls to init
         self.assertEqual(len(rt.argparser_details), 3)
 
+    def test_runtime_nesting_registration(self):
+        """
+        Nested runtime registration
+        """
+
+        from calmjs.testing import utils
+
+        class Simple1Runtime(runtime.Runtime):
+            pass
+
+        class Simple2Runtime(Simple1Runtime):
+            pass
+
+        def cleanup():
+            del utils.simple1
+            del utils.simple2
+            del utils.runtime
+        self.addCleanup(cleanup)
+
+        stub_stdouts(self)
+
+        # create a dummy based
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.runtime]\n'
+            'runtime = calmjs.testing.utils:runtime\n'
+            'simple1 = calmjs.testing.utils:simple1\n'
+            'simple2 = calmjs.testing.utils:simple2\n'
+        ),), 'example.simple', '1.0')
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+        utils.simple2 = Simple2Runtime(working_set=working_set)
+        utils.simple1 = Simple1Runtime(working_set=working_set)
+        utils.runtime = runtime.Runtime(working_set=working_set)
+
+        # for usage by entry_point for now surrogate...
+        rt = runtime.Runtime(working_set=working_set)
+        with self.assertRaises(SystemExit):
+            rt(['-h'])
+        stdout = sys.stdout.getvalue()
+        self.assertNotIn('runtime\n', stdout)
+        self.assertIn('simple1\n', stdout)
+        self.assertIn('simple2\n', stdout)
+
+        stub_stdouts(self)
+        with self.assertRaises(SystemExit):
+            rt(['simple1', '-h'])
+        stdout = sys.stdout.getvalue()
+        self.assertNotIn('runtime\n', stdout)
+        self.assertNotIn('simple1\n', stdout)
+        self.assertIn('simple2\n', stdout)
+
     def test_duplication_and_runtime_nested_running(self):
         """
         Nested runtime registration running.

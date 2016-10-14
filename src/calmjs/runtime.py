@@ -326,7 +326,7 @@ class Runtime(BaseRuntime):
             )
             return None
 
-        if not isinstance(inst, DriverRuntime):
+        if not isinstance(inst, BaseRuntime):
             logger.error(
                 "bad '%s' entry point '%s' from '%s': "
                 "target not a calmjs.runtime.DriverRuntime instance; "
