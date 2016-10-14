@@ -530,12 +530,18 @@ class Toolchain(BaseDriver):
         build_dir.
 
         Default is to append the module name with the filename_suffix
-        assigned to this instance (setup by setup_filename_suffix).
+        assigned to this instance (setup by setup_filename_suffix), iff
+        the provided source also end with this filename suffix.
 
         Called by generator method `_gen_modname_source_target_modpath`.
         """
 
-        return modname + self.filename_suffix
+        if (source.endswith(self.filename_suffix) and
+                not modname.endswith(self.filename_suffix)):
+            return modname + self.filename_suffix
+        else:
+            # assume that modname IS the filename
+            return modname
 
     def modname_source_target_to_modpath(self, spec, modname, source, target):
         """

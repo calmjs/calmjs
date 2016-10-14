@@ -568,9 +568,27 @@ class NullToolchainTestCase(unittest.TestCase):
             s, 'example/module', '/tmp/example.module/src/example/module.js'),
             '/tmp/example.module/src/example/module.js',
         )
+
+    def test_toolchain_naming_modname_source_to_target(self):
+        s = Spec()
         self.assertEqual(self.toolchain.modname_source_to_target(
             s, 'example/module', '/tmp/example.module/src/example/module.js'),
             'example/module.js',
+        )
+        self.assertEqual(self.toolchain.modname_source_to_target(
+            s,
+            'example', '/tmp/example.module/src/example'),
+            'example',
+        )
+        self.assertEqual(self.toolchain.modname_source_to_target(
+            s,
+            'example.module.js', '/tmp/example.module/src/example/module.js'),
+            'example.module.js',
+        )
+        self.assertEqual(self.toolchain.modname_source_to_target(
+            s,
+            'template.tmpl', '/tmp/example.module/src/template.tmpl'),
+            'template.tmpl',
         )
 
     def test_toolchain_gen_modname_source_target_modpath(self):
@@ -705,8 +723,8 @@ class NullToolchainTestCase(unittest.TestCase):
         spec = Spec(
             build_dir=build_dir,
             bundle_source_map={
-                'bundle1': source_file,
-                'bundle2': bundle_dir,
+                'bundle1': source_file,  # bundle as source file.
+                'bundle2': bundle_dir,  # bundle as dir.
             },
         )
         self.toolchain(spec)
@@ -725,7 +743,7 @@ class NullToolchainTestCase(unittest.TestCase):
             },
             'bundled_targets': {
                 'bundle1': 'bundle1.js',
-                'bundle2': 'bundle2.js',
+                'bundle2': 'bundle2',  # dir does NOT get appended.
             },
             'transpiled_modpaths': {},
             'transpiled_targets': {},
