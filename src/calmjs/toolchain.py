@@ -14,6 +14,41 @@ This whole thing started simply because the author thought it is a lot
 easier to deal with JavaScript when one treats that as a compilation
 target.  However given that the generic method works better, this module
 encapsulates the generalized implementation of the previous version.
+
+To better convey the understanding of how this came to place, the
+following terms and variable name, prefix and suffixes have been defined
+to carry the following meanings that is applicable throughout the entire
+calmjs system:
+
+modname
+    A JavaScript path for a given module import system that it might
+    have.  The Python analogue is the name of a given import module.
+    Using the default mapper, one might map a Python module with the
+    name ``calmjs.toolchain`` to ``calmjs/toolchain``.  While relative
+    modpaths are supported by most JavaScript/Node.js based import
+    systems, its usage from within calmjs framework is discouraged.
+
+source
+    An absolute path on the local filesystem to the source file for a
+    given modpath.  These two values (modpath and source) serves as the
+    foundational mapping from a JavaScript module name to its
+    corresponding source file.
+
+target
+    A relative path to a build_dir.  The relative path MUST not contain
+    relative references.  A mapping from modpath to target is generated
+    from a modpath to source mapping, where the source file has been
+    somehow transformed into the target at the target location.  The
+    relative path version (again, from build_dir) is typically recorded
+    by instances of ``Spec`` objects that have undergone a ``Toolchain``
+    run.
+
+modpath
+    Typically identical to modname, however the slight difference is
+    that this is the transformed value that is to be better understood
+    by the underlying tools.  Think of this as the post compiled value,
+    or an alternative import location that is only applicable in the
+    post-compiled context.
 """
 
 from __future__ import absolute_import
