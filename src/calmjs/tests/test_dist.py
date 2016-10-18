@@ -35,11 +35,9 @@ class DistTestCase(unittest.TestCase):
         with self.assertRaises(ValueError) as e:
             calmjs_dist.is_json_compat(NotImplemented)
 
-        self.assertEqual(
-            str(e.exception),
-            'must be a JSON serializable object: '
-            'NotImplemented is not JSON serializable'
-        )
+        msg = str(e.exception)
+        self.assertIn('must be a JSON serializable object', msg)
+        self.assertIn('NotImplemented', msg)
 
     def test_is_json_compat_bad_type_in_dict(self):
         with self.assertRaises(ValueError) as e:
@@ -49,11 +47,9 @@ class DistTestCase(unittest.TestCase):
                 }
             })
 
-        self.assertEqual(
-            str(e.exception),
-            'must be a JSON serializable object: '
-            'NotImplemented is not JSON serializable'
-        )
+        msg = str(e.exception)
+        self.assertIn('must be a JSON serializable object', msg)
+        self.assertIn('NotImplemented', msg)
 
     def test_is_json_compat_bad_type_not_dict(self):
         with self.assertRaises(ValueError) as e:
