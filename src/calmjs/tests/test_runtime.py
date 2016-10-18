@@ -693,10 +693,14 @@ class PackageManagerDriverTestCase(unittest.TestCase):
 
         utils.foo_runtime = BadDummy(None)
         utils.runtime_foo = BadDummy(None)
+        utils.bar_runtime = BadDummy(None)
+        utils.runtime_bar = BadDummy(None)
 
         def cleanup():
             del utils.foo_runtime
             del utils.runtime_foo
+            del utils.bar_runtime
+            del utils.runtime_bar
 
         self.addCleanup(cleanup)
 
@@ -710,6 +714,10 @@ class PackageManagerDriverTestCase(unittest.TestCase):
             ' = calmjs.testing.utils:foo_runtime\n'
             'calmjs.testing.utils:foo_runtime'
             ' = calmjs.testing.utils:runtime_foo\n'
+            'calmjs.testing.utils:bar_runtime'
+            ' = calmjs.testing.utils:bar_runtime\n'
+            'calmjs.testing.utils:runtime_bar'
+            ' = calmjs.testing.utils:runtime_bar\n'
         ),), 'example5.bad', '1.0')
 
         make_dummy_dist(self, ((
@@ -719,6 +727,10 @@ class PackageManagerDriverTestCase(unittest.TestCase):
             ' = calmjs.testing.utils:foo_runtime\n'
             'calmjs.testing.utils:runtime_foo'
             ' = calmjs.testing.utils:runtime_foo\n'
+            'calmjs.testing.utils:bar_runtime'
+            ' = calmjs.testing.utils:runtime_bar\n'
+            'calmjs.testing.utils:runtime_bar'
+            ' = calmjs.testing.utils:bar_runtime\n'
         ),), 'example6.bad', '1.0')
 
         working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
