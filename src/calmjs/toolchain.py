@@ -270,12 +270,36 @@ class Spec(dict):
         """
         Call all advices at the provided name.
 
+        This has an analogue in the join point in aspected oriented
+        programming, but the analogy is a weak one as we don't have the
+        proper metaobject protocol to support this.  Implementation that
+        make use of this system should make it clear that they will call
+        this method with name associated with its group before and after
+        its execution, or that the method at hand that want this invoked
+        be called by this other conductor method.
+
+        For the Toolchain standard steps (prepare, compile, assemble,
+        link and finalize), this handle method will only be called by
+        invoking the toolchain as a callable.  Calling those methods
+        piecemeal will not trigger the invocation, even though it
+        probably should.  Modules, classes and methods that desire to
+        call their own handler should instead follow the convention
+        where the handle be called before and after with the appropriate
+        names.  For instance:
+
+            def test(self, spec):
+                spec.handle(BEFORE_TEST)
+                # do the things
+                spec.handle(AFTER_TEST)
+
+        This arrangement will need to be revisited when a proper system
+        is written at the metaclass level.
+
         Arguments:
 
         name
             The name of the advices group.  All the callables
-            registered to this group will be invoked, last-in-first-out
-            style.
+            registered to this group will be invoked, last-in-first-out.
         """
 
         if name in self._called:
