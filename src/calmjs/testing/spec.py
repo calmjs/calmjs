@@ -5,11 +5,11 @@ testing purposes.
 """
 
 
-def apply_spec_event_fault(spec, event):
+def apply_spec_advise_fault(spec, advice_name):
     def fault():
         raise Exception('an exception')
-    spec.on_event(event, fault)
+    spec.advise(advice_name, fault)
 
 
-def create_spec_event_fault(spec, event):
-    apply_spec_event_fault(spec, event)
+def create_spec_advise_fault(spec, advice_name):
+    apply_spec_advise_fault(spec, advice_name)

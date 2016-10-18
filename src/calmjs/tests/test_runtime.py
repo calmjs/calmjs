@@ -247,7 +247,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         # Should not have unexpected error logged.
         stderr = sys.stderr.getvalue()
         self.assertNotIn(
-            "an event in group 'after_prepare' triggered an abort: "
+            "an advice in group 'after_prepare' triggered an abort: "
             "EXPORT_TARGET should be specified by this stage", stderr,
         )
         self.assertNotIn(
@@ -266,7 +266,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         # no direct error message logged by the BaseRuntime.__call__
         self.assertNotIn('CRITICAL: ToolchainAbort:', stderr)
         self.assertIn(
-            "an event in group 'after_prepare' triggered an abort: "
+            "an advice in group 'after_prepare' triggered an abort: "
             "EXPORT_TARGET should be specified by this stage", stderr,
         )
         self.assertIn(
@@ -322,11 +322,11 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         stub_check_interactive(self, True)
         result = rt(['tool', '--export-target', target, '-dd', '-vv'])
         self.assertEqual(result['debug'], 2)
-        # This is an integration test of sort for the debug event output
-        self.assertIn("on_event 'cleanup' invoked by", sys.stderr.getvalue())
+        # This is an integration test of sort for the debug advice output
+        self.assertIn("advise 'cleanup' invoked by", sys.stderr.getvalue())
         self.assertIn("toolchain.py", sys.stderr.getvalue())
         self.assertIn(
-            'on_event(AFTER_PREPARE, self.prompt_export_target_check, spec)',
+            'advise(AFTER_PREPARE, self.prompt_export_target_check, spec)',
             sys.stderr.getvalue(),
         )
 

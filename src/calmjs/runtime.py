@@ -673,7 +673,7 @@ class ToolchainRuntime(DriverRuntime):
         """
 
         spec[DEBUG] = self.debug
-        spec.on_event(AFTER_PREPARE, self.prompt_export_target_check, spec)
+        spec.advise(AFTER_PREPARE, self.prompt_export_target_check, spec)
 
     def create_spec(self, **kwargs):
         """

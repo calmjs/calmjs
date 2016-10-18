@@ -98,7 +98,7 @@ __all__ = [
     'WORKING_DIR',
 ]
 
-# define these as reserved event names
+# define these as reserved advice names
 CLEANUP = 'cleanup'
 SUCCESS = 'success'
 AFTER_TEST = 'after_test'  # reserved however unused in this module
@@ -194,7 +194,7 @@ class Spec(dict):
 
     def __init__(self, *a, **kw):
         super(Spec, self).__init__(*a, **kw)
-        self._events = {}
+        self._advices = {}
         self._frames = {}
         self._called = set()
 
@@ -205,7 +205,7 @@ class Spec(dict):
 
         self.update({k: other[k] for k in selected})
 
-    def __do_events_frame_protection(self, frame):
+    def __advice_stack_frame_protection(self, frame):
         """
         Overriding of this is only permitted if and only if your name is
         Megumin and you have a pet/familiar named Chomusuke.
@@ -218,21 +218,21 @@ class Spec(dict):
 
         f_back = frame.f_back
         while f_back:
-            if f_back.f_code is self.do_events.__code__:
+            if f_back.f_code is self.handle.__code__:
                 raise RuntimeError(
-                    "indirect invocation of '%s' by 'do_events' is forbidden" %
+                    "indirect invocation of '%s' by 'handle' is forbidden" %
                     frame.f_code.co_name,
                 )
             f_back = f_back.f_back
 
-    def on_event(self, name, f, *a, **kw):
+    def advise(self, name, f, *a, **kw):
         """
-        Add a event that can be called by do_events.
+        Add an advice that will be handled later by the handle method.
 
         Arguments:
 
         name
-            The name of the event group
+            The name of the advice group
         f
             A callable method or function.
 
@@ -243,95 +243,96 @@ class Spec(dict):
         if name is None:
             return
 
-        event = (f, a, kw)
+        advice = (f, a, kw)
         debug = self.get(DEBUG)
 
         frame = currentframe()
         if frame is None:
             logger.debug('currentframe() failed to return frame')
         else:
-            self.__do_events_frame_protection(frame)
+            self.__advice_stack_frame_protection(frame)
             if debug:
                 logger.debug(
-                    "on_event '%s' invoked by %s:%d",
+                    "advise '%s' invoked by %s:%d",
                     name,
                     frame.f_back.f_code.co_filename, frame.f_back.f_lineno,
                 )
                 if debug > 1:
                     # use the memory address of the tuple which should
                     # be stable
-                    self._frames[id(event)] = ''.join(
+                    self._frames[id(advice)] = ''.join(
                         format_stack(frame.f_back))
 
-        self._events[name] = self._events.get(name, [])
-        self._events[name].append(event)
+        self._advices[name] = self._advices.get(name, [])
+        self._advices[name].append(advice)
 
-    def do_events(self, name):
+    def handle(self, name):
         """
-        Do all the events
+        Call all advices at the provided name.
 
         Arguments:
 
         name
-            The name of the events group.  All the callables
+            The name of the advices group.  All the callables
             registered to this group will be invoked, last-in-first-out
             style.
         """
 
         if name in self._called:
             logger.warning(
-                "event '%s' has been called for this spec %r", name, self,
+                "advice group '%s' has been called for this spec %r",
+                name, self,
             )
             # only now ensure checking
-            self.__do_events_frame_protection(currentframe())
+            self.__advice_stack_frame_protection(currentframe())
         else:
             self._called.add(name)
 
         # Get a complete clone, so indirect manipulation done to the
         # reference that others have access to will not have an effect
         # within the scope of this execution.  Please refer to the
-        # test_toolchain, test_spec_event_no_infinite_pop test case.
-        events = []
-        events.extend(self._events.get(name, []))
+        # test_toolchain, test_spec_advice_no_infinite_pop test case.
+        advices = []
+        advices.extend(self._advices.get(name, []))
 
-        while events:
+        while advices:
             try:
                 # cleanup basically done lifo (last in first out)
-                values = events.pop()
-                event, a, kw = values
-                if not ((callable(event)) and
+                values = advices.pop()
+                advice, a, kw = values
+                if not ((callable(advice)) and
                         isinstance(a, tuple) and
                         isinstance(kw, dict)):
                     raise TypeError
             except ValueError:
-                logger.info('Spec event extraction error: got %s', values)
+                logger.info('Spec advice extraction error: got %s', values)
             except TypeError:
-                logger.info('Spec event malformed: got %s', values)
+                logger.info('Spec advice malformed: got %s', values)
             else:
                 try:
                     try:
-                        event(*a, **kw)
+                        advice(*a, **kw)
                     except Exception as e:
                         # get that back by the id.
                         frame = self._frames.get(id(values))
                         if frame:
-                            logger.info('Spec event exception: %r', e)
+                            logger.info('Spec advice exception: %r', e)
                             logger.info(
-                                'Traceback for original event:\n%s', frame)
+                                'Traceback for original advice:\n%s', frame)
                         # continue on for the normal exception
                         raise
                 except ToolchainCancel:
                     raise
                 except ToolchainAbort as e:
                     logger.critical(
-                        "an event in group '%s' triggered an abort: %s",
+                        "an advice in group '%s' triggered an abort: %s",
                         name, str(e)
                     )
                     raise
                 except KeyboardInterrupt:
                     raise ToolchainCancel('interrupted')
                 except Exception:
-                    logger.exception('Spec event execution: got %s', values)
+                    logger.exception('Spec advice execution: got %s', values)
 
 
 class Toolchain(BaseDriver):
@@ -772,7 +773,7 @@ class Toolchain(BaseDriver):
         """
         The main call, assuming the base spec is prepared.
 
-        Also, no events will be triggered.
+        Also, no advices will be triggered.
         """
 
         self.prepare(spec)
@@ -794,7 +795,7 @@ class Toolchain(BaseDriver):
 
         if not spec.get(BUILD_DIR):
             tempdir = realpath(mkdtemp())
-            spec.on_event(CLEANUP, shutil.rmtree, tempdir)
+            spec.advise(CLEANUP, shutil.rmtree, tempdir)
             build_dir = join(tempdir, 'build')
             mkdir(build_dir)
             spec[BUILD_DIR] = build_dir
@@ -812,15 +813,15 @@ class Toolchain(BaseDriver):
         try:
             process = ('prepare', 'compile', 'assemble', 'link', 'finalize')
             for p in process:
-                spec.do_events('before_' + p)
+                spec.handle('before_' + p)
                 getattr(self, p)(spec)
-                spec.do_events('after_' + p)
-            spec.do_events(SUCCESS)
+                spec.handle('after_' + p)
+            spec.handle(SUCCESS)
         except ToolchainCancel:
             # quietly handle the issue and move on out of here.
             pass
         finally:
-            spec.do_events(CLEANUP)
+            spec.handle(CLEANUP)
 
     def __call__(self, spec):
         """

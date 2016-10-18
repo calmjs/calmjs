@@ -34,7 +34,7 @@ from calmjs.toolchain import AFTER_PREPARE
 from calmjs.toolchain import BEFORE_PREPARE
 
 from calmjs.testing.mocks import StringIO
-from calmjs.testing.spec import create_spec_event_fault
+from calmjs.testing.spec import create_spec_advise_fault
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import fake_error
 from calmjs.testing.utils import stub_stdouts
@@ -60,161 +60,161 @@ class SpecTestCase(unittest.TestCase):
         spec.update_selected({'abcd': 123, 'defg': 321, 'c': 4}, ['defg', 'c'])
         self.assertEqual(spec, {'a': 1, 'b': 2, 'c': 4, 'defg': 321})
 
-    def test_spec_event_standard(self):
+    def test_spec_advice_standard(self):
         def cb(sideeffect, *a, **kw):
             sideeffect.append((a, kw))
 
         check = []
 
         spec = Spec()
-        spec.on_event(CLEANUP, cb, check, 1, keyword='foo')
-        spec.on_event(CLEANUP, cb, check, 2, keyword='bar')
-        self.assertEqual(len(spec._events), 1)
+        spec.advise(CLEANUP, cb, check, 1, keyword='foo')
+        spec.advise(CLEANUP, cb, check, 2, keyword='bar')
+        self.assertEqual(len(spec._advices), 1)
 
-        spec.do_events('foo')
+        spec.handle('foo')
         self.assertEqual(check, [])
 
-        spec.do_events(CLEANUP)
+        spec.handle(CLEANUP)
         # cleanup done lifo
         self.assertEqual(check, [
             ((2,), {'keyword': 'bar'}),
             ((1,), {'keyword': 'foo'}),
         ])
 
-    def test_spec_event_blackhole(self):
+    def test_spec_advice_blackhole(self):
         spec = Spec()
         check = []
-        spec.on_event(None, check.append, 1)
-        self.assertEqual(len(spec._events), 0)
-        spec.do_events(None)
+        spec.advise(None, check.append, 1)
+        self.assertEqual(len(spec._advices), 0)
+        spec.handle(None)
         self.assertEqual(check, [])
 
-    def test_spec_event_malformed(self):
+    def test_spec_advice_malformed(self):
         def cb(sideeffect, *a, **kw):
             sideeffect.append((a, kw))
 
         check = []
 
         spec = Spec()
-        spec.on_event(CLEANUP, cb, check, 1, keyword='foo')
+        spec.advise(CLEANUP, cb, check, 1, keyword='foo')
         # malformed data shouldn't be added, but just in case.
-        spec._events[CLEANUP].append((cb,))
-        spec._events[CLEANUP].append((cb, [], []))
-        spec._events[CLEANUP].append((cb, {}, {}))
-        spec._events[CLEANUP].append((None, [], {}))
+        spec._advices[CLEANUP].append((cb,))
+        spec._advices[CLEANUP].append((cb, [], []))
+        spec._advices[CLEANUP].append((cb, {}, {}))
+        spec._advices[CLEANUP].append((None, [], {}))
 
-        spec.do_events(CLEANUP)
+        spec.handle(CLEANUP)
         self.assertEqual(check, [
             ((1,), {'keyword': 'foo'}),
         ])
 
-    def test_spec_event_broken(self):
+    def test_spec_advice_broken(self):
         spec = Spec()
-        spec.on_event(CLEANUP, fake_error(Exception))
+        spec.advise(CLEANUP, fake_error(Exception))
         with pretty_logging(stream=StringIO()) as s:
-            spec.do_events(CLEANUP)
+            spec.handle(CLEANUP)
         self.assertIn('Traceback', s.getvalue())
 
-    def test_spec_event_fault_standard(self):
+    def test_spec_advise_fault_standard(self):
         spec = Spec()
         with pretty_logging(stream=StringIO()) as s:
-            create_spec_event_fault(spec, 'broken')
-        self.assertNotIn("on_event 'broken' invoked by ", s.getvalue())
+            create_spec_advise_fault(spec, 'broken')
+        self.assertNotIn("advise 'broken' invoked by ", s.getvalue())
         self.assertNotIn("spec.py:11", s.getvalue())
 
-    def test_spec_event_fault_debug_1_emulate_no_currentframe(self):
+    def test_spec_advise_fault_debug_1_emulate_no_currentframe(self):
         stub_item_attr_value(
             self, calmjs_toolchain, 'currentframe', lambda: None)
         spec = Spec(debug=1)
         with pretty_logging(stream=StringIO()) as s:
-            create_spec_event_fault(spec, 'broken')
+            create_spec_advise_fault(spec, 'broken')
         self.assertIn("currentframe() failed to return frame", s.getvalue())
 
     @unittest.skipIf(currentframe() is None, 'stack frame not supported')
-    def test_spec_event_fault_debug_1(self):
+    def test_spec_advise_fault_debug_1(self):
         spec = Spec(debug=1)
         with pretty_logging(stream=StringIO()) as s:
-            create_spec_event_fault(spec, 'broken')
+            create_spec_advise_fault(spec, 'broken')
 
-        self.assertIn("on_event 'broken' invoked by ", s.getvalue())
+        self.assertIn("advise 'broken' invoked by ", s.getvalue())
         self.assertIn("spec.py:11", s.getvalue())
 
         with pretty_logging(stream=StringIO()) as s:
-            spec.do_events('broken')
+            spec.handle('broken')
         self.assertIn('Traceback', s.getvalue())
-        self.assertNotIn('Traceback for original event', s.getvalue())
+        self.assertNotIn('Traceback for original advice', s.getvalue())
 
     @unittest.skipIf(currentframe() is None, 'stack frame not supported')
-    def test_spec_event_fault_debug_2(self):
+    def test_spec_advise_fault_debug_2(self):
         spec = Spec(debug=2)
         with pretty_logging(stream=StringIO()) as s:
-            create_spec_event_fault(spec, 'broken')
+            create_spec_advise_fault(spec, 'broken')
 
-        self.assertIn("on_event 'broken' invoked by ", s.getvalue())
+        self.assertIn("advise 'broken' invoked by ", s.getvalue())
         self.assertIn("spec.py:11", s.getvalue())
 
         with pretty_logging(stream=StringIO()) as s:
-            spec.do_events('broken')
-        self.assertIn('Traceback for original event', s.getvalue())
-        self.assertIn('line 15, in create_spec_event_fault', s.getvalue())
+            spec.handle('broken')
+        self.assertIn('Traceback for original advice', s.getvalue())
+        self.assertIn('line 15, in create_spec_advise_fault', s.getvalue())
 
     # infinite loop protection checks.
 
     @unittest.skipIf(currentframe() is None, 'stack frame not supported')
-    def test_spec_event_block_do_events_further_on_event(self):
+    def test_spec_advise_block_handle_further_advise_calls(self):
         spec = Spec()
 
-        def on_event():
-            spec.on_event(CLEANUP, add_bad_cleanup, spec)
+        def advise():
+            spec.advise(CLEANUP, add_bad_cleanup, spec)
 
         def add_bad_cleanup(spec):
-            on_event()
+            advise()
 
-        # can add the event in through any method required
+        # can add the advice in through any method required
         with pretty_logging(stream=StringIO()) as s:
-            spec.on_event(CLEANUP, add_bad_cleanup, spec)
+            spec.advise(CLEANUP, add_bad_cleanup, spec)
         self.assertEqual(s.getvalue(), '')
 
-        # The failure is raised from within do_events; this case would
+        # The failure is raised from within handle; this case would
         # have raised an infinite loop.
         with pretty_logging(stream=StringIO()) as s:
-            spec.do_events(CLEANUP)
+            spec.handle(CLEANUP)
 
         self.assertIn(
-            "indirect invocation of 'on_event' by 'do_events' is forbidden",
+            "indirect invocation of 'advise' by 'handle' is forbidden",
             s.getvalue())
 
     @unittest.skipIf(currentframe() is None, 'stack frame not supported')
-    def test_spec_event_block_do_events_further_do_events(self):
+    def test_spec_advice_block_handle_further_handle_call(self):
         spec = Spec()
-        spec._events[CLEANUP] = []
+        spec._advices[CLEANUP] = []
 
-        def fake_event_add():
-            event = (fake_event_add, (), {})
-            spec._events[CLEANUP].append(event)
-            spec.do_events(CLEANUP)
+        def fake_advice_add():
+            advice = (fake_advice_add, (), {})
+            spec._advices[CLEANUP].append(advice)
+            spec.handle(CLEANUP)
 
         with pretty_logging(stream=StringIO()) as s:
-            fake_event_add()
-            spec.do_events(CLEANUP)
+            fake_advice_add()
+            spec.handle(CLEANUP)
 
         self.assertIn(
-            "indirect invocation of 'do_events' by 'do_events' is forbidden",
+            "indirect invocation of 'handle' by 'handle' is forbidden",
             s.getvalue())
 
-    def test_spec_event_no_infinite_pop(self):
+    def test_spec_advice_no_infinite_pop(self):
         spec = Spec(counter=0)
-        spec._events[CLEANUP] = []
+        spec._advices[CLEANUP] = []
 
-        def fake_event_add():
-            event = (fake_event_add, (), {})
-            spec._events[CLEANUP].append(event)
+        def fake_advice_add():
+            advice = (fake_advice_add, (), {})
+            spec._advices[CLEANUP].append(advice)
             spec['counter'] += 1
 
         with pretty_logging(stream=StringIO()) as s:
-            fake_event_add()
+            fake_advice_add()
             self.assertEqual(spec['counter'], 1)
-            spec.do_events(CLEANUP)
+            spec.handle(CLEANUP)
             # ensure that it only got called once.
             self.assertEqual(spec['counter'], 2)
         self.assertEqual(s.getvalue(), '')
@@ -223,7 +223,7 @@ class SpecTestCase(unittest.TestCase):
         stub_item_attr_value(
             self, calmjs_toolchain, 'currentframe', lambda: None)
         with pretty_logging(stream=StringIO()) as s:
-            spec.do_events(CLEANUP)
+            spec.handle(CLEANUP)
         self.assertEqual(spec['counter'], 4)
         self.assertIn(
             'currentframe() returned None; frame protection disabled',
@@ -281,11 +281,11 @@ class ToolchainTestCase(unittest.TestCase):
         # Also that it got deleted properly.
         self.assertFalse(exists(spec['build_dir']))
 
-    def test_toolchain_call_standard_failure_event(self):
+    def test_toolchain_call_standard_failure_advice(self):
         cleanup, success = [], []
         spec = Spec()
-        spec.on_event(CLEANUP, cleanup.append, True)
-        spec.on_event(SUCCESS, success.append, True)
+        spec.advise(CLEANUP, cleanup.append, True)
+        spec.advise(SUCCESS, success.append, True)
 
         with self.assertRaises(NotImplementedError):
             self.toolchain(spec)
@@ -805,50 +805,50 @@ class NullToolchainTestCase(unittest.TestCase):
         self.assertTrue(exists(join(
             build_dir, 'namespace', 'dummy', 'source.js')))
 
-    def test_null_toolchain_call_standard_success_event(self):
+    def test_null_toolchain_call_standard_success_advice(self):
         cleanup, success = [], []
         spec = Spec()
-        spec.on_event(CLEANUP, cleanup.append, True)
-        spec.on_event(SUCCESS, success.append, True)
+        spec.advise(CLEANUP, cleanup.append, True)
+        spec.advise(SUCCESS, success.append, True)
         self.toolchain(spec)
         self.assertEqual(len(cleanup), 1)
         self.assertEqual(len(success), 1)
 
-    def test_null_toolchain_no_event(self):
+    def test_null_toolchain_no_advice(self):
         cleanup, success = [], []
         spec = Spec()
-        spec.on_event(CLEANUP, cleanup.append, True)
-        spec.on_event(SUCCESS, success.append, True)
-        # no events done through the private call
+        spec.advise(CLEANUP, cleanup.append, True)
+        spec.advise(SUCCESS, success.append, True)
+        # no advices done through the private call
         self.toolchain._calf(spec)
         self.assertEqual(len(cleanup), 0)
         self.assertEqual(len(success), 0)
 
-    def test_null_toolchain_all_events(self):
+    def test_null_toolchain_all_advices(self):
         # These are ordered in the same order as they should be called
         stub_stdouts(self)
-        events = (
+        advices = (
             BEFORE_PREPARE, AFTER_PREPARE, BEFORE_COMPILE, AFTER_COMPILE,
             BEFORE_ASSEMBLE, AFTER_ASSEMBLE, BEFORE_LINK, AFTER_LINK,
             BEFORE_FINALIZE, AFTER_FINALIZE, SUCCESS, CLEANUP,
         )
         spec = Spec()
         results = []
-        for event in events:
-            spec.on_event(event, results.append, event)
+        for advice in advices:
+            spec.advise(advice, results.append, advice)
 
         self.toolchain._calf(spec)
         self.assertEqual(len(results), 0)
 
         self.toolchain(spec)
-        self.assertEqual(tuple(results), events)
+        self.assertEqual(tuple(results), advices)
 
-    def _check_toolchain_event(self, event, error):
-        events = []
+    def _check_toolchain_advice(self, advice, error):
+        advices = []
         spec = Spec()
-        spec.on_event(BEFORE_ASSEMBLE, event)
-        spec.on_event(CLEANUP, events.append, CLEANUP)
-        spec.on_event(SUCCESS, events.append, SUCCESS)
+        spec.advise(BEFORE_ASSEMBLE, advice)
+        spec.advise(CLEANUP, advices.append, CLEANUP)
+        spec.advise(SUCCESS, advices.append, SUCCESS)
 
         if error:
             with self.assertRaises(ToolchainAbort):
@@ -861,26 +861,26 @@ class NullToolchainTestCase(unittest.TestCase):
             test_method = self.assertNotIn
 
         test_method(
-            "an event in group 'before_assemble' triggered an abort: "
+            "an advice in group 'before_assemble' triggered an abort: "
             "forced abort", s.getvalue()
         )
         # ensure cleanup is executed regardless, and success is not.
-        self.assertEqual(events, [CLEANUP])
+        self.assertEqual(advices, [CLEANUP])
 
-    def test_null_toolchain_event_abort(self):
+    def test_null_toolchain_advice_abort(self):
         def abort():
             raise ToolchainAbort('forced abort')
 
-        self._check_toolchain_event(abort, True)
+        self._check_toolchain_advice(abort, True)
 
-    def test_null_toolchain_event_cancel(self):
+    def test_null_toolchain_advice_cancel(self):
         def cancel():
             raise ToolchainCancel('toolchain cancel')
 
-        self._check_toolchain_event(cancel, False)
+        self._check_toolchain_advice(cancel, False)
 
-    def test_null_toolchain_event_keyboard_interrupt(self):
+    def test_null_toolchain_advice_keyboard_interrupt(self):
         def interrupt():
             raise KeyboardInterrupt()
 
-        self._check_toolchain_event(interrupt, False)
+        self._check_toolchain_advice(interrupt, False)
