@@ -833,7 +833,7 @@ class PackageManagerRuntime(DriverRuntime):
         return action(**kwargs)
 
 
-def main(args=None):
+def main(args=None, runtime_cls=CalmJSRuntime):
     import warnings
     bootstrap = BootstrapRuntime()
     # None to distinguish args from unspecified or specified as [], but
@@ -848,7 +848,7 @@ def main(args=None):
         with pretty_logging(
                 logger='', level=bootstrap.log_level, stream=sys.stderr):
             # pass in the extra arguments that bootstrap cannot handle.
-            runtime = CalmJSRuntime()
+            runtime = runtime_cls()
         if runtime(args):
             sys.exit(0)
         else:
