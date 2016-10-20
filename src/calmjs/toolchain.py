@@ -73,6 +73,7 @@ from os.path import realpath
 from tempfile import mkdtemp
 
 from calmjs.base import BaseDriver
+from calmjs.base import BaseRegistry
 from calmjs.exc import ValueSkip
 from calmjs.exc import RuntimeAbort
 from calmjs.utils import raise_os_error
@@ -80,7 +81,9 @@ from calmjs.utils import raise_os_error
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    'Spec', 'Toolchain', 'null_transpiler',
+    'AdviceRegistry', 'Spec', 'Toolchain', 'null_transpiler',
+
+    'CALMJS_TOOLCHAIN_ADVICE',
 
     'CLEANUP', 'SUCCESS',
 
@@ -88,7 +91,7 @@ __all__ = [
     'AFTER_ASSEMBLE', 'BEFORE_ASSEMBLE', 'AFTER_COMPILE', 'BEFORE_COMPILE',
     'AFTER_PREPARE', 'BEFORE_PREPARE', 'AFTER_TEST', 'BEFORE_TEST',
 
-    'BUILD_DIR',
+    'ADVICE_PACKAGES', 'BUILD_DIR',
     'CALMJS_MODULE_REGISTRY_NAMES', 'CALMJS_TEST_REGISTRY_NAMES',
     'CONFIG_JS_FILES', 'DEBUG',
     'EXPORT_MODULE_NAMES', 'EXPORT_PACKAGE_NAMES',
@@ -97,6 +100,8 @@ __all__ = [
     'TEST_MODULE_NAMES', 'TEST_MODULE_PATHS', 'TEST_PACKAGE_NAMES',
     'WORKING_DIR',
 ]
+
+CALMJS_TOOLCHAIN_ADVICE = 'calmjs.toolchain.advice'
 
 # define these as reserved advice names
 CLEANUP = 'cleanup'
@@ -115,6 +120,10 @@ AFTER_PREPARE = 'after_prepare'
 BEFORE_PREPARE = 'before_prepare'
 
 # define these as reserved spec keys
+
+# packages that have extra _optional_ advices supplied that have to be
+# manually included.
+ADVICE_PACKAGES = 'advice_packages'
 # build directory
 BUILD_DIR = 'build_dir'
 # source registries that have been used
@@ -357,6 +366,66 @@ class Spec(dict):
                     raise ToolchainCancel('interrupted')
                 except Exception:
                     logger.exception('Spec advice execution: got %s', values)
+
+
+class AdviceRegistry(BaseRegistry):
+    """
+    Registry for package level optional setup for advices.
+
+    These are specific to one given toolchain.
+    """
+
+    def _init(self):
+        for entry_point in self.raw_entry_points:
+            key = entry_point.dist.project_name
+            records = self.records[key] = self.records.get(key, {})
+            records[entry_point.name] = entry_point
+
+    def get_record(self, name):
+        return self.records.get(name)
+
+    def _to_name(self, cls):
+        return '%s:%s' % (cls.__module__, cls.__name__)
+
+    def process_toolchain_spec_package(self, toolchain, spec, pkg_name):
+        if not isinstance(toolchain, Toolchain):
+            return
+
+        toolchain_cls = type(toolchain)
+        toolchain_advices = self.get_record(pkg_name)
+
+        if not toolchain_advices:
+            return
+
+        logger.debug(
+            "found advice setup steps registered for package '%s' for "
+            "toolchain '%s'", pkg_name, self._to_name(toolchain_cls)
+        )
+
+        for cls in getattr(toolchain_cls, '__mro__'):
+            # traverse the entire subclass for relevant registration.
+            if not issubclass(cls, Toolchain):
+                continue
+
+            entry_point = toolchain_advices.get(self._to_name(cls))
+            if entry_point:
+                try:
+                    f = entry_point.load()
+                except ImportError:
+                    logger.error(
+                        "ImportError: entry_point '%s' in group '%s'",
+                        entry_point, self.registry_name,
+                    )
+                    return None
+
+                try:
+                    f(spec)
+                except Exception:
+                    logger.exception(
+                        "failure encountered while setting up advices through "
+                        "entry_point '%s' in group '%s'",
+                        entry_point, self.registry_name,
+                    )
 
 
 class Toolchain(BaseDriver):

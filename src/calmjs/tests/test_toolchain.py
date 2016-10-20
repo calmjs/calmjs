@@ -11,9 +11,14 @@ from os.path import join
 from os.path import pardir
 from os.path import realpath
 
+import pkg_resources
+
 from calmjs.exc import ValueSkip
 from calmjs import toolchain as calmjs_toolchain
 from calmjs.utils import pretty_logging
+from calmjs.registry import get
+from calmjs.toolchain import CALMJS_TOOLCHAIN_ADVICE
+from calmjs.toolchain import AdviceRegistry
 from calmjs.toolchain import Spec
 from calmjs.toolchain import Toolchain
 from calmjs.toolchain import ToolchainAbort
@@ -37,8 +42,24 @@ from calmjs.testing.mocks import StringIO
 from calmjs.testing.spec import create_spec_advise_fault
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import fake_error
+from calmjs.testing.utils import make_dummy_dist
 from calmjs.testing.utils import stub_stdouts
 from calmjs.testing.utils import stub_item_attr_value
+
+
+def bad(spec):
+    """A simple bad function"""
+
+    items = spec['dummy'] = spec.get('dummy', [])
+    items.append('bad')
+    raise Exception('bad')
+
+
+def dummy(spec):
+    """A simple dummy function"""
+
+    items = spec['dummy'] = spec.get('dummy', [])
+    items.append('dummy')
 
 
 class SpecTestCase(unittest.TestCase):
@@ -232,6 +253,119 @@ class SpecTestCase(unittest.TestCase):
     # that's all the standard vectors I can cover, if someone wants to
     # attack this using somewhat more advanced/esoteric methods, I guess
     # they wanted an EXPLOSION.
+
+
+class AdviceRegistryTestCase(unittest.TestCase):
+    """
+    Test case for management of registration for package specific extra
+    advice steps for toolchain/spec execution.
+    """
+
+    def test_get_package_advices(self):
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.toolchain.advice]\n'
+            'calmjs.toolchain:Toolchain = calmjs.tests.test_toolchain:dummy\n'
+            'calmjs.toolchain:Alt = calmjs.tests.test_toolchain:dummy\n'
+        ),), 'example.package', '1.0')
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+        reg = AdviceRegistry(CALMJS_TOOLCHAIN_ADVICE, _working_set=working_set)
+        self.assertEqual(sorted(reg.get('example.package').keys()), [
+            'calmjs.toolchain:Alt',
+            'calmjs.toolchain:Toolchain',
+        ])
+
+    def test_not_toolchain_process(self):
+        reg = AdviceRegistry(CALMJS_TOOLCHAIN_ADVICE)
+        self.assertIsNone(
+            reg.process_toolchain_spec_package(object(), Spec(), 'calmjs'))
+
+    def test_standard_toolchain_process_nothing(self):
+        reg = AdviceRegistry(CALMJS_TOOLCHAIN_ADVICE)
+        toolchain = Toolchain()
+        spec = Spec()
+        with pretty_logging(stream=StringIO()) as s:
+            reg.process_toolchain_spec_package(toolchain, spec, 'calmjs')
+        self.assertEqual(s.getvalue(), '')
+
+    def test_standard_toolchain_process(self):
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.toolchain.advice]\n'
+            'calmjs.toolchain:Toolchain = calmjs.tests.test_toolchain:dummy\n'
+        ),), 'example.package', '1.0')
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+        reg = AdviceRegistry(CALMJS_TOOLCHAIN_ADVICE, _working_set=working_set)
+        toolchain = Toolchain()
+        spec = Spec()
+        with pretty_logging(stream=StringIO()) as s:
+            reg.process_toolchain_spec_package(
+                toolchain, spec, 'example.package')
+
+        self.assertEqual(spec, {'dummy': ['dummy']})
+        self.assertIn(
+            "found advice setup steps registered for package "
+            "'example.package' for toolchain 'calmjs.toolchain:Toolchain'",
+            s.getvalue(),
+        )
+
+    def test_standard_toolchain_no_import_process(self):
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.toolchain.advice]\n'
+            'calmjs.toolchain:Toolchain = calmjs.tests.bad.import:dummy\n'
+        ),), 'example.package', '1.0')
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+        reg = AdviceRegistry(CALMJS_TOOLCHAIN_ADVICE, _working_set=working_set)
+        toolchain = Toolchain()
+        spec = Spec()
+        with pretty_logging(stream=StringIO()) as s:
+            reg.process_toolchain_spec_package(
+                toolchain, spec, 'example.package')
+
+        self.assertIn(
+            "ImportError: entry_point 'calmjs.toolchain:Toolchain",
+            s.getvalue(),
+        )
+
+    def test_standard_toolchain_failure_process(self):
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.toolchain.advice]\n'
+            'calmjs.toolchain:Toolchain = calmjs.tests.test_toolchain:bad\n'
+            'calmjs.toolchain:NullToolchain = '
+            'calmjs.tests.test_toolchain:dummy\n'
+        ),), 'example.package', '1.0')
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+        reg = AdviceRegistry(CALMJS_TOOLCHAIN_ADVICE, _working_set=working_set)
+        toolchain = NullToolchain()
+        spec = Spec()
+        with pretty_logging(stream=StringIO()) as s:
+            reg.process_toolchain_spec_package(
+                toolchain, spec, 'example.package')
+
+        err = s.getvalue()
+        # inheritance applies.
+        self.assertIn(
+            "found advice setup steps registered for package "
+            "'example.package' for toolchain 'calmjs.toolchain:NullToolchain'",
+            err,
+        )
+        self.assertIn("ERROR", err)
+        self.assertIn(
+            "failure encountered while setting up advices through entry_point",
+            err)
+
+        # partial execution will be done, so do test stuff.
+        self.assertEqual(spec, {'dummy': ['dummy', 'bad']})
+
+    def test_toolchain_advice_integration(self):
+        reg = get(CALMJS_TOOLCHAIN_ADVICE)
+        self.assertTrue(isinstance(reg, AdviceRegistry))
 
 
 class ToolchainTestCase(unittest.TestCase):

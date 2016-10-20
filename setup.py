@@ -72,6 +72,7 @@ setup(
             'calmjs.module.tests = calmjs.module:ModuleRegistry',
             'calmjs.py.module = calmjs.module:PythonicModuleRegistry',
             'calmjs.py.module.tests = calmjs.module:PythonicModuleRegistry',
+            'calmjs.toolchain.advice = calmjs.toolchain:AdviceRegistry',
         ],
     },
     test_suite="calmjs.tests.make_suite",
