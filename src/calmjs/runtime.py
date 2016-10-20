@@ -8,18 +8,17 @@ from __future__ import absolute_import
 import logging
 import re
 import sys
-import textwrap
 from collections import namedtuple
 from functools import partial
 from argparse import Action
 from argparse import ArgumentParser
-from argparse import HelpFormatter
 from argparse import SUPPRESS
 from inspect import currentframe
 from os.path import exists
 
 from pkg_resources import working_set as default_working_set
 
+from calmjs.argparse import HyphenNoBreakFormatter
 from calmjs.argparse import Version
 from calmjs.argparse import ATTR_INFO
 from calmjs.argparse import ATTR_ROOT_PKG
@@ -79,13 +78,6 @@ def _initialize_global_runtime_attrs(**kwargs):
 
 def norm_args(args):
     return sys.argv[1:] if args is None else (args or [])
-
-
-class HyphenNoBreakFormatter(HelpFormatter):
-
-    def _split_lines(self, text, width):
-        text = self._whitespace_matcher.sub(' ', text).strip()
-        return textwrap.wrap(text, width, break_on_hyphens=False)
 
 
 class BootstrapRuntime(object):

@@ -65,11 +65,12 @@ setup(
             'node_modules = enabled',
         ],
         'calmjs.registry': [
-            'calmjs.extras_keys = calmjs.module:ExtrasJsonKeysRegistry',
             'calmjs.registry = calmjs.registry:Registry',
+
+            'calmjs.extras_keys = calmjs.module:ExtrasJsonKeysRegistry',
             'calmjs.module = calmjs.module:ModuleRegistry',
-            'calmjs.py.module = calmjs.module:PythonicModuleRegistry',
             'calmjs.module.tests = calmjs.module:ModuleRegistry',
+            'calmjs.py.module = calmjs.module:PythonicModuleRegistry',
             'calmjs.py.module.tests = calmjs.module:PythonicModuleRegistry',
         ],
     },

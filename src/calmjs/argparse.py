@@ -6,13 +6,22 @@ Extensions to the argparse library for calmjs.
 from __future__ import absolute_import
 
 import sys
+import textwrap
 from os import linesep
 from argparse import Action
+from argparse import HelpFormatter
 from pkg_resources import working_set as default_working_set
 from pkg_resources import Requirement
 
 ATTR_INFO = '_calmjs_runtime_info'
 ATTR_ROOT_PKG = '_calmjs_root_pkg_name'
+
+
+class HyphenNoBreakFormatter(HelpFormatter):
+
+    def _split_lines(self, text, width):
+        text = self._whitespace_matcher.sub(' ', text).strip()
+        return textwrap.wrap(text, width, break_on_hyphens=False)
 
 
 class Version(Action):
