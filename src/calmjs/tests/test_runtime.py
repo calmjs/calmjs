@@ -420,6 +420,19 @@ class PackageManagerDriverTestCase(unittest.TestCase):
         self.assertNotIn('foo', out)
         self.assertIn('npm', out)
 
+    def test_npm_description(self):
+        stub_stdouts(self)
+        working_set = mocks.WorkingSet({'calmjs.runtime': [
+            'foo = calmjs.nosuchmodule:no.where',
+            'bar = calmjs.npm:npm',
+            'npm = calmjs.npm:npm.runtime',
+        ]})
+        rt = runtime.Runtime(working_set=working_set)
+        with self.assertRaises(SystemExit):
+            rt(['npm', '-h'])
+        out = sys.stdout.getvalue()
+        self.assertIn('npm support for the calmjs framework', out)
+
     def test_root_runtime_bad_names(self):
         working_set = mocks.WorkingSet({'calmjs.runtime': [
             'bad name = calmjs.npm:npm.runtime',

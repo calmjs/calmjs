@@ -381,6 +381,9 @@ class Runtime(BaseRuntime):
                 name, help=inst.description,
                 formatter_class=HyphenNoBreakFormatter,
             )
+            # Have to specify this separately because otherwise the root
+            # parser will not have a proper description.
+            subparser.description = inst.description
 
             # Assign values for version reporting system
             setattr(subparser, ATTR_ROOT_PKG, getattr(
