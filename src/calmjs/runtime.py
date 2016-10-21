@@ -19,15 +19,19 @@ from os.path import exists
 from pkg_resources import working_set as default_working_set
 
 from calmjs.argparse import HyphenNoBreakFormatter
+from calmjs.argparse import StoreDelimitedList
 from calmjs.argparse import Version
 from calmjs.argparse import ATTR_INFO
 from calmjs.argparse import ATTR_ROOT_PKG
 from calmjs.exc import RuntimeAbort
+from calmjs.registry import get
 from calmjs.toolchain import Spec
 from calmjs.toolchain import ToolchainAbort
 from calmjs.toolchain import ToolchainCancel
+from calmjs.toolchain import ADVICE_PACKAGES
 from calmjs.toolchain import AFTER_PREPARE
 from calmjs.toolchain import BUILD_DIR
+from calmjs.toolchain import CALMJS_TOOLCHAIN_ADVICE
 from calmjs.toolchain import DEBUG
 from calmjs.toolchain import EXPORT_TARGET
 from calmjs.toolchain import EXPORT_TARGET_OVERWRITE
@@ -630,6 +634,16 @@ class ToolchainRuntime(DriverRuntime):
                  'existing file, with no cleanup done after.'
         )
 
+        argparser.add_argument(
+            '--optional-advice', default=[], required=False,
+            dest=ADVICE_PACKAGES, action=StoreDelimitedList,
+            help='a comma separated list of packages to retrieve optional '
+                 'advice from; the provided packages should have registered '
+                 'the appropriate entry points for setting up the advices for '
+                 'the toolchain; refer to documentation for the specified '
+                 'packages for details',
+        )
+
         # it is possible for subclasses to fully override this, but if
         # they are using this as the runtime to drive the toolchain they
         # should be prepared to follow the layout, but if they omit them
@@ -656,7 +670,7 @@ class ToolchainRuntime(DriverRuntime):
         if not overwrite:
             raise ToolchainCancel('cancelation initiated by user')
 
-    def prepare_spec(self, spec):
+    def prepare_spec(self, spec, **kwargs):
         """
         Prepare a spec for usage with the generic ToolchainRuntime.
 
@@ -666,6 +680,17 @@ class ToolchainRuntime(DriverRuntime):
 
         spec[DEBUG] = self.debug
         spec.advise(AFTER_PREPARE, self.prompt_export_target_check, spec)
+
+        reg = get(CALMJS_TOOLCHAIN_ADVICE)
+        advice_packages = kwargs.get(ADVICE_PACKAGES) or []
+        if isinstance(advice_packages, (list, tuple)):
+            logger.debug(
+                'prepare spec with optional advices from packages %r',
+                advice_packages
+            )
+            for pkg_name in advice_packages:
+                reg.process_toolchain_spec_package(
+                    self.toolchain, spec, pkg_name)
 
     def create_spec(self, **kwargs):
         """
@@ -681,7 +706,7 @@ class ToolchainRuntime(DriverRuntime):
         """
 
         spec = self.create_spec(**kwargs)
-        self.prepare_spec(spec)
+        self.prepare_spec(spec, **kwargs)
         return spec
 
     def run(self, argparser=None, **kwargs):

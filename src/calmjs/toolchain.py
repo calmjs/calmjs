@@ -389,6 +389,10 @@ class AdviceRegistry(BaseRegistry):
 
     def process_toolchain_spec_package(self, toolchain, spec, pkg_name):
         if not isinstance(toolchain, Toolchain):
+            logger.debug(
+                'must call process_toolchain_spec_package with a toolchain, '
+                'not %s', toolchain,
+            )
             return
 
         toolchain_cls = type(toolchain)

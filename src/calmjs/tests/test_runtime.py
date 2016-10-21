@@ -302,6 +302,48 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         result = rt(['tool', '--export-target', 'dummy', '-d'])
         self.assertEqual(result['debug'], 1)
 
+    def test_spec_optional_advice(self):
+        from calmjs.registry import _inst as root_registry
+        key = toolchain.CALMJS_TOOLCHAIN_ADVICE
+        stub_stdouts(self)
+
+        def cleanup_fake_registry():
+            # pop out the fake advice registry that was added.
+            root_registry.records.pop(key, None)
+
+        self.addCleanup(cleanup_fake_registry)
+
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.toolchain.advice]\n'
+            'calmjs.toolchain:Toolchain = calmjs.tests.test_toolchain:bad\n'
+            'calmjs.toolchain:NullToolchain = '
+            'calmjs.tests.test_toolchain:dummy\n'
+        ),), 'example.package', '1.0')
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+
+        root_registry.records[key] = toolchain.AdviceRegistry(
+            key, _working_set=working_set)
+
+        tc = toolchain.NullToolchain()
+        rt = runtime.ToolchainRuntime(tc)
+
+        result = rt([
+            '--export-target', 'dummy',
+            '--optional-advice', 'example.package', '-vv',
+        ])
+
+        self.assertEqual(result['dummy'], ['dummy', 'bad'])
+        err = sys.stderr.getvalue()
+
+        self.assertIn('prepare spec with optional advices from packages', err)
+        self.assertIn('example.package', err)
+        self.assertIn('failure encountered while setting up advices', err)
+
+        # Doing it normally should not result in that optional key.
+        result = rt(['--export-target', 'dummy'])
+        self.assertNotIn('dummy', result)
+
     @unittest.skipIf(currentframe() is None, 'stack frame not supported')
     def test_spec_debugged_via_cmdline_target_exists_export_cancel(self):
         stub_item_attr_value(
