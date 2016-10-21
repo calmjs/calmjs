@@ -24,6 +24,10 @@ class WorkingSet(object):
             entry_point.dist = self.dist
             yield entry_point
 
+    def find(self, name):
+        # just always return the dist.
+        return self.dist
+
 
 class Mock_egg_info(egg_info):
 

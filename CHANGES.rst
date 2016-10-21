@@ -39,6 +39,9 @@ Changelog
   ``calmjs.pythonic`` is renamed to ``calmjs.py.module``; the related
   testing related registry is renamed to include the full name of its
   implied target.
+- Reserved a small set of core (already defined) registries for the
+  calmjs framework, which is formally defined and enforce by the
+  registry itself.
 - Corrected interactive-mode detection.
 
 1.0.3 (2016-09-07)

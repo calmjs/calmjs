@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*-
 import unittest
 
+import pkg_resources
+
 import calmjs.registry
 from calmjs.base import BaseRegistry
 from calmjs.utils import pretty_logging
 
 from calmjs.testing import mocks
+from calmjs.testing.utils import make_dummy_dist
 
 
 class RegistryIntegrationTestCase(unittest.TestCase):
@@ -65,3 +68,66 @@ class RegistryIntegrationTestCase(unittest.TestCase):
         from calmjs.testing.module3.module import CustomModuleRegistry
         self.assertTrue(isinstance(
             registry.get_record('custom'), CustomModuleRegistry))
+
+    def test_registry_reserved(self):
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.reserved]\n'
+            'calmjs.r1 = calmjs\n'
+            'calmjs.r3 = an.external\n'
+            '\n'
+            '[calmjs.registry]\n'
+            'calmjs.r1 = calmjs.module:ModuleRegistry\n'
+            'calmjs.r2 = calmjs.module:ModuleRegistry\n'
+            'calmjs.r3 = calmjs.module:ModuleRegistry\n'
+        ),), 'calmjs', '1.0')
+
+        make_dummy_dist(self, ((
+            'requires.txt',
+            'calmjs',
+            ), (
+            'entry_points.txt',
+            '[calmjs.reserved]\n'
+            'calmjs.r1 = an.external\n'
+            'calmjs.r2 = calmjs\n'
+            'calmjs.r3 = calmjs\n'
+            '\n'
+            '[calmjs.registry]\n'
+            'calmjs.r1 = calmjs.testing.module3.module:CustomModuleRegistry\n'
+            'calmjs.r2 = calmjs.testing.module3.module:CustomModuleRegistry\n'
+            'calmjs.r3 = calmjs.testing.module3.module:CustomModuleRegistry\n'
+        ),), 'an.external', '2.0')
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+        with pretty_logging(stream=mocks.StringIO()) as stream:
+            registry = calmjs.registry.Registry(
+                'calmjs.registry', _working_set=working_set)
+
+        from calmjs.testing.module3.module import CustomModuleRegistry
+        from calmjs.module import ModuleRegistry
+
+        r1 = registry.get('calmjs.r1')
+        r2 = registry.get('calmjs.r2')
+        r3 = registry.get('calmjs.r3')
+
+        # since this one is reserved to calmjs, not registered
+        self.assertFalse(isinstance(r1, CustomModuleRegistry))
+        self.assertTrue(isinstance(r1, ModuleRegistry))
+        # whatever this is.
+        self.assertTrue(isinstance(r2, ModuleRegistry))
+        # this one is reserved to an.external
+        self.assertTrue(isinstance(r3, CustomModuleRegistry))
+
+        log = stream.getvalue()
+        self.assertIn(
+            "registry 'calmjs.r1' for 'calmjs.registry' is reserved for "
+            "package 'calmjs'", log
+        )
+        self.assertIn(
+            "registry 'calmjs.r3' for 'calmjs.registry' is reserved for "
+            "package 'an.external'", log
+        )
+        self.assertIn(
+            "registry 'calmjs.r2' for 'calmjs.registry' is already registered",
+            log
+        )

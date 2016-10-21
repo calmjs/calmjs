@@ -74,6 +74,18 @@ setup(
             'calmjs.py.module.tests = calmjs.module:PythonicModuleRegistry',
             'calmjs.toolchain.advice = calmjs.toolchain:AdviceRegistry',
         ],
+        'calmjs.reserved': [
+            'calmjs.dev.module = calmjs.dev',
+            'calmjs.dev.module.tests = calmjs.dev',
+            'calmjs.extras_keys = calmjs',
+            'calmjs.module = calmjs',
+            'calmjs.module.tests = calmjs',
+            'calmjs.registry = calmjs',
+            'calmjs.reserved = calmjs',
+            'calmjs.py.module = calmjs',
+            'calmjs.py.module.tests = calmjs',
+            'calmjs.toolchain.advice = calmjs',
+        ]
     },
     test_suite="calmjs.tests.make_suite",
 )

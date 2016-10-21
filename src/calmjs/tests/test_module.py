@@ -76,6 +76,9 @@ class IntegratedModuleRegistryTestCase(unittest.TestCase):
                 'module2 = calmjs.testing.module2',
                 'module3 = calmjs.testing.module3',
             ],
+            'calmjs.reserved': [
+                'calmjs.module = calmjs.testing',
+            ],
             __name__: [
                 'calmjs.module = calmjs.module:ModuleRegistry',
             ]},
@@ -83,8 +86,10 @@ class IntegratedModuleRegistryTestCase(unittest.TestCase):
         )
         utils.stub_mod_working_set(self, [calmjs.base], working_set)
 
-        # Not going to use the global registry
-        local_root_registry = Registry(__name__)
+        # Not going to use the global registry, and using our custom
+        # reservation entry
+        local_root_registry = Registry(
+            __name__, 'calmjs.testing', _working_set=working_set)
         global_registry = get('calmjs.module')
         registry = local_root_registry.get_record('calmjs.module')
         self.assertIsNot(registry, global_registry)
