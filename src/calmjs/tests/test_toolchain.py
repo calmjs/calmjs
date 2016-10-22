@@ -14,6 +14,8 @@ from os.path import realpath
 import pkg_resources
 
 from calmjs.exc import ValueSkip
+from calmjs.exc import ToolchainAbort
+from calmjs.exc import ToolchainCancel
 from calmjs import toolchain as calmjs_toolchain
 from calmjs.utils import pretty_logging
 from calmjs.registry import get
@@ -21,8 +23,6 @@ from calmjs.toolchain import CALMJS_TOOLCHAIN_ADVICE
 from calmjs.toolchain import AdviceRegistry
 from calmjs.toolchain import Spec
 from calmjs.toolchain import Toolchain
-from calmjs.toolchain import ToolchainAbort
-from calmjs.toolchain import ToolchainCancel
 from calmjs.toolchain import NullToolchain
 
 from calmjs.toolchain import CLEANUP

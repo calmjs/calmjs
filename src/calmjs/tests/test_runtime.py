@@ -16,6 +16,7 @@ import pkg_resources
 from calmjs import argparse as calmjs_argparse
 from calmjs import cli
 from calmjs import dist
+from calmjs import exc
 from calmjs import runtime
 from calmjs import toolchain
 from calmjs.utils import pretty_logging
@@ -123,7 +124,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         stub_stdouts(self)
         spec = toolchain.Spec()
         rt = runtime.ToolchainRuntime(toolchain.NullToolchain())
-        with self.assertRaises(toolchain.ToolchainAbort):
+        with self.assertRaises(exc.ToolchainAbort):
             rt.prompt_export_target_check(spec)
 
     def test_prompt_export_target_check_not_exists(self):
@@ -144,7 +145,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         open(export_target, 'w').close()  # write an empty file
         spec = toolchain.Spec(export_target=export_target)
         rt = runtime.ToolchainRuntime(toolchain.NullToolchain())
-        with self.assertRaises(toolchain.ToolchainCancel):
+        with self.assertRaises(exc.ToolchainCancel):
             rt.prompt_export_target_check(spec)
         self.assertIn('already exists, overwrite?', sys.stdout.getvalue())
 
@@ -171,7 +172,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         rt = runtime.ToolchainRuntime(toolchain.NullToolchain())
         with pretty_logging(
                 logger='calmjs', level=DEBUG, stream=mocks.StringIO()) as err:
-            with self.assertRaises(toolchain.ToolchainCancel):
+            with self.assertRaises(exc.ToolchainCancel):
                 rt.prompt_export_target_check(spec)
         self.assertIn(
             'non-interactive mode; auto-selecting default option [No]',

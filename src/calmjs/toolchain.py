@@ -75,7 +75,8 @@ from tempfile import mkdtemp
 from calmjs.base import BaseDriver
 from calmjs.base import BaseRegistry
 from calmjs.exc import ValueSkip
-from calmjs.exc import RuntimeAbort
+from calmjs.exc import ToolchainAbort
+from calmjs.exc import ToolchainCancel
 from calmjs.utils import raise_os_error
 
 logger = logging.getLogger(__name__)
@@ -179,20 +180,6 @@ def _check_key_exists(spec, keys):
 
 def null_transpiler(spec, reader, writer):
     writer.write(reader.read())
-
-
-class ToolchainAbort(RuntimeAbort):
-    """
-    Events can raise this to abort a toolchain execution if a condition
-    required this to be done.
-    """
-
-
-class ToolchainCancel(ToolchainAbort):
-    """
-    Events that interact with user input during a toolchain execution
-    may raise this to signify user cancellation.
-    """
 
 
 class Spec(dict):
