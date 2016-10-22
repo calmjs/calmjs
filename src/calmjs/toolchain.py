@@ -74,6 +74,8 @@ from tempfile import mkdtemp
 
 from calmjs.base import BaseDriver
 from calmjs.base import BaseRegistry
+from calmjs.exc import AdviceAbort
+from calmjs.exc import AdviceCancel
 from calmjs.exc import ValueSkip
 from calmjs.exc import ToolchainAbort
 from calmjs.exc import ToolchainCancel
@@ -341,6 +343,25 @@ class Spec(dict):
                                 'Traceback for original advice:\n%s', frame)
                         # continue on for the normal exception
                         raise
+                except AdviceCancel as e:
+                    logger.info(
+                        "advice %s in group '%s' signaled its cancellation "
+                        "during its execution: %s", advice, name, e
+                    )
+                    if self.get(DEBUG):
+                        logger.debug(
+                            'showing traceback for cancellation', exc_info=1,
+                        )
+                except AdviceAbort as e:
+                    logger.warning(
+                        "advice %s in group '%s' raised an error "
+                        "during its execution: %s; toolchain execution will "
+                        "continue, however", advice, name, e
+                    )
+                    if self.get(DEBUG):
+                        logger.warning(
+                            'showing traceback for error', exc_info=1,
+                        )
                 except ToolchainCancel:
                     raise
                 except ToolchainAbort as e:

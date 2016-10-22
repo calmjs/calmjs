@@ -14,6 +14,8 @@ from os.path import realpath
 import pkg_resources
 
 from calmjs.exc import ValueSkip
+from calmjs.exc import AdviceAbort
+from calmjs.exc import AdviceCancel
 from calmjs.exc import ToolchainAbort
 from calmjs.exc import ToolchainCancel
 from calmjs import toolchain as calmjs_toolchain
@@ -977,9 +979,10 @@ class NullToolchainTestCase(unittest.TestCase):
         self.toolchain(spec)
         self.assertEqual(tuple(results), advices)
 
-    def _check_toolchain_advice(self, advice, error):
+    def _check_toolchain_advice(
+            self, advice, error, executed=[CLEANUP], **kw):
         advices = []
-        spec = Spec()
+        spec = Spec(**kw)
         spec.advise(BEFORE_ASSEMBLE, advice)
         spec.advise(CLEANUP, advices.append, CLEANUP)
         spec.advise(SUCCESS, advices.append, SUCCESS)
@@ -999,7 +1002,8 @@ class NullToolchainTestCase(unittest.TestCase):
             "forced abort", s.getvalue()
         )
         # ensure cleanup is executed regardless, and success is not.
-        self.assertEqual(advices, [CLEANUP])
+        self.assertEqual(advices, executed)
+        return s
 
     def test_null_toolchain_advice_abort(self):
         def abort():
@@ -1012,6 +1016,45 @@ class NullToolchainTestCase(unittest.TestCase):
             raise ToolchainCancel('toolchain cancel')
 
         self._check_toolchain_advice(cancel, False)
+
+    def test_null_toolchain_advice_abort_itself(self):
+        def abort():
+            raise AdviceAbort('advice abort')
+
+        s = self._check_toolchain_advice(
+            abort, False, executed=[SUCCESS, CLEANUP])
+        self.assertIn('', s.getvalue())
+
+        self.assertIn('raised an error', s.getvalue())
+        self.assertIn('will continue', s.getvalue())
+        self.assertIn('advice abort', s.getvalue())
+        self.assertNotIn('showing traceback for error', s.getvalue())
+        self.assertNotIn('Traceback', s.getvalue())
+        self.assertNotIn('test_toolchain.py', s.getvalue())
+
+        s = self._check_toolchain_advice(
+            abort, False, executed=[SUCCESS, CLEANUP], debug=1)
+        self.assertIn('showing traceback for error', s.getvalue())
+        self.assertIn('Traceback', s.getvalue())
+        self.assertIn('test_toolchain.py', s.getvalue())
+
+    def test_null_toolchain_advice_cancel_itself(self):
+        def cancel():
+            raise AdviceCancel('advice cancel')
+
+        s = self._check_toolchain_advice(
+            cancel, False, executed=[SUCCESS, CLEANUP])
+        self.assertIn('signaled its cancellation', s.getvalue())
+        self.assertIn('advice cancel', s.getvalue())
+        self.assertNotIn('showing traceback for cancellation', s.getvalue())
+        self.assertNotIn('Traceback', s.getvalue())
+        self.assertNotIn('test_toolchain.py', s.getvalue())
+
+        s = self._check_toolchain_advice(
+            cancel, False, executed=[SUCCESS, CLEANUP], debug=1)
+        self.assertIn('showing traceback for cancellation', s.getvalue())
+        self.assertIn('Traceback', s.getvalue())
+        self.assertIn('test_toolchain.py', s.getvalue())
 
     def test_null_toolchain_advice_keyboard_interrupt(self):
         def interrupt():
