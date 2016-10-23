@@ -26,7 +26,6 @@ from calmjs.argparse import ATTR_ROOT_PKG
 from calmjs.exc import RuntimeAbort
 from calmjs.registry import get
 from calmjs.toolchain import Spec
-from calmjs.toolchain import ToolchainAbort
 from calmjs.toolchain import ToolchainCancel
 from calmjs.toolchain import ADVICE_PACKAGES
 from calmjs.toolchain import AFTER_PREPARE
@@ -584,15 +583,15 @@ class ToolchainRuntime(DriverRuntime):
         """
 
         argparser.add_argument(
-            '--export-target', dest=EXPORT_TARGET,
-            default=default,
-            help=help,
-        )
-
-        argparser.add_argument(
             '-w', '--overwrite', dest=EXPORT_TARGET_OVERWRITE,
             default=default, action='store_true',
             help='overwrite the export target without any confirmation',
+        )
+
+        argparser.add_argument(
+            '--export-target', dest=EXPORT_TARGET,
+            default=default,
+            help=help,
         )
 
     def init_argparser_working_dir(
@@ -629,6 +628,13 @@ class ToolchainRuntime(DriverRuntime):
 
         super(ToolchainRuntime, self).init_argparser(argparser)
 
+        # it is possible for subclasses to fully override this, but if
+        # they are using this as the runtime to drive the toolchain they
+        # should be prepared to follow the layout, but if they omit them
+        # it should only result in the spec omitting these arguments.
+        self.init_argparser_export_target(argparser)
+        self.init_argparser_working_dir(argparser)
+
         argparser.add_argument(
             '--build-dir', default=None,
             dest=BUILD_DIR,
@@ -651,20 +657,27 @@ class ToolchainRuntime(DriverRuntime):
                  'packages for details',
         )
 
-        # it is possible for subclasses to fully override this, but if
-        # they are using this as the runtime to drive the toolchain they
-        # should be prepared to follow the layout, but if they omit them
-        # it should only result in the spec omitting these arguments.
-        self.init_argparser_export_target(argparser)
-        self.init_argparser_working_dir(argparser)
-
-    def prompt_export_target_check(self, spec):
+    def check_export_target_exists(self, spec):
+        # to ensure the key is really available.
         export_target = spec.get(EXPORT_TARGET)
+
         if not export_target:
-            raise ToolchainAbort(
-                'EXPORT_TARGET should be specified by this stage')
-        if not exists(export_target) or spec.get(EXPORT_TARGET_OVERWRITE):
-            return  # continue normally
+            logger.warning(
+                "spec missing key 'export_target'; no destination check will "
+                "be done"
+            )
+            return
+        if not exists(export_target):
+            return
+
+        if spec.get(EXPORT_TARGET_OVERWRITE):
+            logger.warning(
+                "export target location '%(export_target)s' already exists; "
+                "it may be overwritten as the overwrite flag is specified.",
+                {'export_target': export_target},
+            )
+            return
+
         overwrite = prompt(
             u"export target '%(export_target)s' already exists, overwrite? " %
             {'export_target': export_target},
@@ -686,8 +699,9 @@ class ToolchainRuntime(DriverRuntime):
         """
 
         spec[DEBUG] = self.debug
-        spec.advise(AFTER_PREPARE, self.prompt_export_target_check, spec)
+        spec[EXPORT_TARGET_OVERWRITE] = kwargs.get(EXPORT_TARGET_OVERWRITE)
 
+        spec.advise(AFTER_PREPARE, self.check_export_target_exists, spec)
         reg = get(CALMJS_TOOLCHAIN_ADVICE)
         advice_packages = kwargs.get(ADVICE_PACKAGES) or []
         if isinstance(advice_packages, (list, tuple)):

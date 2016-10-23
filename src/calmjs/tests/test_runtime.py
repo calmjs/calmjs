@@ -142,20 +142,22 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
     def test_prompt_export_target_export_target_undefined(self):
         stub_stdouts(self)
         spec = toolchain.Spec()
+        err = mocks.StringIO()
         rt = runtime.ToolchainRuntime(toolchain.NullToolchain())
-        with self.assertRaises(exc.ToolchainAbort):
-            rt.prompt_export_target_check(spec)
+        with pretty_logging(logger='calmjs.runtime', level=DEBUG, stream=err):
+            rt.check_export_target_exists(spec)
+        self.assertIn("spec missing key 'export_target'; ", err.getvalue())
 
-    def test_prompt_export_target_check_not_exists(self):
+    def test_check_export_target_exists_not_exists(self):
         stub_stdouts(self)
         target_dir = mkdtemp(self)
         export_target = join(target_dir, 'export_file')
         spec = toolchain.Spec(export_target=export_target)
         rt = runtime.ToolchainRuntime(toolchain.NullToolchain())
-        rt.prompt_export_target_check(spec)
+        rt.check_export_target_exists(spec)
         self.assertEqual(sys.stdout.getvalue(), '')
 
-    def test_prompt_export_target_check_exists_no(self):
+    def test_check_export_target_exists_exists_no(self):
         stub_check_interactive(self, True)
         stub_stdouts(self)
         stub_stdin(self, u'n\n')
@@ -165,10 +167,10 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         spec = toolchain.Spec(export_target=export_target)
         rt = runtime.ToolchainRuntime(toolchain.NullToolchain())
         with self.assertRaises(exc.ToolchainCancel):
-            rt.prompt_export_target_check(spec)
+            rt.check_export_target_exists(spec)
         self.assertIn('already exists, overwrite?', sys.stdout.getvalue())
 
-    def test_prompt_export_target_check_exists_yes(self):
+    def test_check_export_target_exists_exists_yes(self):
         stub_check_interactive(self, True)
         stub_stdouts(self)
         stub_stdin(self, u'y\n')
@@ -177,10 +179,10 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         open(export_target, 'w').close()  # write an empty file
         spec = toolchain.Spec(export_target=export_target)
         rt = runtime.ToolchainRuntime(toolchain.NullToolchain())
-        rt.prompt_export_target_check(spec)
+        rt.check_export_target_exists(spec)
         self.assertIn('already exists, overwrite?', sys.stdout.getvalue())
 
-    def test_prompt_export_target_check_exists_non_interactive(self):
+    def test_check_export_target_exists_exists_non_interactive(self):
         stub_check_interactive(self, False)
         stub_stdouts(self)
         stub_stdin(self, u'y\n')
@@ -192,7 +194,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         with pretty_logging(
                 logger='calmjs', level=DEBUG, stream=mocks.StringIO()) as err:
             with self.assertRaises(exc.ToolchainCancel):
-                rt.prompt_export_target_check(spec)
+                rt.check_export_target_exists(spec)
         self.assertIn(
             'non-interactive mode; auto-selecting default option [No]',
             err.getvalue()
@@ -214,6 +216,11 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
             "export target '%s' already exists, overwrite? " % export_target,
             sys.stdout.getvalue()
         )
+        self.assertNotIn(
+            "export target location '%s' already exists; it may be overwritten"
+            % export_target,
+            sys.stderr.getvalue()
+        )
         self.assertNotIn('CRITICAL', sys.stdout.getvalue())
         self.assertTrue(isinstance(result, toolchain.Spec))
         # prove that it did at least run
@@ -233,6 +240,55 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         rt = runtime.ToolchainRuntime(tc)
         result = rt(['--export-target', export_target, '-w'])
         self.assertNotIn(
+            "export target '%s' already exists, overwrite? " % export_target,
+            sys.stdout.getvalue()
+        )
+        self.assertIn(
+            "export target location '%s' already exists; it may be overwritten"
+            % export_target,
+            sys.stderr.getvalue()
+        )
+        self.assertNotIn('CRITICAL', sys.stdout.getvalue())
+        self.assertTrue(isinstance(result, toolchain.Spec))
+        # prove that it did at least run
+        self.assertIn('build_dir', result)
+        self.assertEqual(result['link'], 'linked')
+
+    def test_prompted_overwrite_for_modified_create_spec(self):
+        """
+        Test execution for runtime that completely overrides create_spec
+        to return an bare minimum spec.
+        """
+
+        class CustomToolchainRuntime(runtime.ToolchainRuntime):
+            def create_spec(self, export_target=None, **kwargs):
+                return toolchain.Spec(export_target=export_target)
+
+        stub_check_interactive(self, True)
+        stub_stdouts(self)
+        stub_stdin(self, u'y\n')
+
+        target_dir = mkdtemp(self)
+        export_target = join(target_dir, 'export_file')
+        open(export_target, 'w').close()  # write an empty file
+
+        tc = toolchain.NullToolchain()
+        rt = CustomToolchainRuntime(tc)
+        result = rt(['--export-target', export_target, '-w'])
+        self.assertNotIn(
+            "export target '%s' already exists, overwrite? " % export_target,
+            sys.stdout.getvalue()
+        )
+        self.assertNotIn('CRITICAL', sys.stdout.getvalue())
+        self.assertTrue(isinstance(result, toolchain.Spec))
+        # prove that it did at least run
+        self.assertIn('build_dir', result)
+        self.assertEqual(result['link'], 'linked')
+
+        stub_stdouts(self)
+        stub_stdin(self, u'y\n')
+        result = rt(['--export-target', export_target])
+        self.assertIn(
             "export target '%s' already exists, overwrite? " % export_target,
             sys.stdout.getvalue()
         )
@@ -264,37 +320,20 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         self.assertIn('build_dir', result)
         self.assertNotIn('link', result)
 
-        # Should not have unexpected error logged.
+        # Should not have unexpected warnings logged.
         stderr = sys.stderr.getvalue()
-        self.assertNotIn(
-            "an advice in group 'after_prepare' triggered an abort: "
-            "EXPORT_TARGET should be specified by this stage", stderr,
-        )
-        self.assertNotIn(
-            "terminating due to expected unrecoverable condition",
-            stderr,
-        )
+        self.assertNotIn('WARNING', stderr)
+        self.assertNotIn("spec missing key 'export_target';", stderr)
 
     def test_excution_missing_export_file(self):
         # as the null toolchain does not automatically provide one
         stub_stdouts(self)
         rt = runtime.ToolchainRuntime(toolchain.NullToolchain())
-        result = rt([])
+        rt([])
         self.assertEqual('', sys.stdout.getvalue())
         stderr = sys.stderr.getvalue()
-        self.assertIn('CRITICAL', stderr)
-        # no direct error message logged by the BaseRuntime.__call__
-        self.assertNotIn('CRITICAL: ToolchainAbort:', stderr)
-        self.assertIn(
-            "an advice in group 'after_prepare' triggered an abort: "
-            "EXPORT_TARGET should be specified by this stage", stderr,
-        )
-        self.assertIn(
-            "terminating due to expected unrecoverable condition",
-            stderr,
-        )
-
-        self.assertFalse(result)
+        self.assertIn('WARNING', stderr)
+        self.assertIn("spec missing key 'export_target';", stderr)
 
     def test_spec_nodebug(self):
         tc = toolchain.NullToolchain()
@@ -388,7 +427,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         self.assertIn("advise 'cleanup' invoked by", sys.stderr.getvalue())
         self.assertIn("toolchain.py", sys.stderr.getvalue())
         self.assertIn(
-            'advise(AFTER_PREPARE, self.prompt_export_target_check, spec)',
+            'advise(AFTER_PREPARE, self.check_export_target_exists, spec)',
             sys.stderr.getvalue(),
         )
 
