@@ -279,23 +279,27 @@ class BaseRuntime(BootstrapRuntime):
             except KeyboardInterrupt:
                 logger.critical('termination requested; aborted.')
             except Exception as e:
+                if isinstance(e, RuntimeAbort):
+                    reason = 'expected unrecoverable condition'
+                else:
+                    reason = 'unexpected error'
+
                 if self.debug:
                     # ensure debug is handled completely
                     logger.critical(
-                        'terminating due to unexpected exception', exc_info=1)
+                        'terminating due to %s', reason, exc_info=1)
                     if self.debug > 1:
                         pdb_post_mortem(sys.exc_info()[2])
                 elif isinstance(e, RuntimeAbort):
-                    logger.critical(
-                        'terminating due to expected unrecoverable condition')
+                    logger.critical('terminating due to %s', reason)
                 elif not self.debug:
                     logger.critical(
                         '%s: %s', type(e).__name__, e)
                     logger.critical(
-                        'terminating due to unexpected critical error; for '
+                        'terminating due to %s; for '
                         'details please refer to previous log entries, or by '
                         'retrying with more verbosity (-v) and/or enable '
-                        'debug/traceback output (-d)'
+                        'debug/traceback output (-d)', reason
                     )
             return False
 

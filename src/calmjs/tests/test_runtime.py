@@ -80,6 +80,25 @@ class BaseRuntimeTestCase(unittest.TestCase):
             bt.error(bt.argparser, None, 'error message')
         self.assertIn('error message', sys.stderr.getvalue())
 
+    def test_runtime_run_abort(self):
+        class CustomRuntime(runtime.BaseRuntime):
+            def run(self, export_target=None, **kwargs):
+                raise exc.RuntimeAbort
+
+        stub_stdouts(self)
+        rt = CustomRuntime()
+        rt([])
+        self.assertEqual('', sys.stdout.getvalue())
+        stderr = sys.stderr.getvalue()
+        self.assertIn(
+            'terminating due to expected unrecoverable condition', stderr)
+
+        stub_stdouts(self)
+        rt(['-vvd'])
+        self.assertEqual('', sys.stdout.getvalue())
+        stderr = sys.stderr.getvalue()
+        self.assertNotIn('unexpected', stderr)
+
 
 class ToolchainRuntimeTestCase(unittest.TestCase):
     """
@@ -1384,7 +1403,7 @@ class RuntimeIntegrationTestCase(unittest.TestCase):
         self.assertIn("ERROR", stderr)
         self.assertIn(
             "invocation of the 'npm' binary failed;", stderr)
-        self.assertIn("terminating due to unexpected exception", stderr)
+        self.assertIn("terminating due to unexpected error", stderr)
         self.assertIn("Traceback ", stderr)
         self.assertNotIn("(Pdb)", stderr)
 
@@ -1410,7 +1429,7 @@ class RuntimeIntegrationTestCase(unittest.TestCase):
         self.assertIn("ERROR", stderr)
         self.assertIn(
             "invocation of the 'npm' binary failed;", stderr)
-        self.assertIn("terminating due to unexpected exception", stderr)
+        self.assertIn("terminating due to unexpected error", stderr)
         self.assertIn("Traceback ", stderr)
         self.assertIn("(Pdb)", sys.stdout.getvalue())
 
