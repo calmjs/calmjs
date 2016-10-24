@@ -127,6 +127,15 @@ def prompt(question, validator=None,
         Defaults to str.lower.  See above.
     """
 
+    def write_choices(choice_keys, default_key):
+        _stdout.write('(')
+        _stdout.write('/'.join(choice_keys))
+        _stdout.write(') ')
+        if default_key is not NotImplemented:
+            _stdout.write('[')
+            _stdout.write(choice_keys[default_key])
+            _stdout.write('] ')
+
     if _stdin is None:
         _stdin = sys.stdin
 
@@ -138,12 +147,15 @@ def prompt(question, validator=None,
 
     if not check_interactive():
         if choices and default_key is not NotImplemented:
+            choice_keys = [choice for choice, mapped in choices]
+            write_choices(choice_keys, default_key)
             display, answer = choices[default_key]
-            logger.warning(
-                'non-interactive mode; auto-selecting default option [%s]',
-                display)
             _stdout.write(display)
             _stdout.write('\n')
+
+            logger.warning(
+                'non-interactive mode; auto-selected default option [%s]',
+                display)
             return answer
         logger.warning(
             'interactive code triggered within non-interactive session')
@@ -163,13 +175,7 @@ def prompt(question, validator=None,
     answer = NotImplemented
     while answer is NotImplemented:
         if choice_keys:
-            _stdout.write('(')
-            _stdout.write('/'.join(choice_keys))
-            _stdout.write(') ')
-            if default_key:
-                _stdout.write('[')
-                _stdout.write(choice_keys[default_key])
-                _stdout.write('] ')
+            write_choices(choice_keys, default_key)
         _stdout.flush()
         try:
             answer = validator(

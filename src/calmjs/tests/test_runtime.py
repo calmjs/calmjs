@@ -196,7 +196,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
             with self.assertRaises(exc.ToolchainCancel):
                 rt.check_export_target_exists(spec)
         self.assertIn(
-            'non-interactive mode; auto-selecting default option [No]',
+            'non-interactive mode; auto-selected default option [No]',
             err.getvalue()
         )
 

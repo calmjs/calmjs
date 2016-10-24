@@ -679,7 +679,7 @@ class ToolchainRuntime(DriverRuntime):
             return
 
         overwrite = prompt(
-            u"export target '%(export_target)s' already exists, overwrite? " %
+            u"export target '%(export_target)s' already exists, overwrite?" %
             {'export_target': export_target},
             choices=(
                 (u'Yes', True),

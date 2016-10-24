@@ -181,7 +181,8 @@ class PromptTestCase(unittest.TestCase):
             default_key=0,
         )
         self.assertEqual(result, 'A')
-        self.assertEqual(self.stdout.getvalue(), 'What are you? a\n')
+        self.assertEqual(
+            self.stdout.getvalue(), 'What are you? (a/b/c) [a] a\n')
 
 
 class JsonPromptTestCase(unittest.TestCase):
