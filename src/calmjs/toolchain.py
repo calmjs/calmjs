@@ -317,6 +317,10 @@ class Spec(dict):
         advices = []
         advices.extend(self._advices.get(name, []))
 
+        if advices and self.get('debug'):
+            logger.debug(
+                "handling %d advices in group '%s' ", len(advices), name)
+
         while advices:
             try:
                 # cleanup basically done lifo (last in first out)

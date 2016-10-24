@@ -89,15 +89,25 @@ class SpecTestCase(unittest.TestCase):
 
         check = []
 
-        spec = Spec()
+        spec = Spec(debug=1)
         spec.advise(CLEANUP, cb, check, 1, keyword='foo')
         spec.advise(CLEANUP, cb, check, 2, keyword='bar')
         self.assertEqual(len(spec._advices), 1)
 
-        spec.handle('foo')
-        self.assertEqual(check, [])
+        with pretty_logging(stream=StringIO()) as s:
+            spec.handle('foo')
 
-        spec.handle(CLEANUP)
+        self.assertEqual(check, [])
+        self.assertEqual('', s.getvalue())
+
+        with pretty_logging(stream=StringIO()) as s:
+            spec.handle(CLEANUP)
+
+        self.assertIn(
+            "calmjs.toolchain handling 2 advices in group 'cleanup'",
+            s.getvalue(),
+        )
+
         # cleanup done lifo
         self.assertEqual(check, [
             ((2,), {'keyword': 'bar'}),
@@ -105,12 +115,20 @@ class SpecTestCase(unittest.TestCase):
         ])
 
     def test_spec_advice_blackhole(self):
-        spec = Spec()
+        spec = Spec(debug=1)
         check = []
         spec.advise(None, check.append, 1)
         self.assertEqual(len(spec._advices), 0)
-        spec.handle(None)
+        with pretty_logging(stream=StringIO()) as s:
+            spec.handle(None)
         self.assertEqual(check, [])
+        self.assertEqual(s.getvalue(), '')
+
+    def test_spec_advice_empty_stack(self):
+        spec = Spec(debug=1)
+        with pretty_logging(stream=StringIO()) as s:
+            spec.handle('cleanup')
+        self.assertEqual(s.getvalue(), '')
 
     def test_spec_advice_malformed(self):
         def cb(sideeffect, *a, **kw):
@@ -240,6 +258,7 @@ class SpecTestCase(unittest.TestCase):
             spec.handle(CLEANUP)
             # ensure that it only got called once.
             self.assertEqual(spec['counter'], 2)
+
         self.assertEqual(s.getvalue(), '')
 
         # this one can work without frame protection.
