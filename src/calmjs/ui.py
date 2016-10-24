@@ -14,9 +14,8 @@ import sys
 from functools import partial
 from json import dumps
 from locale import getpreferredencoding
-from os import fstat
+from os import isatty
 from os.path import basename
-from stat import S_ISCHR
 
 locale = getpreferredencoding()
 logger = logging.getLogger(__name__)
@@ -32,7 +31,7 @@ json_dumps = partial(dumps, indent=4, sort_keys=True, separators=(',', ': '))
 def _check_interactive(*descriptors):
     for desc in descriptors:
         try:
-            if not S_ISCHR(fstat(desc.fileno()).st_mode):
+            if not isatty(desc.fileno()):
                 return False
         except Exception:
             # Anything broken we are going to pretend this is not
@@ -43,7 +42,7 @@ def _check_interactive(*descriptors):
 
 
 def check_interactive():
-    return _check_interactive(sys.stdin, sys.stdout)
+    return _check_interactive(sys.stdin, sys.stdout, sys.stderr)
 
 
 def make_choice_validator(

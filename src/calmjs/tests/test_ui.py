@@ -34,9 +34,10 @@ class CliCheckInteractiveTestCase(unittest.TestCase):
         with open(fn) as fd2:
             self.assertFalse(ui._check_interactive(fd2, fd1))
 
-    @unittest.skipIf(not isatty, 'Environment not a tty')
+    @unittest.skipIf(not isatty, 'stdin is not a tty')
     def test_check_interactive_good(self):
-        self.assertTrue(ui._check_interactive(sys.__stdin__, sys.__stdout__))
+        # kind of unnecessary because test relies on low level function
+        self.assertTrue(ui._check_interactive(sys.__stdin__))
 
 
 class MakeChoiceValidatorTestCase(unittest.TestCase):
