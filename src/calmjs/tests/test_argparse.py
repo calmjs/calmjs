@@ -1,11 +1,33 @@
 # -*- coding: utf-8 -*-
 import unittest
+import sys
 
 from argparse import Namespace
-from argparse import ArgumentParser
+from argparse import _
 
+from calmjs.argparse import ArgumentParser
 from calmjs.argparse import StoreDelimitedList
 # test for Version done as part of the runtime.
+
+from calmjs.testing.utils import stub_stdouts
+
+
+class ArgumentParserTestCase(unittest.TestCase):
+
+    def test_filtered(self):
+        stub_stdouts(self)
+        parser = ArgumentParser()
+        with self.assertRaises(SystemExit):
+            parser.error('some random other error')
+
+        self.assertIn('some random other error', sys.stderr.getvalue())
+
+    def test_error(self):
+        stub_stdouts(self)
+        parser = ArgumentParser()
+        parser.error(_('too few arguments'))
+        self.assertEqual('', sys.stdout.getvalue())
+        self.assertEqual('', sys.stderr.getvalue())
 
 
 class StoreDelimitedListTestCase(unittest.TestCase):

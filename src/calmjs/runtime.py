@@ -11,13 +11,13 @@ import sys
 from collections import namedtuple
 from functools import partial
 from argparse import Action
-from argparse import ArgumentParser
 from argparse import SUPPRESS
 from inspect import currentframe
 from os.path import exists
 
 from pkg_resources import working_set as default_working_set
 
+from calmjs.argparse import ArgumentParser
 from calmjs.argparse import HyphenNoBreakFormatter
 from calmjs.argparse import StoreDelimitedList
 from calmjs.argparse import Version

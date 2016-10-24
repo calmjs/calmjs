@@ -5,9 +5,11 @@ Extensions to the argparse library for calmjs.
 
 from __future__ import absolute_import
 
+import argparse
 import sys
 import textwrap
 from os import linesep
+from argparse import _
 from argparse import Action
 from argparse import HelpFormatter
 from pkg_resources import working_set as default_working_set
@@ -15,6 +17,15 @@ from pkg_resources import Requirement
 
 ATTR_INFO = '_calmjs_runtime_info'
 ATTR_ROOT_PKG = '_calmjs_root_pkg_name'
+
+
+class ArgumentParser(argparse.ArgumentParser):
+
+    # In Python 3, this particular error message was removed, so we will
+    # do this for Python 2 in this blunt manner.
+    def error(self, message):
+        if message != _('too few arguments'):
+            super(ArgumentParser, self).error(message)
 
 
 class HyphenNoBreakFormatter(HelpFormatter):
