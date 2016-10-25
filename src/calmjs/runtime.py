@@ -19,7 +19,7 @@ from pkg_resources import working_set as default_working_set
 
 from calmjs.argparse import ArgumentParser
 from calmjs.argparse import HyphenNoBreakFormatter
-from calmjs.argparse import StoreDelimitedList
+from calmjs.argparse import StoreRequirementList
 from calmjs.argparse import Version
 from calmjs.argparse import ATTR_INFO
 from calmjs.argparse import ATTR_ROOT_PKG
@@ -649,7 +649,7 @@ class ToolchainRuntime(DriverRuntime):
 
         argparser.add_argument(
             '--optional-advice', default=[], required=False,
-            dest=ADVICE_PACKAGES, action=StoreDelimitedList,
+            dest=ADVICE_PACKAGES, action=StoreRequirementList,
             help='a comma separated list of packages to retrieve optional '
                  'advice from; the provided packages should have registered '
                  'the appropriate entry points for setting up the advices for '

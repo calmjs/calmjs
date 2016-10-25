@@ -15,6 +15,8 @@ from argparse import HelpFormatter
 from pkg_resources import working_set as default_working_set
 from pkg_resources import Requirement
 
+from calmjs.utils import requirement_comma_list
+
 ATTR_INFO = '_calmjs_runtime_info'
 ATTR_ROOT_PKG = '_calmjs_root_pkg_name'
 
@@ -93,7 +95,7 @@ class Version(Action):
         sys.exit(0)
 
 
-class StoreDelimitedList(Action):
+class StoreDelimitedListBase(Action):
 
     def __init__(self, option_strings, dest, sep=',', **kw):
         self.sep = sep
@@ -105,8 +107,23 @@ class StoreDelimitedList(Action):
                 'provided default for store delimited list must be a list or '
                 'tuple.'
             )
-        super(StoreDelimitedList, self).__init__(
+        super(StoreDelimitedListBase, self).__init__(
             option_strings=option_strings, dest=dest, **kw)
 
     def __call__(self, parser, namespace, values, option_string=None):
         setattr(namespace, self.dest, values[0].split(self.sep))
+
+
+class StoreCommaDelimitedList(StoreDelimitedListBase):
+
+    def __init__(self, option_strings, dest, **kw):
+        super(StoreCommaDelimitedList, self).__init__(
+            option_strings=option_strings, dest=dest, sep=',', **kw)
+
+StoreDelimitedList = StoreCommaDelimitedList
+
+
+class StoreRequirementList(StoreDelimitedListBase):
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, self.dest, requirement_comma_list.split(values[0]))

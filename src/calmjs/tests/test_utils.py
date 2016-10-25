@@ -8,6 +8,7 @@ from os.path import join
 from os.path import pathsep
 import sys
 
+from calmjs.utils import requirement_comma_list
 from calmjs.utils import which
 from calmjs.utils import enable_pretty_logging
 from calmjs.utils import finalize_env
@@ -17,6 +18,22 @@ from calmjs.utils import raise_os_error
 
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import stub_os_environ
+
+
+class RequirementCommaListTestCase(unittest.TestCase):
+
+    def test_basic(self):
+        self.assertEqual(
+            ['some', 'simple', 'test.foo'],
+            requirement_comma_list.split('some,simple,test.foo'),
+        )
+
+    def test_with_requirement_commas(self):
+        self.assertEqual(
+            ['some', 'simple[part1]', 'test.foo[part2,part3,part4]'],
+            requirement_comma_list.split(
+                'some,simple[part1],test.foo[part2,part3,part4]'),
+        )
 
 
 class WhichTestCase(unittest.TestCase):

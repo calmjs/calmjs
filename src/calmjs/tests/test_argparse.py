@@ -6,7 +6,9 @@ from argparse import Namespace
 from argparse import _
 
 from calmjs.argparse import ArgumentParser
-from calmjs.argparse import StoreDelimitedList
+from calmjs.argparse import StoreCommaDelimitedList
+from calmjs.argparse import StoreDelimitedListBase
+from calmjs.argparse import StoreRequirementList
 # test for Version done as part of the runtime.
 
 from calmjs.testing.utils import stub_stdouts
@@ -30,45 +32,47 @@ class ArgumentParserTestCase(unittest.TestCase):
         self.assertEqual('', sys.stderr.getvalue())
 
 
-class StoreDelimitedListTestCase(unittest.TestCase):
+class StoreCommaDelimitedListTestCase(unittest.TestCase):
     """
-    Test out the StoreDelimitedList action
+    Test out the StoreCommaDelimitedList action
     """
 
     def test_basic_singlevalue(self):
         namespace = Namespace()
         parser = None
-        action = StoreDelimitedList('', dest='basic')
+        action = StoreCommaDelimitedList('', dest='basic')
         action(parser, namespace, ['singlevalue'])
         self.assertEqual(namespace.basic, ['singlevalue'])
 
     def test_basic_multivalue(self):
         namespace = Namespace()
         parser = None
-        action = StoreDelimitedList('', dest='basic')
+        action = StoreCommaDelimitedList('', dest='basic')
         action(parser, namespace, ['single,double,triple'])
         self.assertEqual(namespace.basic, ['single', 'double', 'triple'])
 
     def test_basic_multivalue_alt_sep(self):
         namespace = Namespace()
         parser = None
-        action = StoreDelimitedList('', dest='basic', sep='.')
+        action = StoreDelimitedListBase('', dest='basic', sep='.')
         action(parser, namespace, ['single,double.triple'])
         self.assertEqual(namespace.basic, ['single,double', 'triple'])
 
     def test_fail_argument(self):
         with self.assertRaises(ValueError):
-            StoreDelimitedList('', dest='basic', default='default')
+            StoreCommaDelimitedList('', dest='basic', default='default')
 
     def test_integration(self):
         argparser = ArgumentParser(prog='prog', add_help=False)
 
         with self.assertRaises(ValueError):
             argparser.add_argument(
-                '-p', '--params', action=StoreDelimitedList, default='123')
+                '-p', '--params', action=StoreCommaDelimitedList,
+                default='123')
 
         argparser.add_argument(
-            '-p', '--params', action=StoreDelimitedList, default=('1', '2',))
+            '-p', '--params', action=StoreCommaDelimitedList,
+            default=('1', '2',))
 
         parsed, extras = argparser.parse_known_args(['-p', '3,4'])
         self.assertEqual(parsed.params, ['3', '4'])
@@ -83,10 +87,32 @@ class StoreDelimitedListTestCase(unittest.TestCase):
         argparser = ArgumentParser(prog='prog', add_help=False)
 
         argparser.add_argument(
-            '-p', '--params', action=StoreDelimitedList, required=False)
+            '-p', '--params', action=StoreCommaDelimitedList, required=False)
 
         parsed, extras = argparser.parse_known_args(['-p', '3,4'])
         self.assertEqual(parsed.params, ['3', '4'])
 
         parsed, extras = argparser.parse_known_args()
         self.assertEqual(parsed.params, None)
+
+
+class StoreRequirementListTestCase(unittest.TestCase):
+
+    def test_basic_singlevalue(self):
+        namespace = Namespace()
+        parser = None
+        action = StoreRequirementList('', dest='basic')
+        action(parser, namespace, ['singlevalue'])
+        self.assertEqual(namespace.basic, ['singlevalue'])
+
+        action(parser, namespace, ['single,value'])
+        self.assertEqual(namespace.basic, ['single', 'value'])
+
+        action(parser, namespace, ['single[1,2,3],value'])
+        self.assertEqual(namespace.basic, ['single[1,2,3]', 'value'])
+
+        action(parser, namespace, ['single.value'])
+        self.assertEqual(namespace.basic, ['single.value'])
+
+        action(parser, namespace, ['single[1,2,3]'])
+        self.assertEqual(namespace.basic, ['single[1,2,3]'])
