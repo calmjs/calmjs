@@ -70,9 +70,9 @@ class NpmTestCase(unittest.TestCase):
             npm.npm_install()
             self.assertIn(
                 "no package name supplied, "
-                "but continuing with 'npm install'", stderr.getvalue())
+                "not continuing with 'npm install'", stderr.getvalue())
         # However we make sure that it's been fake called
-        self.assertEqual(self.call_args, (([which_npm, 'install'],), {}))
+        self.assertIsNone(self.call_args)
         self.assertFalse(exists(join(tmpdir, 'package.json')))
 
     @unittest.skipIf(which_npm is None, 'npm not found.')

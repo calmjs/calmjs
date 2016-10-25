@@ -436,20 +436,21 @@ class PackageManagerDriver(NodeDriver):
             The arguments to pass into the command line install.
         """
 
-        if package_names:
-            result = self.pkg_manager_init(package_names, **kw)
-            if not result:
-                logger.warning(
-                    "not continuing with '%s %s' as the generation of "
-                    "'%s' failed", self.pkg_manager_bin, self.install_cmd,
-                    self.pkgdef_filename
-                )
-                return
-        else:
+        if not package_names:
             logger.warning(
-                "no package name supplied, but continuing with '%s %s'",
+                "no package name supplied, not continuing with '%s %s'",
                 self.pkg_manager_bin, self.install_cmd,
             )
+            return
+
+        result = self.pkg_manager_init(package_names, **kw)
+        if not result:
+            logger.warning(
+                "not continuing with '%s %s' as the generation of "
+                "'%s' failed", self.pkg_manager_bin, self.install_cmd,
+                self.pkgdef_filename
+            )
+            return
 
         call_kw = self._gen_call_kws(**env)
         logger.debug(

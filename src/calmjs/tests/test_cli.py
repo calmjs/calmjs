@@ -102,6 +102,11 @@ class CliDriverTestCase(unittest.TestCase):
     Base cli driver class test case.
     """
 
+    def setUp(self):
+        self.cwd = mkdtemp(self)
+        remember_cwd(self)
+        os.chdir(self.cwd)
+
     def test_get_bin_version_long(self):
         stub_mod_check_output(self, cli)
         stub_base_which(self)
@@ -200,11 +205,7 @@ class CliDriverTestCase(unittest.TestCase):
         self.assertIn('no_such_attr_here', str(e.exception))
         self.assertIsNot(driver.mgr_init, None)
         self.assertIsNot(driver.get_mgr_version, None)
-        with pretty_logging(stream=mocks.StringIO()) as stderr:
-            driver.mgr_install()
-            self.assertIn(
-                "no package name supplied, "
-                "but continuing with 'mgr install'", stderr.getvalue())
+        driver.mgr_install(['calmjs'])
         self.assertEqual(self.call_args, ((['mgr', 'install'],), {}))
 
     def test_install_failure(self):
@@ -213,7 +214,7 @@ class CliDriverTestCase(unittest.TestCase):
         driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
         with pretty_logging(stream=mocks.StringIO()) as stderr:
             with self.assertRaises(IOError):
-                driver.mgr_install()
+                driver.mgr_install(['calmjs'])
         val = stderr.getvalue()
         self.assertIn("invocation of the 'mgr' binary failed", val)
 
@@ -222,7 +223,7 @@ class CliDriverTestCase(unittest.TestCase):
         stub_base_which(self)
         driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
         with pretty_logging(stream=mocks.StringIO()):
-            driver.pkg_manager_install(args=('--pedantic',))
+            driver.pkg_manager_install(['calmjs'], args=('--pedantic',))
         self.assertEqual(
             self.call_args, ((['mgr', 'install', '--pedantic'],), {}))
 
@@ -231,21 +232,14 @@ class CliDriverTestCase(unittest.TestCase):
         stub_base_which(self)
         driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', install_cmd='sync')
-        with pretty_logging(stream=mocks.StringIO()) as stderr:
-            driver.pkg_manager_install()
-            self.assertIn(
-                "no package name supplied, "
-                "but continuing with 'mgr sync'", stderr.getvalue())
+        driver.pkg_manager_install(['calmjs'])
         self.assertEqual(self.call_args, ((['mgr', 'sync'],), {}))
 
         # Naturally, the short hand call will be changed.
-        with pretty_logging(stream=mocks.StringIO()) as stderr:
-            # note that args is NOT the package_name, and thus this just
-            # means that init won't be called.
-            driver.mgr_sync(args=('all',))
-            self.assertIn(
-                "no package name supplied, "
-                "but continuing with 'mgr sync'", stderr.getvalue())
+        # note that args is NOT the package_name, and thus this just
+        # means that the installation may not operate as expected off
+        # the package.
+        driver.mgr_sync(['calmjs'], args=('all',))
         self.assertEqual(self.call_args, ((['mgr', 'sync', 'all'],), {}))
 
     def test_install_other_environ(self):
@@ -253,7 +247,8 @@ class CliDriverTestCase(unittest.TestCase):
         stub_base_which(self)
         driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
         with pretty_logging(stream=mocks.StringIO()):
-            driver.pkg_manager_install(env={'MGR_ENV': 'production'})
+            driver.pkg_manager_install(['calmjs'], env={
+                'MGR_ENV': 'production'})
         self.assertEqual(self.call_args, ((['mgr', 'install'],), {
             'env': finalize_env({'MGR_ENV': 'production'}),
         }))
@@ -267,14 +262,14 @@ class CliDriverTestCase(unittest.TestCase):
 
         # ensure env is passed into the call.
         with pretty_logging(stream=mocks.StringIO()):
-            driver.pkg_manager_install()
+            driver.pkg_manager_install(['calmjs'])
         self.assertEqual(self.call_args, ((['mgr', 'install'],), {
             'env': finalize_env({'NODE_PATH': node_path}),
         }))
 
         # will be overridden by instance settings.
         with pretty_logging(stream=mocks.StringIO()):
-            driver.pkg_manager_install(env={
+            driver.pkg_manager_install(['calmjs'], env={
                 'PATH': '.',
                 'MGR_ENV': 'dev',
                 'NODE_PATH': '/tmp/somewhere/else/node_mods',
@@ -289,11 +284,11 @@ class CliDriverTestCase(unittest.TestCase):
         stub_mod_call(self, cli)
         stub_base_which(self)
         somepath = mkdtemp(self)
-        cwd = mkdtemp(self)
+        cwd = self.cwd
         driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', env_path=somepath, working_dir=cwd)
         with pretty_logging(stream=mocks.StringIO()):
-            driver.pkg_manager_install()
+            driver.pkg_manager_install(['calmjs'])
         args, kwargs = self.call_args
         self.assertEqual(kwargs['env']['PATH'].split(pathsep)[0], somepath)
         self.assertEqual(kwargs['cwd'], cwd)
@@ -305,7 +300,7 @@ class CliDriverTestCase(unittest.TestCase):
         driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', env_path=bad_path)
         with pretty_logging(stream=mocks.StringIO()):
-            driver.pkg_manager_install()
+            driver.pkg_manager_install(['calmjs'])
         args, kwargs = self.call_args
         self.assertNotEqual(kwargs['env']['PATH'].split(pathsep)[0], bad_path)
 
@@ -314,7 +309,7 @@ class CliDriverTestCase(unittest.TestCase):
         stub_base_which(self)
         driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
         with pretty_logging(stream=mocks.StringIO()):
-            driver.pkg_manager_install()
+            driver.pkg_manager_install(['calmjs'])
         args, kwargs = self.call_args
         self.assertNotIn('PATH', kwargs)
         self.assertNotIn('cwd', kwargs)
@@ -322,25 +317,32 @@ class CliDriverTestCase(unittest.TestCase):
     def test_working_dir_set(self):
         stub_mod_call(self, cli)
         stub_base_which(self)
-        some_cwd = mkdtemp(self)
+        some_cwd = self.cwd
         driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', working_dir=some_cwd)
         with pretty_logging(stream=mocks.StringIO()):
-            driver.pkg_manager_install()
+            driver.pkg_manager_install(['calmjs'])
         args, kwargs = self.call_args
         self.assertNotIn('PATH', kwargs)
         self.assertEqual(kwargs['cwd'], some_cwd)
 
-    def test_set_binary(self):
+    def test_set_binary_no_package(self):
         stub_mod_call(self, cli)
         stub_base_which(self)
         driver = cli.PackageManagerDriver(pkg_manager_bin='bower')
-        # this will call ``bower install`` instead.
         with pretty_logging(stream=mocks.StringIO()) as fd:
             driver.pkg_manager_install()
             self.assertIn(
                 "no package name supplied, "
-                "but continuing with 'bower install'", fd.getvalue())
+                "not continuing with 'bower install'", fd.getvalue())
+        self.assertIsNone(self.call_args)
+
+    def test_set_binary_with_package(self):
+        stub_mod_call(self, cli)
+        stub_base_which(self)
+        driver = cli.PackageManagerDriver(pkg_manager_bin='bower')
+        # this will call ``bower install`` instead.
+        driver.pkg_manager_install(['calmjs'])
         self.assertEqual(self.call_args, ((['bower', 'install'],), {}))
 
     def test_which_is_none(self):
@@ -553,9 +555,7 @@ class CliDriverTestCase(unittest.TestCase):
         # we still need a temporary directory, but the difference is
         # that whether the instance contains it or not.
         self.setup_requirements_json()
-        remember_cwd(self)
-        cwd = mkdtemp(self)
-        os.chdir(cwd)
+        cwd = self.cwd
 
         driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', pkgdef_filename='requirements.json',
@@ -574,7 +574,6 @@ class CliDriverTestCase(unittest.TestCase):
 
     def test_pkg_manager_init_working_dir(self):
         self.setup_requirements_json()
-        remember_cwd(self)
         original = mkdtemp(self)
         os.chdir(original)
         cwd = mkdtemp(self)
