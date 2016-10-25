@@ -388,11 +388,9 @@ class PackageManagerDriver(NodeDriver):
                 logger.warning("not overwriting existing '%s'", pkgdef_path)
                 return False
 
-        if pkgdef_json:
-            # Only write one if we actually got data.
-            with open(pkgdef_path, 'w') as fd:
-                self.dump(pkgdef_json, fd)
-            logger.info("wrote '%s'", pkgdef_path)
+        with open(pkgdef_path, 'w') as fd:
+            self.dump(pkgdef_json, fd)
+        logger.info("wrote '%s'", pkgdef_path)
 
         return True
 
