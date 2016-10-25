@@ -544,29 +544,6 @@ Troubleshooting
 The following may be some issues that may be encountered with typical
 usage of |calmjs|.
 
-Runtime reporting 'unrecognized arguments:' on recognized ones
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-For instance, if the |calmjs| binary was executed like so resulting in
-error message may look like this:
-
-.. code:: sh
-
-    $ calmjs npm --install calmjs.dev -v
-    usage: calmjs [-h] [-v] [-q] [-d] <command> ...
-    calmjs: error: unrecognized arguments: -v
-
-This means that the ``-v`` is unrecognized by the subcommand (i.e. the
-``calmjs npm`` command) as it was placed after.  Unfortunately there are
-a number of issues in the ``argparse`` module that makes its behaviors
-manifesting differently across different python versions that made it
-very difficult to consistently provide this information (for the gory
-details, please refer to the ``argparse`` related issues on the Python
-issue tracker; some of these links are in the |calmjs| source code).
-There are workarounds made in the ``calmjs.runtime`` module so this
-situation should not arise, however if it does, please file an issue on
-the |calmjs| tracker.
-
 CRITICAL calmjs.runtime terminating due to a critical error
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -609,6 +586,37 @@ bad entry point
     This is caused by packages defining malformed entry point.  The name
     of the package triggering this error will be noted in the log; the
     error may be reported to its developer.
+
+Environmental variables being ignored/not passed to underlying tools
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Generally speaking, the |calmjs| framework filters out all environmental
+variables except for the bare minimum by default, and only passes a
+limited number to the underlying tool.  These are the ``PATH`` and the
+``NODE_PATH`` variables, plus platform specific variables to enable
+execution of scripts and binaries.
+
+Runtime reporting 'unrecognized arguments:' on recognized ones
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For instance, if the |calmjs| binary was executed like so resulting in
+error message may look like this:
+
+.. code:: sh
+
+    $ calmjs subcmd1 subcmd2 --flag item
+    usage: calmjs subcmd1 ... [--flag FLAG]
+    calmjs subcmd1: error: unrecognized arguments: --flag
+
+This means that ``--flag`` is unrecognized by the second subcommand
+(i.e. the ``calmjs subcmd1 subcmd2`` command) as that was placed after
+``subcmd2``, but the subparser for ``subcmd1`` flagged that as an error.
+Unfortunately there are a number of issues in the ``argparse`` module
+that makes it difficult to resolve this problem, so for the mean time
+please ensure the flag is provided at the correct subcommand level (i.e.
+in this case, ``calmjs subcmd1 --flag item subcmd2``), otherwise consult
+the help at the correct level by appending ``-h`` to each of the valid
+subcommands.
 
 
 Contribute

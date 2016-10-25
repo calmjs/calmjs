@@ -286,6 +286,8 @@ class BaseDriver(object):
     def which(self):
         """
         Figure out which binary this will execute.
+
+        Returns None if the binary is not found.
         """
 
         if self.binary is None:
@@ -387,6 +389,11 @@ class BaseDriver(object):
         be called by this instance's external execution methods as they
         will be also invoke _gen_call_kws to pass into the call_kw
         argument.
+
+        This is different from the `which` method as the underlying
+        function will raise the correct exception as if the underlying
+        Popen method was called directly with the self.binary argument,
+        while `which` will simply return None.
         """
 
         return _get_exec_binary(self.binary, kw)
