@@ -49,7 +49,7 @@ from calmjs.testing.utils import stub_stdouts
 from calmjs.testing.utils import stub_item_attr_value
 
 
-def bad(spec):
+def bad(spec, extras):
     """A simple bad function"""
 
     items = spec['dummy'] = spec.get('dummy', [])
@@ -57,11 +57,13 @@ def bad(spec):
     raise Exception('bad')
 
 
-def dummy(spec):
+def dummy(spec, extras):
     """A simple dummy function"""
 
     items = spec['dummy'] = spec.get('dummy', [])
     items.append('dummy')
+    if extras:
+        spec['extras'] = extras
 
 
 class SpecTestCase(unittest.TestCase):
@@ -383,6 +385,27 @@ class AdviceRegistryTestCase(unittest.TestCase):
 
         # partial execution will be done, so do test stuff.
         self.assertEqual(spec, {'dummy': ['dummy', 'bad']})
+
+    def test_standard_toolchain_advice_extras(self):
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.toolchain.advice]\n'
+            'calmjs.toolchain:NullToolchain = '
+            'calmjs.tests.test_toolchain:dummy\n'
+        ),), 'example.package', '1.0')
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+        reg = AdviceRegistry(CALMJS_TOOLCHAIN_ADVICE, _working_set=working_set)
+        toolchain = NullToolchain()
+        spec = Spec()
+        with pretty_logging(stream=StringIO()) as s:
+            reg.process_toolchain_spec_package(
+                toolchain, spec, 'example.package[a,bc,d]')
+        self.assertEqual(spec['extras'], ['a', 'bc', 'd'])
+        self.assertIn(
+            "found advice setup steps registered for package "
+            "'example.package[a,bc,d]' for toolchain ", s.getvalue()
+        )
 
     def test_toolchain_advice_integration(self):
         reg = get(CALMJS_TOOLCHAIN_ADVICE)

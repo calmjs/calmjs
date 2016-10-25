@@ -403,6 +403,38 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         result = rt(['--export-target', 'dummy'])
         self.assertNotIn('dummy', result)
 
+    def test_spec_optional_advice_extras(self):
+        from calmjs.registry import _inst as root_registry
+        key = toolchain.CALMJS_TOOLCHAIN_ADVICE
+        stub_stdouts(self)
+
+        def cleanup_fake_registry():
+            # pop out the fake advice registry that was added.
+            root_registry.records.pop(key, None)
+
+        self.addCleanup(cleanup_fake_registry)
+
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.toolchain.advice]\n'
+            'calmjs.toolchain:NullToolchain = '
+            'calmjs.tests.test_toolchain:dummy\n'
+        ),), 'example.package', '1.0')
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+
+        root_registry.records[key] = toolchain.AdviceRegistry(
+            key, _working_set=working_set)
+
+        tc = toolchain.NullToolchain()
+        rt = runtime.ToolchainRuntime(tc)
+
+        result = rt([
+            '--export-target', 'dummy',
+            '--optional-advice', 'example.package[extra1,extra2]', '-vv',
+        ])
+
+        self.assertEqual(result['extras'], ['extra1', 'extra2'])
+
     @unittest.skipIf(currentframe() is None, 'stack frame not supported')
     def test_spec_debugged_via_cmdline_target_exists_export_cancel(self):
         stub_item_attr_value(

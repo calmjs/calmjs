@@ -72,6 +72,8 @@ from os.path import isdir
 from os.path import realpath
 from tempfile import mkdtemp
 
+from pkg_resources import Requirement
+
 from calmjs.base import BaseDriver
 from calmjs.base import BaseRegistry
 from calmjs.exc import AdviceAbort
@@ -399,7 +401,7 @@ class AdviceRegistry(BaseRegistry):
     def _to_name(self, cls):
         return '%s:%s' % (cls.__module__, cls.__name__)
 
-    def process_toolchain_spec_package(self, toolchain, spec, pkg_name):
+    def process_toolchain_spec_package(self, toolchain, spec, value):
         if not isinstance(toolchain, Toolchain):
             logger.debug(
                 'must call process_toolchain_spec_package with a toolchain, '
@@ -408,6 +410,8 @@ class AdviceRegistry(BaseRegistry):
             return
 
         toolchain_cls = type(toolchain)
+        req = Requirement.parse(value)
+        pkg_name = req.project_name
         toolchain_advices = self.get_record(pkg_name)
 
         if not toolchain_advices:
@@ -415,7 +419,7 @@ class AdviceRegistry(BaseRegistry):
 
         logger.debug(
             "found advice setup steps registered for package '%s' for "
-            "toolchain '%s'", pkg_name, self._to_name(toolchain_cls)
+            "toolchain '%s'", value, self._to_name(toolchain_cls)
         )
 
         for cls in getattr(toolchain_cls, '__mro__'):
@@ -435,7 +439,7 @@ class AdviceRegistry(BaseRegistry):
                     return None
 
                 try:
-                    f(spec)
+                    f(spec, sorted(req.extras))
                 except Exception:
                     logger.exception(
                         "failure encountered while setting up advices through "
