@@ -28,6 +28,7 @@ from calmjs.base import NODE
 from calmjs.base import BaseDriver
 from calmjs.base import _get_exec_binary
 
+from calmjs import ui
 from calmjs.ui import locale
 
 
@@ -121,6 +122,7 @@ class PackageManagerDriver(NodeDriver):
 
     def __init__(self, pkg_manager_bin, pkgdef_filename=DEFAULT_JSON,
                  install_cmd='install', dep_keys=DEP_KEYS,
+                 devkey='devDependencies',
                  pkg_name_field='name', *a, **kw):
         """
         Optional Arguments:
@@ -143,6 +145,7 @@ class PackageManagerDriver(NodeDriver):
         self.pkgdef_filename = pkgdef_filename
         self.install_cmd = install_cmd
         self.dep_keys = dep_keys
+        self.devkey = devkey
         self.pkg_name_field = pkg_name_field
 
     @property
@@ -328,9 +331,9 @@ class PackageManagerDriver(NodeDriver):
             Typically the calmjs.ui.prompt_overwrite_json is passed into
             this argument; refer to its documentation on details.
 
-        Returns True if successful; can be achieved by writing a new
-        file or that the existing one matches with the expected version.
-        Returns False otherwise.
+        Returns generated definition file if successful; can be achieved
+        by writing a new file or that the existing one matches with the
+        expected version.  Returns False otherwise.
         """
 
         # this will be modified in place
@@ -373,7 +376,7 @@ class PackageManagerDriver(NodeDriver):
             if original_json == pkgdef_json:
                 # Well, if original existing one is identical with the
                 # generated version, we have reached our target.
-                return True
+                return pkgdef_json
 
             if not overwrite and callable(callback):
                 overwrite = callback(
@@ -392,15 +395,25 @@ class PackageManagerDriver(NodeDriver):
             self.dump(pkgdef_json, fd)
         logger.info("wrote '%s'", pkgdef_path)
 
-        return True
+        return pkgdef_json
 
-    def pkg_manager_install(self, package_names=None, args=(), env={}, **kw):
+    def pkg_manager_install(
+            self, package_names=None,
+            production=None, development=None,
+            args=(), env={}, **kw):
         """
         This will install all dependencies into the current working
         directory for the specific Python package from the selected
         JavaScript package manager; this requires that this package
         manager's package definition file to be properly generated
         first, otherwise the process will be aborted.
+
+        If the production argument is supplied, it will be passed to the
+        underlying package manager binary as a true or false value with
+        the --production flag, otherwise it will not be set.
+
+        Likewise for development.  However, the production flag has
+        priority.
 
         If the argument 'args' is supplied as a tuple, those will be
         passed through to the package manager install command as its
@@ -442,7 +455,7 @@ class PackageManagerDriver(NodeDriver):
             return
 
         result = self.pkg_manager_init(package_names, **kw)
-        if not result:
+        if result is False:
             logger.warning(
                 "not continuing with '%s %s' as the generation of "
                 "'%s' failed", self.pkg_manager_bin, self.install_cmd,
@@ -461,7 +474,10 @@ class PackageManagerDriver(NodeDriver):
                 "invoked from working directory '%s'", self.working_dir)
         try:
             cmd = [self._get_exec_binary(call_kw), self.install_cmd]
+            cmd.extend(self._prodev_flag(
+                production, development, result.get(self.devkey)))
             cmd.extend(args)
+            logger.info('invoking %s', ' '.join(cmd))
             call(cmd, **call_kw)
         except (IOError, OSError):
             logger.error(
@@ -470,6 +486,39 @@ class PackageManagerDriver(NodeDriver):
             )
             # Still raise the exception as this is a lower level API.
             raise
+
+    def _prodev_flag(self, production, development, has_devkey):
+        if production is True:
+            return ['--production=true']
+        elif production is False:
+            return ['--production=false']
+        elif development is True:
+            return ['--production=false']
+        elif development is False:
+            return ['--production=true']
+
+        if not has_devkey:
+            logger.debug("no packages defined in '%s' section", self.devkey)
+        else:
+            logger.warning(
+                "undefined production flag may result in unexpected "
+                "installation behavior for '%s' packages; for well "
+                "defined behavior, please specify an explicit desired "
+                "value for the production or development argument",
+                self.devkey,
+            )
+            if ui.check_interactive():
+                logger.warning(
+                    "interactive mode assumed; '%s' may be installed",
+                    self.devkey,
+                )
+            else:
+                logger.warning(
+                    "non-interactive mode assumed; '%s' may be "
+                    "ignored", self.devkey,
+                )
+
+        return []
 
     def run(self, args=(), env={}):
         """

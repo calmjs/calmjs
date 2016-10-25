@@ -771,7 +771,7 @@ class PackageManagerRuntime(DriverRuntime):
         # This required implicit step is done, otherwise there are no
         # difference to running ``npm init`` directly from the shell.
         ('install', None,
-         "run '%(pkg_manager_bin)s install' with generated "
+         "run '%(pkg_manager_bin)s %(install_cmd)s' with generated "
          "'%(pkgdef_filename)s'; implies init; will abort if init fails "
          "to write the generated file"),
         # As far as I know typically setuptools setup.py are not
@@ -792,11 +792,18 @@ class PackageManagerRuntime(DriverRuntime):
         ('explicit', 'E',
          "explicit mode disables resolution for dependencies; only the "
          "specified Python package will be used."),
+        ('production', 'P',
+         "explicitly specify production mode for "
+         "%(pkg_manager_bin)s %(install_cmd)s"),
+        ('development', 'D',
+         "explicitly specify development mode for "
+         "%(pkg_manager_bin)s %(install_cmd)s"),
     )
 
     def make_cli_options(self):
         return [
             (full, s, desc % {
+                'install_cmd': self.cli_driver.install_cmd,
                 'pkgdef_filename': self.cli_driver.pkgdef_filename,
                 'pkg_manager_bin': self.cli_driver.pkg_manager_bin,
             }) for full, s, desc in self._pkg_manager_options
@@ -868,6 +875,9 @@ class PackageManagerRuntime(DriverRuntime):
         if interactive:
             kwargs['callback'] = partial(
                 prompt_overwrite_json, dumps=self.cli_driver.dumps)
+
+        kwargs['production'] = True if kwargs.get('production') else None
+        kwargs['development'] = True if kwargs.get('development') else None
         return action(**kwargs)
 
 

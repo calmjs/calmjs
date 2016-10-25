@@ -105,6 +105,7 @@ class PackageManagerCommand(Command):
             pkg_name,
             overwrite=self.overwrite, merge=self.merge,
             callback=self.callback,
+            production=self.production, development=self.development,
             stream=self.stream,
         )
 
@@ -116,6 +117,9 @@ class PackageManagerCommand(Command):
         if self.view or self.dry_run:
             self.stream = sys.stdout
         self.callback = prompt_overwrite_json if self.interactive else None
+        # require explicit boolean value.
+        self.production = True if self.production else None
+        self.development = True if self.development else None
 
     def run(self):
         if self.dry_run:

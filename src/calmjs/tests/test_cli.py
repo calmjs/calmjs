@@ -23,6 +23,7 @@ from calmjs.testing.utils import create_fake_bin
 from calmjs.testing.utils import fake_error
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import remember_cwd
+from calmjs.testing.utils import stub_check_interactive
 from calmjs.testing.utils import stub_item_attr_value
 from calmjs.testing.utils import stub_base_which
 from calmjs.testing.utils import stub_mod_call
@@ -711,3 +712,116 @@ class CliDriverTestCase(unittest.TestCase):
         self.assertIn(
             'malformed package name(s) specified: {foo}, /r',
             str(e.exception))
+
+    def test_pkg_manager_cmd_prodev_flag_basic(self):
+        driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
+        with pretty_logging(stream=mocks.StringIO()) as log:
+            # production has priority
+            self.assertEqual(driver._prodev_flag(True, True, False), [
+                '--production=true'])
+            self.assertEqual(driver._prodev_flag(False, True, False), [
+                '--production=false'])
+            self.assertEqual(driver._prodev_flag(True, False, True), [
+                '--production=true'])
+            self.assertEqual(driver._prodev_flag(False, False, True), [
+                '--production=false'])
+        self.assertEqual(log.getvalue(), '')
+
+        with pretty_logging(stream=mocks.StringIO()) as log:
+            self.assertEqual(driver._prodev_flag(True, None, False), [
+                '--production=true'])
+            self.assertEqual(driver._prodev_flag(False, None, False), [
+                '--production=false'])
+            self.assertEqual(driver._prodev_flag(True, None, True), [
+                '--production=true'])
+            self.assertEqual(driver._prodev_flag(False, None, True), [
+                '--production=false'])
+        self.assertEqual(log.getvalue(), '')
+
+        with pretty_logging(stream=mocks.StringIO()) as log:
+            self.assertEqual(driver._prodev_flag(None, True, False), [
+                '--production=false'])
+            self.assertEqual(driver._prodev_flag(None, False, False), [
+                '--production=true'])
+            self.assertEqual(driver._prodev_flag(None, True, True), [
+                '--production=false'])
+            self.assertEqual(driver._prodev_flag(None, False, True), [
+                '--production=true'])
+        self.assertEqual(log.getvalue(), '')
+
+        with pretty_logging(stream=mocks.StringIO()) as log:
+            self.assertEqual(driver._prodev_flag(None, None, False), [])
+        self.assertNotIn('WARNING', log.getvalue())
+        self.assertIn('DEBUG', log.getvalue())
+        self.assertIn(
+            "no packages defined in 'devDependencies' section", log.getvalue())
+
+    def test_pkg_manager_cmd_production_flag_warnings_interactive(self):
+        stub_check_interactive(self, True)
+        driver = cli.PackageManagerDriver(pkg_manager_bin='mgr', devkey='blah')
+        with pretty_logging(stream=mocks.StringIO()) as log:
+            self.assertEqual(driver._prodev_flag(None, None, True), [])
+        self.assertIn('WARNING', log.getvalue())
+        self.assertIn(
+            'undefined production flag may result in unexpected installation '
+            'behavior', log.getvalue()
+        )
+        self.assertNotIn("non-interactive", log.getvalue())
+        self.assertIn("'blah' may be installed", log.getvalue())
+
+    def test_pkg_manager_cmd_production_flag_warnings_noninteractive(self):
+        stub_check_interactive(self, False)
+        driver = cli.PackageManagerDriver(pkg_manager_bin='mgr', devkey='blah')
+        with pretty_logging(stream=mocks.StringIO()) as log:
+            self.assertEqual(driver._prodev_flag(None, None, True), [])
+        self.assertIn('WARNING', log.getvalue())
+        self.assertIn(
+            'undefined production flag may result in unexpected installation '
+            'behavior', log.getvalue()
+        )
+        self.assertIn("non-interactive", log.getvalue())
+        self.assertIn("'blah' may be ignored", log.getvalue())
+
+    def test_pkg_manager_cmd_production_flag_unset(self):
+        stub_check_interactive(self, False)
+        stub_mod_call(self, cli)
+        stub_base_which(self)
+        self.setup_requirements_json()
+        driver = cli.PackageManagerDriver(
+            pkg_manager_bin='mgr', pkgdef_filename='requirements.json',
+            dep_keys=('require',), devkey='require',
+        )
+
+        with pretty_logging(stream=mocks.StringIO()) as log:
+            driver.pkg_manager_install(['calmpy.pip'])
+
+        self.assertIn('WARNING', log.getvalue())
+        self.assertIn(
+            'undefined production flag may result in unexpected installation '
+            'behavior', log.getvalue()
+        )
+        self.assertIn("non-interactive", log.getvalue())
+        self.assertIn("'require' may be ignored", log.getvalue())
+        self.assertEqual(self.call_args, ((
+            ['mgr', 'install'],), {}))
+
+    def test_pkg_manager_cmd_production_flag_set(self):
+        stub_mod_call(self, cli)
+        stub_base_which(self)
+        self.setup_requirements_json()
+        driver = cli.PackageManagerDriver(
+            pkg_manager_bin='mgr', pkgdef_filename='requirements.json',
+            dep_keys=('require',), devkey='require',
+        )
+
+        with pretty_logging(stream=mocks.StringIO()) as log:
+            driver.pkg_manager_install(['calmpy.pip'], production=True)
+        self.assertNotIn('WARNING', log.getvalue())
+        self.assertEqual(self.call_args, ((
+            ['mgr', 'install', '--production=true'],), {}))
+
+        with pretty_logging(stream=mocks.StringIO()) as log:
+            driver.pkg_manager_install(['calmpy.pip'], production=False)
+        self.assertNotIn('WARNING', log.getvalue())
+        self.assertEqual(self.call_args, ((
+            ['mgr', 'install', '--production=false'],), {}))

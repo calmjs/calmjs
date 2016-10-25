@@ -750,7 +750,7 @@ class DistCommandTestCase(unittest.TestCase):
         })
 
     @unittest.skipIf(which_npm is None, 'npm not found.')
-    def test_install_no_init(self):
+    def test_install_no_init_nodevnoprod(self):
         # install implies init
         stub_mod_call(self, cli)
         stub_base_which(self, which_npm)
@@ -777,14 +777,14 @@ class DistCommandTestCase(unittest.TestCase):
         self.assertEqual(self.call_args, (([which_npm, 'install'],), {}))
 
     @unittest.skipIf(which_npm is None, 'npm not found.')
-    def test_install_init_install(self):
+    def test_install_init_install_production(self):
         stub_mod_call(self, cli)
         stub_base_which(self, which_npm)
         tmpdir = mkdtemp(self)
         os.chdir(tmpdir)
         dist = Distribution(dict(
             script_name='setup.py',
-            script_args=['npm', '--init', '--install'],
+            script_args=['npm', '--init', '--install', '--production'],
             name='foo',
         ))
         dist.parse_command_line()
@@ -799,7 +799,34 @@ class DistCommandTestCase(unittest.TestCase):
             'name': 'foo',
         })
         # Should still invoke install
-        self.assertEqual(self.call_args, (([which_npm, 'install'],), {}))
+        self.assertEqual(self.call_args, ((
+            [which_npm, 'install', '--production=true'],), {}))
+
+    @unittest.skipIf(which_npm is None, 'npm not found.')
+    def test_install_init_install_develop(self):
+        stub_mod_call(self, cli)
+        stub_base_which(self, which_npm)
+        tmpdir = mkdtemp(self)
+        os.chdir(tmpdir)
+        dist = Distribution(dict(
+            script_name='setup.py',
+            script_args=['npm', '--init', '--install', '--development'],
+            name='foo',
+        ))
+        dist.parse_command_line()
+        dist.run_commands()
+
+        with open(os.path.join(tmpdir, 'package.json')) as fd:
+            result = json.load(fd)
+
+        self.assertEqual(result, {
+            'dependencies': {'jquery': '~1.11.0'},
+            'devDependencies': {},
+            'name': 'foo',
+        })
+        # Should still invoke install
+        self.assertEqual(self.call_args, ((
+            [which_npm, 'install', '--production=false'],), {}))
 
     def test_install_no_init_has_package_json_interactive_default_input(self):
         stub_stdin(self, u'')

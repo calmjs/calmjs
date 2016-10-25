@@ -1293,6 +1293,40 @@ class RuntimeIntegrationTestCase(unittest.TestCase):
         # the actual runtime instance.
         self.assertEqual(self.call_args, (([which_npm, 'install'],), {}))
 
+    def test_npm_install_integration_dev_or_prod(self):
+        remember_cwd(self)
+        tmpdir = mkdtemp(self)
+        os.chdir(tmpdir)
+        stub_mod_call(self, cli)
+        stub_base_which(self, which_npm)
+        rt = self.setup_runtime()
+        rt(['foo', '--install', 'example.package1', '--development'])
+        self.assertEqual(self.call_args, (([
+            which_npm, 'install', '--production=false'],), {}))
+
+        stub_mod_call(self, cli)
+        rt(['foo', '--install', 'example.package1', '--production'])
+        self.assertEqual(self.call_args, (([
+            which_npm, 'install', '--production=true'],), {}))
+
+    def test_npm_install_integration_dev_and_prod(self):
+        remember_cwd(self)
+        tmpdir = mkdtemp(self)
+        os.chdir(tmpdir)
+        stub_mod_call(self, cli)
+        stub_base_which(self, which_npm)
+        rt = self.setup_runtime()
+        # production flag always trumps
+        rt(['foo', '--install', 'example.package1', '-D', '-P'])
+        self.assertEqual(self.call_args, (([
+            which_npm, 'install', '--production=true'],), {}))
+
+        stub_mod_call(self, cli)
+        # production flag always trumps
+        rt(['foo', '--install', 'example.package1', '-P', '-D'])
+        self.assertEqual(self.call_args, (([
+            which_npm, 'install', '--production=true'],), {}))
+
     def test_npm_view(self):
         stub_stdouts(self)
         rt = self.setup_runtime()
