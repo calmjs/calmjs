@@ -561,7 +561,7 @@ class CliDriverTestCase(unittest.TestCase):
             pkg_manager_bin='mgr', pkgdef_filename='requirements.json',
             dep_keys=('require',),
         )
-        driver.pkg_manager_init('calmpy.pip', interactive=False)
+        driver.pkg_manager_init('calmpy.pip')
 
         target = join(cwd, 'requirements.json')
         self.assertTrue(exists(target))
@@ -584,7 +584,7 @@ class CliDriverTestCase(unittest.TestCase):
             dep_keys=('require',),
             working_dir=cwd,
         )
-        driver.pkg_manager_init('calmpy.pip', interactive=False)
+        driver.pkg_manager_init('calmpy.pip')
 
         self.assertFalse(exists(join(original, 'requirements.json')))
         self.assertTrue(exists(target))
@@ -609,16 +609,14 @@ class CliDriverTestCase(unittest.TestCase):
             result = json.dump({"require": {}}, fd)
 
         with pretty_logging(stream=mocks.StringIO()) as err:
-            driver.pkg_manager_init(
-                'calmpy.pip', interactive=False, overwrite=False)
+            driver.pkg_manager_init('calmpy.pip', overwrite=False)
         self.assertIn('not overwriting existing ', err.getvalue())
         self.assertIn('requirements.json', err.getvalue())
         with open(target) as fd:
             result = json.load(fd)
         self.assertNotEqual(result, {"require": {"setuptools": "25.1.6"}})
 
-        driver.pkg_manager_init(
-            'calmpy.pip', interactive=False, overwrite=True)
+        driver.pkg_manager_init('calmpy.pip', overwrite=True)
         with open(target) as fd:
             result = json.load(fd)
         self.assertEqual(result, {
@@ -638,8 +636,7 @@ class CliDriverTestCase(unittest.TestCase):
         with open(target, 'w') as fd:
             result = json.dump({"require": {"calmpy": "1.0.0"}}, fd)
 
-        driver.pkg_manager_init(
-            'calmpy.pip', interactive=False, merge=True, overwrite=True)
+        driver.pkg_manager_init('calmpy.pip', merge=True, overwrite=True)
         self.assertNotEqual(result, {
             "require": {
                 "calmpy": "1.0.0",
