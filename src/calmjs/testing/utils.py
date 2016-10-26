@@ -310,8 +310,10 @@ def generate_integration_environment(
     registry.records = records
     registry.package_module_map = package_module_map
 
+    test_registry = ModuleRegistry(registry_id + '.tests')
+
     # Return dummy working set (for dist resolution) and the registry
-    return mock_working_set, registry
+    return mock_working_set, registry, test_registry
 
 
 def setup_class_integration_environment(cls, **kw):
@@ -320,11 +322,13 @@ def setup_class_integration_environment(cls, **kw):
     from calmjs.registry import _inst as root_registry
     cls.dist_dir = mkdtemp_realpath()
     results = generate_integration_environment(cls.dist_dir, **kw)
-    working_set, registry = results
+    working_set, registry, test_registry = results
     cls.registry_name = registry.registry_name
+    cls.test_registry_name = test_registry.registry_name
     # reset that to force creation from stubbed working_set
     root_registry.records.pop('calmjs.extras_keys', None)
     root_registry.records[cls.registry_name] = registry
+    root_registry.records[cls.test_registry_name] = test_registry
     cls.root_working_set, calmjs_dist.default_working_set = (
         calmjs_dist.default_working_set, working_set)
     base.working_set = working_set
@@ -335,7 +339,9 @@ def teardown_class_integration_environment(cls):
     from calmjs import base
     from calmjs.registry import _inst as root_registry
     rmtree(cls.dist_dir)
+    # reset the manually added registries.
     root_registry.records.pop(cls.registry_name)
+    root_registry.records.pop(cls.test_registry_name)
     root_registry.records.pop('calmjs.extras_keys', None)
     calmjs_dist.default_working_set = cls.root_working_set
     base.working_set = cls.root_working_set

@@ -318,7 +318,7 @@ class IntegrationGeneratorTestCase(unittest.TestCase):
     def test_integration_generator(self):
         tmpdir = mkdtemp(self)
         results = utils.generate_integration_environment(working_dir=tmpdir)
-        working_set, registry = results
+        working_set, registry, test_registry = results
         # validate the underlying information
         self.assertEqual(sorted(registry.records.keys()), [
             'forms', 'framework', 'service', 'service.rpc', 'widget',
@@ -329,6 +329,12 @@ class IntegrationGeneratorTestCase(unittest.TestCase):
         self.assertEqual(sorted(registry.package_module_map['service']), [
             'service', 'service.rpc',
         ])
+
+        # test registry will be empty until there is a standardized way
+        # of doing testing in JavaScript, since the tests supplied may
+        # likely not work with whatever (at least until a Python package
+        # that will provide the JavaScript test framework).
+        self.assertEqual(sorted(test_registry.records.keys()), [])
 
         # Test out the registry
         service_records = registry.get_records_for_package('service')
