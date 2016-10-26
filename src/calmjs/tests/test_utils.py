@@ -8,6 +8,8 @@ from os.path import join
 from os.path import pathsep
 import sys
 
+from calmjs.utils import json_dump
+from calmjs.utils import json_dumps
 from calmjs.utils import requirement_comma_list
 from calmjs.utils import which
 from calmjs.utils import enable_pretty_logging
@@ -16,8 +18,26 @@ from calmjs.utils import fork_exec
 from calmjs.utils import pretty_logging
 from calmjs.utils import raise_os_error
 
+from calmjs.testing.mocks import StringIO
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import stub_os_environ
+
+
+class JsonDumpTestCase(unittest.TestCase):
+
+    def test_dump(self):
+        stream = StringIO()
+        json_dump({'a': 'b', 'c': 'd'}, stream)
+        self.assertEqual(
+            stream.getvalue(),
+            '{\n    "a": "b",\n    "c": "d"\n}'
+        )
+
+    def test_dumps(self):
+        self.assertEqual(
+            json_dumps({'a': 'b', 'c': 'd'}),
+            '{\n    "a": "b",\n    "c": "d"\n}'
+        )
 
 
 class RequirementCommaListTestCase(unittest.TestCase):

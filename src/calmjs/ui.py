@@ -7,15 +7,16 @@ interfacing interactions.
 """
 
 from __future__ import unicode_literals
+from __future__ import absolute_import
 
 import difflib
 import logging
 import sys
-from functools import partial
-from json import dumps
 from locale import getpreferredencoding
 from os import isatty
 from os.path import basename
+
+from calmjs.utils import json_dumps
 
 locale = getpreferredencoding()
 logger = logging.getLogger(__name__)
@@ -24,8 +25,6 @@ if sys.version_info < (3,):  # pragma: no cover
     str = unicode  # noqa: F821
 
 lower = str.lower
-
-json_dumps = partial(dumps, indent=4, sort_keys=True, separators=(',', ': '))
 
 
 def _check_interactive(*descriptors):

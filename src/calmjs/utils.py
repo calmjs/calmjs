@@ -10,6 +10,9 @@ import os
 import re
 import sys
 from contextlib import contextmanager
+from functools import partial
+from json import dump
+from json import dumps
 from locale import getpreferredencoding
 from os import strerror
 from os.path import curdir
@@ -41,6 +44,9 @@ _PLATFORM_ENV_KEYS = {
 # split comma via negative lookahead - match all things inside [] which
 # includes the `,` that may be inside that to avoid splitting.
 requirement_comma_list = re.compile(',(?![^\\[\\]]*\\])')
+
+json_dumps = partial(dumps, indent=4, sort_keys=True, separators=(',', ': '))
+json_dump = partial(dump, indent=4, sort_keys=True, separators=(',', ': '))
 
 
 def enable_pretty_logging(logger='calmjs', level=logging.DEBUG, stream=None):
