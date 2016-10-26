@@ -13,6 +13,7 @@ import errno
 import json
 from os import getcwd
 from os.path import dirname
+from os.path import exists
 from os.path import isdir
 from os.path import join
 from os.path import pathsep
@@ -295,8 +296,38 @@ class BaseDriver(object):
 
         return which(self.binary, path=self.env_path)
 
+    def which_with_node_modules(self):
+        """
+        Which with node_path and node_modules
+        """
+
+        paths = []
+        if self.node_path:
+            paths.extend(self.node_path.split(pathsep))
+            logger.debug(
+                "environment variable '%s' defined '%s'; "
+                "their bin directories will be searched.",
+                NODE_PATH, self.node_path,
+            )
+        local_node_path = self.join_cwd('node_modules')
+        if exists(local_node_path):
+            logger.debug(
+                "including instance's working directory's '%s' for location "
+                "of '%s'",
+                local_node_path, self.binary,
+            )
+            paths.append(local_node_path)
+
+        return which(self.binary, path=pathsep.join(
+            join(p, '.bin') for p in paths))
+
     @classmethod
     def create(cls):
+        """
+        Freeze an instance to the current working directory and its
+        related environmental settings.
+        """
+
         inst = cls()
         inst._set_env_path_with_node_modules()
         return inst
@@ -327,24 +358,7 @@ class BaseDriver(object):
                 realpath(default), modcls_name)
             return True
 
-        node_path = self.node_path
-        if node_path:
-            logger.debug(
-                "environment variable '%s' defined '%s'; "
-                "their bin directories will be searched.",
-                NODE_PATH, node_path,
-            )
-        else:
-            node_path = self.join_cwd('node_modules')
-            logger.debug(
-                "environment variable '%s' undefined; using instance's "
-                "working directory's node_modules (%s) as base directory for "
-                "finding node binaries.",
-                NODE_PATH, node_path,
-            )
-
-        target = which(self.binary, path=pathsep.join(
-            join(p, '.bin') for p in node_path.split(pathsep)))
+        target = self.which_with_node_modules()
 
         if target:
             # Only setting the path specific for the binary; side effect
@@ -386,7 +400,7 @@ class BaseDriver(object):
     def _get_exec_binary(self, kw):
         """
         This wraps the base function for BaseDriver classes; should only
-        be called by this instance's external execution methods as they
+        be called by this instance's binary execution methods as they
         will be also invoke _gen_call_kws to pass into the call_kw
         argument.
 
