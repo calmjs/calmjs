@@ -2,6 +2,7 @@
 import unittest
 import sys
 import tempfile
+import warnings
 
 from pkg_resources import WorkingSet
 from pkg_resources import Requirement
@@ -76,6 +77,38 @@ class TestingUtilsTestCase(unittest.TestCase):
     def tearDown(self):
         self.mock_tempfile.cleanup()
         utils.tempfile = self.old_tempfile
+
+    def test_rmtree_test(self):
+        path = mkdtemp(self)
+        utils.rmtree(path)
+        self.assertFalse(exists(path))
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter('always')
+            utils.rmtree(path)
+            self.assertFalse(w)
+
+        utils.stub_item_attr_value(
+            self, utils, 'rmtree_', utils.fake_error(IOError))
+        path2 = mkdtemp(self)
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter('always')
+            utils.rmtree(path2)
+            self.assertIn("rmtree failed to remove", str(w[-1].message))
+
+    def test_rmtree_win32(self):
+        utils.stub_item_attr_value(self, sys, 'platform', 'win32')
+        removed = []
+
+        def fake_rmtree(path):
+            removed.append(path)
+            raise IOError('fake')
+
+        utils.stub_item_attr_value(self, utils, 'rmtree_', fake_rmtree)
+        with warnings.catch_warnings(record=True):
+            warnings.simplefilter('always')
+            utils.rmtree('C:\\Windows')
+        self.assertEqual(removed, ['C:\\Windows', '\\\\?\\C:\\Windows'])
 
     def test_mkdtemp_not_test(self):
         with self.assertRaises(TypeError):

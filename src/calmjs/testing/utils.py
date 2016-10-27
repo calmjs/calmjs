@@ -4,13 +4,14 @@ import tempfile
 import textwrap
 import os
 import sys
+import warnings
 from os import makedirs
 from os.path import exists
 from os.path import join
 from os.path import dirname
 from os.path import isdir
 from os.path import realpath
-from shutil import rmtree
+from shutil import rmtree as rmtree_
 from types import ModuleType
 from unittest import TestCase
 
@@ -25,6 +26,28 @@ from . import module3
 from .mocks import StringIO
 
 TMPDIR_ID = '_calmjs_testing_tmpdir'
+
+
+def rmtree(path):
+    try:
+        rmtree_(path)
+    except (IOError, OSError):
+        # As it turns out nested node_modules directories are a bad
+        # idea, especially on Windows.  It turns out this situation
+        # is rather common, so we need a way to deal with this.  As
+        # it turns out a workaround exists around this legacy win32
+        # issue through this proprietary prefix:
+        path_ = '\\\\?\\' + path if sys.platform == 'win32' else path
+
+        # and try again
+        try:
+            rmtree_(path_)
+        except (IOError, OSError):
+            pass
+
+        # Don't blow the remaining teardown up if it fails anyway.
+        if exists(path):
+            warnings.warn("rmtree failed to remove %r" % path)
 
 
 def _cleanup_mkdtemp_mark(testcase_inst):
