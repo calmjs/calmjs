@@ -340,7 +340,8 @@ class IntegrationGeneratorTestCase(unittest.TestCase):
     """
 
     def setUp(self):
-        # Again setting up this mock for safety while testing.
+        # Again setting up this mock for safety (and laziness) while
+        # testing.
         self.mock_tempfile = MockTempfile()
         utils.tempfile, self.old_tempfile = self.mock_tempfile, utils.tempfile
 
@@ -417,3 +418,50 @@ class IntegrationGeneratorTestCase(unittest.TestCase):
         std_extra_keys = list(get('calmjs.extras_keys').iter_records())
         self.assertNotEqual(std_extra_keys, ['fake_modules'])
         self.assertIn('node_modules', std_extra_keys)
+
+    def test_setup_class_install_environment_failure(self):
+        from calmjs.base import BaseDriver
+
+        TestCase = type('TestCase', (unittest.TestCase,), {})
+        with self.assertRaises(TypeError):
+            utils.setup_class_install_environment(TestCase, BaseDriver, [])
+
+        # shouldn't create the temporary directory as this should
+        # completely abort the operation (which prevents the cleanup
+        # from even firing).
+        self.assertEqual(self.mock_tempfile.count, 0)
+
+    def test_setup_class_install_environment_install(self):
+        from calmjs import cli
+        from calmjs.npm import Driver
+
+        utils.stub_mod_call(self, cli)
+        utils.stub_base_which(self, 'npm')
+        cwd = os.getcwd()
+        TestCase = type('TestCase', (unittest.TestCase,), {})
+        utils.setup_class_install_environment(
+            TestCase, Driver, ['dummy_package'])
+        self.assertEqual(self.mock_tempfile.count, 1)
+        self.assertNotEqual(TestCase._env_root, cwd)
+        self.assertEqual(TestCase._env_root, TestCase._cls_tmpdir)
+        self.assertTrue(exists(join(TestCase._env_root, 'package.json')))
+        p, kw = self.call_args
+        self.assertEqual(p, (['npm', 'install'],))
+        self.assertEqual(kw['cwd'], TestCase._cls_tmpdir)
+
+    def test_setup_class_install_environment_predefined(self):
+        from calmjs.cli import PackageManagerDriver
+        from calmjs import cli
+
+        utils.stub_os_environ(self)
+        utils.stub_mod_call(self, cli)
+        cwd = os.getcwd()
+        # a very common use case
+        os.environ['CALMJS_TEST_ENV'] = '.'
+        TestCase = type('TestCase', (unittest.TestCase,), {})
+        utils.setup_class_install_environment(
+            TestCase, PackageManagerDriver, [])
+        # temporary directory created nonetheless
+        self.assertEqual(self.mock_tempfile.count, 1)
+        self.assertEqual(TestCase._env_root, cwd)
+        self.assertNotEqual(TestCase._env_root, TestCase._cls_tmpdir)

@@ -370,6 +370,54 @@ def teardown_class_integration_environment(cls):
     base.working_set = cls.root_working_set
 
 
+def setup_class_install_environment(cls, driver_cls, pkg_names, **kws):
+    """
+    For TestCase.setUpClass classmethod to build an environment for the
+    duration of the lifetime of an instance of a given TestCase class.
+    This also creates temporary directory assigned to cls._cls_tmpdir
+    attribute which the caller is responsible for removing in its
+    tearDownClass class method.
+
+    The attributes it assign are the cls._env_root and self._env_path;
+    the _env_root is the root of the environment, either the one
+    specified in the alternative mode or the temporary directory.  The
+    _env_path is the PATH equivalent for the location of node_modules
+    binaries, and this value is safe for assignment to a Toolchain (or
+    BaseDriver) instances to force usage of binaries from that location.
+
+    It has an alternative mode, where if an environmental variable
+    CALMJS_TEST_ENV is passed, that directory will be used to assign
+    the _env_path variable the node_modules binary directory specified
+    by that variable.
+
+    Caller is also responsible for providing the appropriate package
+    manager driver class.
+    """
+
+    from calmjs.cli import PackageManagerDriver
+    if not issubclass(driver_cls, PackageManagerDriver):
+        raise TypeError('driver_cls must be a PackageManagerDriver')
+
+    cls._env_root = cls._cls_tmpdir = realpath(tempfile.mkdtemp())
+
+    test_env = os.environ.get('CALMJS_TEST_ENV')
+    if not test_env:
+        driver = driver_cls(working_dir=cls._cls_tmpdir)
+        driver.pkg_manager_install(pkg_names, **kws)
+        # Save this as the env_path for tools.
+        # reason this is done here rather than using setup_transpiler
+        # method is purely because under environments that have the
+        # standard node_modules/.bin part of the PATH, it never gets
+        # set, and then if the test changes the working directory, it
+        # will then not be able to find the runtime needed.
+        cls._env_path = join(cls._cls_tmpdir, 'node_modules', '.bin')
+    else:
+        # This is for static test environment for development, not
+        # generally suitable for repeatable tests
+        cls._env_root = realpath(test_env)
+        cls._env_path = join(cls._env_root, 'node_modules', '.bin')
+
+
 def mkdtemp(testcase_inst):
     """
     A temporary directory creation helper function that cleans itself up
