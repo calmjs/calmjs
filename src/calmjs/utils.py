@@ -29,16 +29,21 @@ locale = getpreferredencoding()
 _PLATFORM_ENV_KEYS = {
     # win32 specific keys
     # APPDATA
-    #    Some node scripts really need this for some reason?
+    #     Some node scripts really need this for some reason?
     # PATH
-    #    Well, if it's not available, funnily enough even with a full
-    #    path executable things will just also not work.
+    #     Well, if it's not available, funnily enough even with a full
+    #     path executable things will just also not work.
     # PATHEXT
-    #    For cases where supplied argument has no PATHEXT
+    #     For cases where supplied argument has no PATHEXT
     # SYSTEMROOT
-    #    Without this, on Windows 7 (probably others) will just result
-    #    in "socket: (10106)" error.
+    #     Without this, on Windows 7 (probably others) will just result
+    #     in "socket: (10106)" error.
     'win32': ['APPDATA', 'PATH', 'PATHEXT', 'SYSTEMROOT'],
+    # darwin (OS X) specific keys
+    # PATH
+    #     There are cases where this missing under Node.js 6 not work,
+    #     so include it then.
+    'darwin': ['PATH'],
 }
 
 # split comma via negative lookahead - match all things inside [] which
