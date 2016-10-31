@@ -576,7 +576,18 @@ class ToolchainRuntime(DriverRuntime):
         """
         Subclass could override this by providing alternative keyword
         arguments and call this as its super.  It should not reimplement
-        this completely.
+        this completely.  Example:
+
+        def init_argparser_export_target(self, argparser):
+            super(MyToolchainRuntime, self).init_argparser_export_target(
+                argparser, default='my_default.js',
+                help="the export target, default is 'my_default.js'",
+            )
+
+        Note that the above example will prevent its subclasses from
+        directly using the definition of that class, but they _can_
+        simply call the exact same super, or invoke ToolchainRuntime's
+        init_argparser_* method directly.
 
         Arguments
 
@@ -623,6 +634,41 @@ class ToolchainRuntime(DriverRuntime):
             help=help_template % {'explanation': explanation, 'cwd': cwd},
         )
 
+    def init_argparser_build_dir(
+            self, argparser, help=(
+                'the build directory, where all sources will be copied to '
+                'as part of the build process; if left unspecified, the '
+                'default behavior is to create a new temporary directory '
+                'that will be removed upon conclusion of the build; if '
+                'specified, it must be an existing directory and all files '
+                'for the build will be copied there instead, overwriting any '
+                'existing file, with no cleanup done after.'
+            )):
+        """
+        For setting up build directory
+        """
+
+        argparser.add_argument(
+            '--build-dir', default=None, dest=BUILD_DIR, help=help)
+
+    def init_argparser_optional_advice(
+            self, argparser, default=[], help=(
+                'a comma separated list of packages to retrieve optional '
+                'advice from; the provided packages should have registered '
+                'the appropriate entry points for setting up the advices for '
+                'the toolchain; refer to documentation for the specified '
+                'packages for details'
+            )):
+        """
+        For setting up optional advice.
+        """
+
+        argparser.add_argument(
+            '--optional-advice', default=default, required=False,
+            dest=ADVICE_PACKAGES, action=StoreRequirementList,
+            help=help
+        )
+
     def init_argparser(self, argparser):
         """
         Other runtimes (or users of ArgumentParser) can pass their
@@ -638,28 +684,8 @@ class ToolchainRuntime(DriverRuntime):
         # it should only result in the spec omitting these arguments.
         self.init_argparser_export_target(argparser)
         self.init_argparser_working_dir(argparser)
-
-        argparser.add_argument(
-            '--build-dir', default=None,
-            dest=BUILD_DIR,
-            help='the build directory, where all sources will be copied to '
-                 'as part of the build process; if left unspecified, the '
-                 'default behavior is to create a new temporary directory '
-                 'that will be removed upon conclusion of the build; if '
-                 'specified, it must be an existing directory and all files '
-                 'for the build will be copied there instead, overwriting any '
-                 'existing file, with no cleanup done after.'
-        )
-
-        argparser.add_argument(
-            '--optional-advice', default=[], required=False,
-            dest=ADVICE_PACKAGES, action=StoreRequirementList,
-            help='a comma separated list of packages to retrieve optional '
-                 'advice from; the provided packages should have registered '
-                 'the appropriate entry points for setting up the advices for '
-                 'the toolchain; refer to documentation for the specified '
-                 'packages for details',
-        )
+        self.init_argparser_build_dir(argparser)
+        self.init_argparser_optional_advice(argparser)
 
     def check_export_target_exists(self, spec):
         # to ensure the key is really available.
