@@ -1,54 +1,61 @@
 sudo: false
 matrix:
   allow_failures:
-    # While the code here is good, travis as of now still do not have
-    # first class support for Python, so not going to rely on this yet.
     - os: osx
     - python: 3.6-dev
+    - env: TRAVIS_NODE_VERSION=7
   include:
     - language: python
       python: 2.7
-      addons:
+      env: TRAVIS_NODE_VERSION=0.12
     - language: python
       python: 3.3
-      addons:
+      env: TRAVIS_NODE_VERSION=4.6
     - language: python
       python: 3.4
-      addons:
+      env: TRAVIS_NODE_VERSION=4.6
     - language: python
       python: 3.5
-      addons:
+      env: TRAVIS_NODE_VERSION=6.9
     - language: python
       python: 3.6-dev
-      addons:
+      env: TRAVIS_NODE_VERSION=7
     - language: python
       python: pypy
-      addons:
+      env: TRAVIS_NODE_VERSION=0.12
     - language: python
       python: pypy3
-      addons:
+      env: TRAVIS_NODE_VERSION=6.9
     # test different versions of Node.js on osx
     - language: node_js
-      node_js: 4.5
+      node_js: 4.6
       os: osx
-      env: PY_VER=3.4.5
+      env: TRAVIS_PYTHON_VERSION=3.4.5
     - language: node_js
-      node_js: 6.5
+      node_js: 6.9
       os: osx
-      env: PY_VER=3.5.2
+      env: TRAVIS_PYTHON_VERSION=3.5.2
 
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
       brew update || brew update ;
       brew install pyenv ;
       brew outdated pyenv || brew upgrade pyenv ;
-      pyenv install $PY_VER ;
-      pyenv global $PY_VER ;
+      pyenv install $TRAVIS_PYTHON_VERSION ;
+      pyenv global $TRAVIS_PYTHON_VERSION ;
       pyenv rehash ;
       python -m pip install --user virtualenv ;
       python -m virtualenv ~/.venv ;
       source ~/.venv/bin/activate ;
+    else
+      rm -rf ~/.nvm ;
+      git clone https://github.com/creationix/nvm.git ~/.nvm ;
+      (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags` );
+      source ~/.nvm/nvm.sh ;
+      nvm install "$TRAVIS_NODE_VERSION" ;
     fi
+  - node --version
+  - npm --version
 
 install:
   - pip install nose coverage flake8
