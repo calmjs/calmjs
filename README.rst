@@ -2,7 +2,9 @@ calmjs
 ======
 
 A Python framework for building toolchains and utilities for working
-with the JavaScript/Node.js ecosystem from within a Python environment.
+with the JavaScript/Node.js ecosystem from within a Python environment,
+done in a way that facilitates the creation and execution of tests for
+proving the successful integration of the two.
 
 .. image:: https://travis-ci.org/calmjs/calmjs.svg?branch=master
     :target: https://travis-ci.org/calmjs/calmjs
