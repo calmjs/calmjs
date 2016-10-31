@@ -363,6 +363,11 @@ class Runtime(BaseRuntime):
 
         return inst
 
+    def iter_entry_points(self):
+        for entry_point in self.working_set.iter_entry_points(
+                self.entry_point_group):
+            yield entry_point
+
     def init_argparser(self, argparser):
         """
         This should not be called with an external argparser as it will
@@ -432,8 +437,7 @@ class Runtime(BaseRuntime):
         commands = argparser.add_subparsers(
             dest=self.action_key, metavar='<command>')
 
-        for entry_point in self.working_set.iter_entry_points(
-                self.entry_point_group):
+        for entry_point in self.iter_entry_points():
             inst = self.entry_point_load_validated(entry_point)
             if not inst:
                 continue
