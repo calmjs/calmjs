@@ -102,7 +102,7 @@ __all__ = [
     'EXPORT_MODULE_NAMES', 'EXPORT_PACKAGE_NAMES',
     'EXPORT_TARGET', 'EXPORT_TARGET_OVERWRITE',
     'SOURCE_MODULE_NAMES', 'SOURCE_PACKAGE_NAMES',
-    'TEST_MODULE_NAMES', 'TEST_MODULE_PATHS', 'TEST_PACKAGE_NAMES',
+    'TEST_MODULE_NAMES', 'TEST_MODULE_PATHS_MAP', 'TEST_PACKAGE_NAMES',
     'WORKING_DIR',
 ]
 
@@ -158,8 +158,11 @@ SOURCE_PACKAGE_NAMES = 'source_package_names'
 # for testing
 # name of test modules
 TEST_MODULE_NAMES = 'test_module_names'
-# paths directly to the test file
-TEST_MODULE_PATHS = 'test_module_paths'
+# mapping of test module to their paths; i.e. a source_map, but not
+# labled as one to prevent naming conflicts (and they ARE to be
+# standalone modules to be used directly by the toolchain and testing
+# integration layer.
+TEST_MODULE_PATHS_MAP = 'test_module_paths_map'
 # name of test package
 TEST_PACKAGE_NAMES = 'test_package_names'
 # the working directory
