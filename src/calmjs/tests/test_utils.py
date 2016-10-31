@@ -111,7 +111,7 @@ class WhichTestCase(unittest.TestCase):
 
     def test_finalize_env_others(self):
         sys.platform = 'others'
-        self.assertEqual(finalize_env({}), {})
+        self.assertEqual(sorted(finalize_env({}).keys()), ['PATH'])
 
     def test_finalize_env_win32(self):
         sys.platform = 'win32'

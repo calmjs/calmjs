@@ -39,11 +39,6 @@ _PLATFORM_ENV_KEYS = {
     #     Without this, on Windows 7 (probably others) will just result
     #     in "socket: (10106)" error.
     'win32': ['APPDATA', 'PATH', 'PATHEXT', 'SYSTEMROOT'],
-    # darwin (OS X) specific keys
-    # PATH
-    #     There are cases where this missing under Node.js 6 not work,
-    #     so include it then.
-    'darwin': ['PATH'],
 }
 
 # split comma via negative lookahead - match all things inside [] which
@@ -91,7 +86,12 @@ def finalize_env(env):
     will be updated on top of it.  Returns a new env.
     """
 
-    keys = _PLATFORM_ENV_KEYS.get(sys.platform, ())
+    keys = _PLATFORM_ENV_KEYS.get(sys.platform, [])
+    if 'PATH' not in keys:
+        # this MUST be available due to Node.js (and others really)
+        # needing something to look for binary locations when it shells
+        # out to other binaries.
+        keys.append('PATH')
     results = {
         key: os.environ.get(key, '') for key in keys
     }

@@ -207,7 +207,7 @@ class CliDriverTestCase(unittest.TestCase):
         self.assertIsNot(driver.mgr_init, None)
         self.assertIsNot(driver.get_mgr_version, None)
         driver.mgr_install(['calmjs'])
-        self.assertEqual(self.call_args, ((['mgr', 'install'],), {}))
+        self.assertEqual(self.call_args[0], (['mgr', 'install'],))
 
     def test_install_failure(self):
         stub_mod_call(self, cli, fake_error(IOError))
@@ -226,7 +226,7 @@ class CliDriverTestCase(unittest.TestCase):
         with pretty_logging(stream=mocks.StringIO()):
             driver.pkg_manager_install(['calmjs'], args=('--pedantic',))
         self.assertEqual(
-            self.call_args, ((['mgr', 'install', '--pedantic'],), {}))
+            self.call_args[0], (['mgr', 'install', '--pedantic'],))
 
     def test_alternative_install_cmd(self):
         stub_mod_call(self, cli)
@@ -234,14 +234,14 @@ class CliDriverTestCase(unittest.TestCase):
         driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', install_cmd='sync')
         driver.pkg_manager_install(['calmjs'])
-        self.assertEqual(self.call_args, ((['mgr', 'sync'],), {}))
+        self.assertEqual(self.call_args[0], (['mgr', 'sync'],))
 
         # Naturally, the short hand call will be changed.
         # note that args is NOT the package_name, and thus this just
         # means that the installation may not operate as expected off
         # the package.
         driver.mgr_sync(['calmjs'], args=('all',))
-        self.assertEqual(self.call_args, ((['mgr', 'sync', 'all'],), {}))
+        self.assertEqual(self.call_args[0], (['mgr', 'sync', 'all'],))
 
     def test_install_other_environ(self):
         stub_mod_call(self, cli)
@@ -344,7 +344,7 @@ class CliDriverTestCase(unittest.TestCase):
         driver = cli.PackageManagerDriver(pkg_manager_bin='bower')
         # this will call ``bower install`` instead.
         driver.pkg_manager_install(['calmjs'])
-        self.assertEqual(self.call_args, ((['bower', 'install'],), {}))
+        self.assertEqual(self.call_args[0], (['bower', 'install'],))
 
     def test_which_is_none(self):
         driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
@@ -802,8 +802,7 @@ class CliDriverTestCase(unittest.TestCase):
         )
         self.assertIn("non-interactive", log.getvalue())
         self.assertIn("'require' may be ignored", log.getvalue())
-        self.assertEqual(self.call_args, ((
-            ['mgr', 'install'],), {}))
+        self.assertEqual(self.call_args[0], (['mgr', 'install'],))
 
     def test_pkg_manager_cmd_production_flag_set(self):
         stub_mod_call(self, cli)
@@ -817,11 +816,11 @@ class CliDriverTestCase(unittest.TestCase):
         with pretty_logging(stream=mocks.StringIO()) as log:
             driver.pkg_manager_install(['calmpy.pip'], production=True)
         self.assertNotIn('WARNING', log.getvalue())
-        self.assertEqual(self.call_args, ((
-            ['mgr', 'install', '--production=true'],), {}))
+        self.assertEqual(self.call_args[0], (
+            ['mgr', 'install', '--production=true'],))
 
         with pretty_logging(stream=mocks.StringIO()) as log:
             driver.pkg_manager_install(['calmpy.pip'], production=False)
         self.assertNotIn('WARNING', log.getvalue())
-        self.assertEqual(self.call_args, ((
-            ['mgr', 'install', '--production=false'],), {}))
+        self.assertEqual(self.call_args[0], (
+            ['mgr', 'install', '--production=false'],))

@@ -393,8 +393,7 @@ class BaseDriver(object):
             _check_isdir_assign_key(
                 kw, 'cwd', self.working_dir,
                 error_msg="current working directory left as default")
-        if env:
-            kw['env'] = finalize_env(env)
+        kw['env'] = finalize_env(env)
         return kw
 
     def _get_exec_binary(self, kw):

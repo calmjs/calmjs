@@ -774,7 +774,7 @@ class DistCommandTestCase(unittest.TestCase):
             'devDependencies': {},
             'name': 'foo',
         })
-        self.assertEqual(self.call_args, (([which_npm, 'install'],), {}))
+        self.assertEqual(self.call_args[0], ([which_npm, 'install'],))
 
     @unittest.skipIf(which_npm is None, 'npm not found.')
     def test_install_init_install_production(self):
@@ -799,8 +799,8 @@ class DistCommandTestCase(unittest.TestCase):
             'name': 'foo',
         })
         # Should still invoke install
-        self.assertEqual(self.call_args, ((
-            [which_npm, 'install', '--production=true'],), {}))
+        self.assertEqual(self.call_args[0], (
+            [which_npm, 'install', '--production=true'],))
 
     @unittest.skipIf(which_npm is None, 'npm not found.')
     def test_install_init_install_develop(self):
@@ -825,8 +825,8 @@ class DistCommandTestCase(unittest.TestCase):
             'name': 'foo',
         })
         # Should still invoke install
-        self.assertEqual(self.call_args, ((
-            [which_npm, 'install', '--production=false'],), {}))
+        self.assertEqual(self.call_args[0], (
+            [which_npm, 'install', '--production=false'],))
 
     def test_install_no_init_has_package_json_interactive_default_input(self):
         stub_stdin(self, u'')
@@ -902,7 +902,7 @@ class DistCommandTestCase(unittest.TestCase):
             'devDependencies': {},
             'name': 'foo',
         })
-        self.assertEqual(self.call_args, (([which_npm, 'install'],), {}))
+        self.assertEqual(self.call_args[0], ([which_npm, 'install'],))
 
     @unittest.skipIf(which_npm is None, 'npm not found.')
     def test_npm_bin_get(self):
