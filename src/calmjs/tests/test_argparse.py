@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import unittest
 import sys
+from os.path import pathsep
 
 from argparse import Namespace
 from argparse import _
@@ -8,6 +9,7 @@ from argparse import _
 from calmjs.argparse import ArgumentParser
 from calmjs.argparse import StoreCommaDelimitedList
 from calmjs.argparse import StoreDelimitedListBase
+from calmjs.argparse import StorePathSepDelimitedList
 from calmjs.argparse import StoreRequirementList
 # test for Version done as part of the runtime.
 
@@ -94,6 +96,26 @@ class StoreCommaDelimitedListTestCase(unittest.TestCase):
 
         parsed, extras = argparser.parse_known_args()
         self.assertEqual(parsed.params, None)
+
+
+class StorePathSepDelimitedListTestCase(unittest.TestCase):
+    """
+    For the path separator version.
+    """
+
+    def test_basic_singlevalue(self):
+        namespace = Namespace()
+        parser = None
+        action = StorePathSepDelimitedList('', dest='basic')
+        action(parser, namespace, ['singlevalue'])
+        self.assertEqual(namespace.basic, ['singlevalue'])
+
+    def test_multiple_values(self):
+        namespace = Namespace()
+        parser = None
+        action = StorePathSepDelimitedList('', dest='basic')
+        action(parser, namespace, [pathsep.join(['file1', 'file2'])])
+        self.assertEqual(namespace.basic, ['file1', 'file2'])
 
 
 class StoreRequirementListTestCase(unittest.TestCase):

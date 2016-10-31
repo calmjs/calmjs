@@ -9,6 +9,7 @@ import argparse
 import sys
 import textwrap
 from os import linesep
+from os.path import pathsep
 from argparse import _
 from argparse import Action
 from argparse import HelpFormatter
@@ -121,6 +122,13 @@ class StoreCommaDelimitedList(StoreDelimitedListBase):
             option_strings=option_strings, dest=dest, sep=',', **kw)
 
 StoreDelimitedList = StoreCommaDelimitedList
+
+
+class StorePathSepDelimitedList(StoreDelimitedListBase):
+
+    def __init__(self, option_strings, dest, **kw):
+        super(StorePathSepDelimitedList, self).__init__(
+            option_strings=option_strings, dest=dest, sep=pathsep, **kw)
 
 
 class StoreRequirementList(StoreDelimitedListBase):
