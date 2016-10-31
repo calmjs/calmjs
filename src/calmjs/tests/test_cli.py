@@ -386,21 +386,25 @@ class CliDriverTestCase(unittest.TestCase):
             pkg_manager_bin='mgr', working_dir=tmpdir)
         self.assertFalse(driver._set_env_path_with_node_modules())
         self.assertIsNone(driver.env_path)
+        self.assertIsNone(driver.which_with_node_modules())
 
     def fake_mgr_bin(self):
         tmpdir = mkdtemp(self)
         # fake an executable in node_modules
         bin_dir = join(tmpdir, 'node_modules', '.bin')
         os.makedirs(bin_dir)
-        self.create_fake_mgr_bin(bin_dir)
-        return tmpdir, bin_dir
+        fake_bin = self.create_fake_mgr_bin(bin_dir)
+        return tmpdir, bin_dir, fake_bin
 
     def test_set_env_path_with_node_modules_success(self):
-        tmpdir, bin_dir = self.fake_mgr_bin()
+        tmpdir, bin_dir, mgr_bin = self.fake_mgr_bin()
         # constructor with an explicit working directory.
         driver = cli.PackageManagerDriver(
             pkg_manager_bin='mgr', working_dir=tmpdir)
         self.assertIsNone(driver.env_path)
+        # the which_with_node_modules should work immediately
+        self.assertEqual(
+            normcase(driver.which_with_node_modules()), normcase(mgr_bin))
         self.assertTrue(driver._set_env_path_with_node_modules())
         self.assertEqual(driver.env_path, bin_dir)
         # should still result in the same thing.
@@ -408,12 +412,20 @@ class CliDriverTestCase(unittest.TestCase):
         self.assertEqual(driver.env_path, bin_dir)
 
     def test_set_env_path_with_node_path_success(self):
-        tmpdir, bin_dir = self.fake_mgr_bin()
+        tmpdir, bin_dir, mgr_bin = self.fake_mgr_bin()
+        other_dir = mkdtemp(self)
         # default constructor
-        driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
+        driver = cli.PackageManagerDriver(
+            pkg_manager_bin='mgr', working_dir=other_dir)
+        # the which_with_node_modules will not work immeidately in this
+        # case
+        self.assertIsNone(driver.which_with_node_modules())
         self.assertIsNone(driver.env_path)
         # using NODE_PATH set to a valid node_modules
         driver.node_path = join(tmpdir, 'node_modules')
+        # this should work now.
+        self.assertEqual(
+            normcase(driver.which_with_node_modules()), normcase(mgr_bin))
         self.assertTrue(driver._set_env_path_with_node_modules())
         self.assertEqual(driver.env_path, bin_dir)
         # should still result in the same thing.
@@ -422,7 +434,7 @@ class CliDriverTestCase(unittest.TestCase):
 
     def test_set_env_path_with_node_path_with_environ(self):
         stub_os_environ(self)
-        tmpdir, bin_dir = self.fake_mgr_bin()
+        tmpdir, bin_dir, mgr_bin = self.fake_mgr_bin()
         # define a NODE_PATH set to a valid node_modules
         os.environ['NODE_PATH'] = join(tmpdir, 'node_modules')
         driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
@@ -431,8 +443,8 @@ class CliDriverTestCase(unittest.TestCase):
 
     def test_set_env_path_with_node_path_multiple_with_environ(self):
         tmp = mkdtemp(self)
-        tmp1, bin_dir1 = self.fake_mgr_bin()
-        tmp2, bin_dir2 = self.fake_mgr_bin()
+        tmp1, bin_dir1, _ = self.fake_mgr_bin()
+        tmp2, bin_dir2, _ = self.fake_mgr_bin()
         node_path = pathsep.join(
             join(d, 'node_modules') for d in (tmp, tmp1, tmp2))
         driver = cli.PackageManagerDriver(

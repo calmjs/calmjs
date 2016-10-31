@@ -301,6 +301,9 @@ class BaseDriver(object):
         Which with node_path and node_modules
         """
 
+        if self.binary is None:
+            return None
+
         paths = []
         if self.node_path:
             paths.extend(self.node_path.split(pathsep))

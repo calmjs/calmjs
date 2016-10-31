@@ -210,6 +210,11 @@ class BaseDriverClassTestCase(unittest.TestCase):
         # no binary, no nothing.
         self.assertIsNone(driver.which())
 
+    def test_which_with_node_modules(self):
+        driver = base.BaseDriver()
+        # no binary, no nothing.
+        self.assertIsNone(driver.which_with_node_modules())
+
     def test_dump(self):
         driver = base.BaseDriver()
         stream = mocks.StringIO()
