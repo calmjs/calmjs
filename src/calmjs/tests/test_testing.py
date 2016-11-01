@@ -439,6 +439,9 @@ class IntegrationGeneratorTestCase(unittest.TestCase):
 
         utils.stub_mod_call(self, cli)
         utils.stub_base_which(self, 'npm')
+        utils.stub_os_environ(self)
+        os.environ.pop('CALMJS_TEST_ENV', '')
+
         cwd = os.getcwd()
         TestCase = type('TestCase', (unittest.TestCase,), {})
         utils.setup_class_install_environment(
