@@ -111,8 +111,18 @@ class StoreDelimitedListBase(Action):
         super(StoreDelimitedListBase, self).__init__(
             option_strings=option_strings, dest=dest, **kw)
 
+    def _convert(self, values):
+        result = values[0].split(self.sep)
+        if result[-1] == '':
+            result.pop(-1)
+        return result
+
     def __call__(self, parser, namespace, values, option_string=None):
-        setattr(namespace, self.dest, values[0].split(self.sep))
+        if not hasattr(namespace, self.dest) or getattr(
+                namespace, self.dest) is self.default:
+            setattr(namespace, self.dest, self._convert(values))
+        else:
+            getattr(namespace, self.dest).extend(self._convert(values))
 
 
 class StoreCommaDelimitedList(StoreDelimitedListBase):

@@ -39,6 +39,13 @@ class StoreCommaDelimitedListTestCase(unittest.TestCase):
     Test out the StoreCommaDelimitedList action
     """
 
+    def test_basic_emptyvalue(self):
+        namespace = Namespace()
+        parser = None
+        action = StoreCommaDelimitedList('', dest='basic')
+        action(parser, namespace, [''])
+        self.assertEqual(namespace.basic, [])
+
     def test_basic_singlevalue(self):
         namespace = Namespace()
         parser = None
@@ -64,14 +71,15 @@ class StoreCommaDelimitedListTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             StoreCommaDelimitedList('', dest='basic', default='default')
 
-    def test_integration(self):
+    def test_integration_invalid_default_value(self):
         argparser = ArgumentParser(prog='prog', add_help=False)
-
         with self.assertRaises(ValueError):
             argparser.add_argument(
                 '-p', '--params', action=StoreCommaDelimitedList,
                 default='123')
 
+    def test_integration(self):
+        argparser = ArgumentParser(prog='prog', add_help=False)
         argparser.add_argument(
             '-p', '--params', action=StoreCommaDelimitedList,
             default=('1', '2',))
@@ -84,6 +92,30 @@ class StoreCommaDelimitedListTestCase(unittest.TestCase):
 
         parsed, extras = argparser.parse_known_args([])
         self.assertEqual(parsed.params, ('1', '2'))
+
+    def test_integration_edge_cases(self):
+        argparser = ArgumentParser(prog='prog', add_help=False)
+        argparser.add_argument(
+            '-p', '--params', action=StoreCommaDelimitedList,
+            default=['1', '2'])
+
+        parsed, extras = argparser.parse_known_args(['--params=1,2'])
+        self.assertEqual(parsed.params, ['1', '2'])
+
+        parsed, extras = argparser.parse_known_args(['--params=8', '-p', '3'])
+        self.assertEqual(parsed.params, ['8', '3'])
+
+        parsed, extras = argparser.parse_known_args(['--params', ''])
+        self.assertEqual(parsed.params, [])
+
+        parsed, extras = argparser.parse_known_args(['--params='])
+        self.assertEqual(parsed.params, [])
+
+        parsed, extras = argparser.parse_known_args(['--params=,'])
+        self.assertEqual(parsed.params, [''])
+
+        parsed, extras = argparser.parse_known_args(['--params=1,'])
+        self.assertEqual(parsed.params, ['1'])
 
     def test_integration_optional(self):
         argparser = ArgumentParser(prog='prog', add_help=False)
