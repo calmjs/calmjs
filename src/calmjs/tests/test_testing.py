@@ -344,8 +344,10 @@ class IntegrationGeneratorTestCase(unittest.TestCase):
         # testing.
         self.mock_tempfile = MockTempfile()
         utils.tempfile, self.old_tempfile = self.mock_tempfile, utils.tempfile
+        self.cwd = os.getcwd()
 
     def tearDown(self):
+        os.chdir(self.cwd)
         self.mock_tempfile.cleanup()
         utils.tempfile = self.old_tempfile
 
@@ -449,19 +451,50 @@ class IntegrationGeneratorTestCase(unittest.TestCase):
         self.assertEqual(p, (['npm', 'install'],))
         self.assertEqual(kw['cwd'], TestCase._cls_tmpdir)
 
-    def test_setup_class_install_environment_predefined(self):
+    def test_setup_class_install_environment_predefined_no_dir(self):
         from calmjs.cli import PackageManagerDriver
         from calmjs import cli
 
         utils.stub_os_environ(self)
         utils.stub_mod_call(self, cli)
-        cwd = os.getcwd()
+        cwd = mkdtemp(self)
+        # we have the mock_tempfile context...
+        self.assertEqual(self.mock_tempfile.count, 1)
+        os.chdir(cwd)
+
         # a very common use case
         os.environ['CALMJS_TEST_ENV'] = '.'
         TestCase = type('TestCase', (unittest.TestCase,), {})
+        # the directory not there.
+        with self.assertRaises(unittest.SkipTest):
+            utils.setup_class_install_environment(
+                TestCase, PackageManagerDriver, [])
+        # temporary directory should not be created as the skip will
+        # also stop the teardown from running
+        self.assertEqual(self.mock_tempfile.count, 1)
+        # this is still set, but irrelevant.
+        self.assertEqual(TestCase._env_root, cwd)
+        # tmpdir not set.
+        self.assertFalse(hasattr(TestCase, '_cls_tmpdir'))
+
+    def test_setup_class_install_environment_predefined_success(self):
+        from calmjs.cli import PackageManagerDriver
+        from calmjs import cli
+
+        utils.stub_os_environ(self)
+        utils.stub_mod_call(self, cli)
+        cwd = mkdtemp(self)
+        # we have the mock_tempfile context...
+        self.assertEqual(self.mock_tempfile.count, 1)
+        os.chdir(cwd)
+
+        os.environ['CALMJS_TEST_ENV'] = '.'
+        TestCase = type('TestCase', (unittest.TestCase,), {})
+        # the directory now provided..
+        os.mkdir(join(cwd, 'node_modules'))
         utils.setup_class_install_environment(
             TestCase, PackageManagerDriver, [])
         # temporary directory created nonetheless
-        self.assertEqual(self.mock_tempfile.count, 1)
+        self.assertEqual(self.mock_tempfile.count, 2)
         self.assertEqual(TestCase._env_root, cwd)
         self.assertNotEqual(TestCase._env_root, TestCase._cls_tmpdir)

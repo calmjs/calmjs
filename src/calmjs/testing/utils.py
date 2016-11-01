@@ -14,6 +14,7 @@ from os.path import realpath
 from shutil import rmtree as rmtree_
 from types import ModuleType
 from unittest import TestCase
+from unittest import SkipTest
 
 from pkg_resources import PathMetadata
 from pkg_resources import Distribution
@@ -398,10 +399,9 @@ def setup_class_install_environment(cls, driver_cls, pkg_names, **kws):
     if not issubclass(driver_cls, PackageManagerDriver):
         raise TypeError('driver_cls must be a PackageManagerDriver')
 
-    cls._env_root = cls._cls_tmpdir = realpath(tempfile.mkdtemp())
-
     test_env = os.environ.get('CALMJS_TEST_ENV')
     if not test_env:
+        cls._env_root = cls._cls_tmpdir = realpath(tempfile.mkdtemp())
         driver = driver_cls(working_dir=cls._cls_tmpdir)
         driver.pkg_manager_install(pkg_names, **kws)
         # Save this as the env_path for tools.
@@ -415,6 +415,10 @@ def setup_class_install_environment(cls, driver_cls, pkg_names, **kws):
         # This is for static test environment for development, not
         # generally suitable for repeatable tests
         cls._env_root = realpath(test_env)
+        if not exists(join(cls._env_root, 'node_modules')):
+            raise SkipTest("no 'node_modules' directory in %s" % cls._env_root)
+        # create the root regardless to permit consistent cleanup.
+        cls._cls_tmpdir = realpath(tempfile.mkdtemp())
         cls._env_path = join(cls._env_root, 'node_modules', '.bin')
 
 
