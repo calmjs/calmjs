@@ -720,18 +720,14 @@ class ToolchainRuntime(DriverRuntime):
         if not overwrite:
             raise ToolchainCancel('cancelation initiated by user')
 
-    def prepare_spec(self, spec, **kwargs):
-        """
-        Prepare a spec for usage with the generic ToolchainRuntime.
-
-        Subclasses should avoid overriding this; override create_spec
-        instead.
-        """
-
+    def prepare_spec_debug_flag(self, spec, **kwargs):
         spec[DEBUG] = self.debug
-        spec[EXPORT_TARGET_OVERWRITE] = kwargs.get(EXPORT_TARGET_OVERWRITE)
 
+    def prepare_spec_export_target_checks(self, spec, **kwargs):
+        spec[EXPORT_TARGET_OVERWRITE] = kwargs.get(EXPORT_TARGET_OVERWRITE)
         spec.advise(AFTER_PREPARE, self.check_export_target_exists, spec)
+
+    def prepare_spec_advice_packages(self, spec, **kwargs):
         reg = get(CALMJS_TOOLCHAIN_ADVICE)
         advice_packages = kwargs.get(ADVICE_PACKAGES) or []
         if isinstance(advice_packages, (list, tuple)):
@@ -742,6 +738,18 @@ class ToolchainRuntime(DriverRuntime):
             for pkg_name in advice_packages:
                 reg.process_toolchain_spec_package(
                     self.toolchain, spec, pkg_name)
+
+    def prepare_spec(self, spec, **kwargs):
+        """
+        Prepare a spec for usage with the generic ToolchainRuntime.
+
+        Subclasses should avoid overriding this; override create_spec
+        instead.
+        """
+
+        self.prepare_spec_debug_flag(spec, **kwargs)
+        self.prepare_spec_export_target_checks(spec, **kwargs)
+        self.prepare_spec_advice_packages(spec, **kwargs)
 
     def create_spec(self, **kwargs):
         """
