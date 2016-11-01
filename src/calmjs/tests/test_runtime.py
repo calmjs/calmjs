@@ -37,6 +37,16 @@ from calmjs.testing.utils import stub_stdouts
 which_npm = which('npm')
 
 
+def advice_order(spec, extras):
+    def verify_build_dir():
+        build_dir = spec.get('build_dir')
+        if not build_dir or not exists(build_dir):
+            # should NEVER be called.
+            raise toolchain.ToolchainAbort()  # pragma: no cover
+
+    spec.advise(toolchain.CLEANUP, verify_build_dir)
+
+
 class BaseRuntimeTestCase(unittest.TestCase):
 
     def test_base_version(self):
@@ -434,6 +444,46 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         ])
 
         self.assertEqual(result['extras'], ['extra1', 'extra2'])
+
+    def test_spec_deferred_addition(self):
+        """
+        This turns out to be critical - the advices provided by the
+        packages should NOT be added immediately, as it is executed
+        before a number of very important advices were added by the
+        toolchain itself.
+        """
+
+        from calmjs.registry import _inst as root_registry
+        key = toolchain.CALMJS_TOOLCHAIN_ADVICE
+        stub_stdouts(self)
+
+        def cleanup_fake_registry():
+            # pop out the fake advice registry that was added.
+            root_registry.records.pop(key, None)
+
+        self.addCleanup(cleanup_fake_registry)
+
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.toolchain.advice]\n'
+            'calmjs.toolchain:NullToolchain = '
+            'calmjs.tests.test_runtime:advice_order\n'
+        ),), 'example.package', '1.0')
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+
+        root_registry.records[key] = toolchain.AdviceRegistry(
+            key, _working_set=working_set)
+
+        tc = toolchain.NullToolchain()
+        rt = runtime.ToolchainRuntime(tc)
+
+        result = rt([
+            '--export-target', 'dummy',
+            '--optional-advice', 'example.package',
+        ])
+
+        self.assertEqual(sys.stderr.getvalue(), '')
+        self.assertIsNotNone(result)
 
     @unittest.skipIf(currentframe() is None, 'stack frame not supported')
     def test_spec_debugged_via_cmdline_target_exists_export_cancel(self):

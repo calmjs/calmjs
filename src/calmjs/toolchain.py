@@ -90,7 +90,7 @@ __all__ = [
 
     'CALMJS_TOOLCHAIN_ADVICE',
 
-    'CLEANUP', 'SUCCESS',
+    'SETUP', 'CLEANUP', 'SUCCESS',
 
     'AFTER_FINALIZE', 'BEFORE_FINALIZE', 'AFTER_LINK', 'BEFORE_LINK',
     'AFTER_ASSEMBLE', 'BEFORE_ASSEMBLE', 'AFTER_COMPILE', 'BEFORE_COMPILE',
@@ -109,6 +109,7 @@ __all__ = [
 CALMJS_TOOLCHAIN_ADVICE = 'calmjs.toolchain.advice'
 
 # define these as reserved advice names
+SETUP = 'setup'
 CLEANUP = 'cleanup'
 SUCCESS = 'success'
 AFTER_TEST = 'after_test'  # reserved however unused in this module
@@ -253,7 +254,8 @@ class Spec(dict):
         if frame is None:
             logger.debug('currentframe() failed to return frame')
         else:
-            self.__advice_stack_frame_protection(frame)
+            if name in self._called:
+                self.__advice_stack_frame_protection(frame)
             if debug:
                 logger.debug(
                     "advise '%s' invoked by %s:%d",
@@ -925,6 +927,12 @@ class Toolchain(BaseDriver):
                     "realpath of build_dir resolved to '%s', spec is updated",
                     check
                 )
+
+        # Finally, handle setup which may set up the deferred advices,
+        # as all the toolchain (and its runtime and/or its parent
+        # runtime and related toolchains) spec advises should have been
+        # done.
+        spec.handle(SETUP)
 
         try:
             process = ('prepare', 'compile', 'assemble', 'link', 'finalize')

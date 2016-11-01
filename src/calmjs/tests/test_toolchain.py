@@ -228,6 +228,35 @@ class SpecTestCase(unittest.TestCase):
             s.getvalue())
 
     @unittest.skipIf(currentframe() is None, 'stack frame not supported')
+    def test_spec_advise_block_handle_further_advise_calls_alternate(self):
+        spec = Spec()
+
+        def advise_first(spec):
+            spec.advise('second', advise_second, spec)
+
+        def advise_second(spec):
+            spec.advise('first', advise_first, spec)
+
+        # can add the advice in through any method required
+        with pretty_logging(stream=StringIO()) as s:
+            spec.advise('first', advise_first, spec)
+        self.assertEqual(s.getvalue(), '')
+
+        with pretty_logging(stream=StringIO()) as s:
+            spec.handle('first')
+        # should be clear, however...
+        self.assertEqual(s.getvalue(), '')
+
+        with pretty_logging(stream=StringIO()) as s:
+            spec.handle('second')
+        # the second call tries to advise back to first again, which the
+        # protection code will finally trigger, even though it will not
+        # exactly loop in this case.
+        self.assertIn(
+            "indirect invocation of 'advise' by 'handle' is forbidden",
+            s.getvalue())
+
+    @unittest.skipIf(currentframe() is None, 'stack frame not supported')
     def test_spec_advice_block_handle_further_handle_call(self):
         spec = Spec()
         spec._advices[CLEANUP] = []

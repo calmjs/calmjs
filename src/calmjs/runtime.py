@@ -34,6 +34,7 @@ from calmjs.toolchain import CALMJS_TOOLCHAIN_ADVICE
 from calmjs.toolchain import DEBUG
 from calmjs.toolchain import EXPORT_TARGET
 from calmjs.toolchain import EXPORT_TARGET_OVERWRITE
+from calmjs.toolchain import SETUP
 from calmjs.toolchain import WORKING_DIR
 from calmjs.ui import prompt_overwrite_json
 from calmjs.ui import prompt
@@ -749,7 +750,8 @@ class ToolchainRuntime(DriverRuntime):
 
         self.prepare_spec_debug_flag(spec, **kwargs)
         self.prepare_spec_export_target_checks(spec, **kwargs)
-        self.prepare_spec_advice_packages(spec, **kwargs)
+        # defer the setup till the actual toolchain invocation
+        spec.advise(SETUP, self.prepare_spec_advice_packages, spec, **kwargs)
 
     def create_spec(self, **kwargs):
         """
