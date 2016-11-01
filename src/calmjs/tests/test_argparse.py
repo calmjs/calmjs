@@ -129,6 +129,24 @@ class StoreCommaDelimitedListTestCase(unittest.TestCase):
         parsed, extras = argparser.parse_known_args()
         self.assertEqual(parsed.params, None)
 
+    def test_integration_optional_kwargs(self):
+        argparser = ArgumentParser(prog='prog', add_help=False)
+
+        argparser.add_argument(
+            '-p', '--params', action=StoreDelimitedListBase, sep='.')
+
+        parsed, extras = argparser.parse_known_args(['-p', '3,4.5'])
+        self.assertEqual(parsed.params, ['3,4', '5'])
+
+    def test_integration_set_limit(self):
+        argparser = ArgumentParser(prog='prog', add_help=False)
+
+        argparser.add_argument(
+            '-p', '--params', action=StoreDelimitedListBase, maxlen=1)
+
+        parsed, extras = argparser.parse_known_args(['-p', '3,4,5'])
+        self.assertEqual(parsed.params, ['3'])
+
 
 class StorePathSepDelimitedListTestCase(unittest.TestCase):
     """

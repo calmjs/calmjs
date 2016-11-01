@@ -98,8 +98,9 @@ class Version(Action):
 
 class StoreDelimitedListBase(Action):
 
-    def __init__(self, option_strings, dest, sep=',', **kw):
+    def __init__(self, option_strings, dest, sep=',', maxlen=None, **kw):
         self.sep = sep
+        self.maxlen = maxlen
         kw['nargs'] = 1
         kw['const'] = None
         default = kw.get('default')
@@ -120,9 +121,13 @@ class StoreDelimitedListBase(Action):
     def __call__(self, parser, namespace, values, option_string=None):
         if not hasattr(namespace, self.dest) or getattr(
                 namespace, self.dest) is self.default:
-            setattr(namespace, self.dest, self._convert(values))
+            value = []
         else:
-            getattr(namespace, self.dest).extend(self._convert(values))
+            value = getattr(namespace, self.dest)
+        result = value + self._convert(values)
+        if self.maxlen:
+            result = result[:self.maxlen]
+        setattr(namespace, self.dest, result)
 
 
 class StoreCommaDelimitedList(StoreDelimitedListBase):
