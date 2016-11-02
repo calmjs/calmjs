@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
 import unittest
 import tempfile
 from inspect import currentframe
@@ -84,6 +82,30 @@ class SpecTestCase(unittest.TestCase):
         spec = Spec(a=1, b=2, c=3)
         spec.update_selected({'abcd': 123, 'defg': 321, 'c': 4}, ['defg', 'c'])
         self.assertEqual(spec, {'a': 1, 'b': 2, 'c': 4, 'defg': 321})
+
+    def test_spec_repr_standard(self):
+        spec = Spec(key1='value', key2=33)
+        self.assertIn('Spec object', repr(spec))
+        self.assertNotIn("'key1': 'value'", repr(spec))
+
+        self.assertIn('Spec object', repr(Spec(debug='not an int')))
+
+    def test_spec_repr_debug(self):
+        spec = Spec(key1='value', key2=33, debug=2)
+        self.assertNotIn('Spec object', repr(spec))
+        self.assertIn("'key1': 'value'", repr(spec))
+
+    def test_spec_repr_debug_recursion(self):
+        spec = Spec(key1='value', key2=33, debug=2)
+        spec['spec'] = spec
+        # if a better implementation is done...
+        self.assertIn("'spec': {...}", repr(spec))
+
+
+class SpecAdviceTestCase(unittest.TestCase):
+    """
+    Test out the Spec advice system
+    """
 
     def test_spec_advice_standard(self):
         def cb(sideeffect, *a, **kw):
@@ -538,10 +560,10 @@ class ToolchainTestCase(unittest.TestCase):
         # compile step error messages
         self.assertIn(
             ("aborting compile step %r due to existing key" % (
-                ('transpile', 'transpile', 'transpiled'),)), msg)
+                (u'transpile', u'transpile', u'transpiled'),)), msg)
         self.assertIn(
             ("aborting compile step %r due to existing key" % (
-                ('bundle', 'bundle', 'bundled'),)), msg)
+                (u'bundle', u'bundle', u'bundled'),)), msg)
 
         # All should be same identity
         self.assertIs(spec['transpiled_modpaths'], transpiled_modpaths)

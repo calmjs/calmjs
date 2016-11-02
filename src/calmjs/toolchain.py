@@ -202,6 +202,17 @@ class Spec(dict):
         self._frames = {}
         self._called = set()
 
+    def __repr__(self):
+        debug = self.get(DEBUG)
+        if not isinstance(debug, int) or debug < 2:
+            return object.__repr__(self)
+        # for a repr, helpers by pprint module and even json doesn't
+        # deal with circular references for this, so just use the trusty
+        # parent class and be done with it (even though I wanted a
+        # sorted output, this is fine for now as I don't want to spam
+        # logs without debugging enabled).
+        return dict.__repr__(self)
+
     def update_selected(self, other, selected):
         """
         Like update, however a list of selected keys must be provided.
