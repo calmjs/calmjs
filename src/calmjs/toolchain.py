@@ -96,7 +96,7 @@ __all__ = [
     'AFTER_ASSEMBLE', 'BEFORE_ASSEMBLE', 'AFTER_COMPILE', 'BEFORE_COMPILE',
     'AFTER_PREPARE', 'BEFORE_PREPARE', 'AFTER_TEST', 'BEFORE_TEST',
 
-    'ADVICE_PACKAGES', 'BUILD_DIR',
+    'ADVICE_PACKAGES', 'ARTIFACT_PATHS', 'BUILD_DIR',
     'CALMJS_MODULE_REGISTRY_NAMES', 'CALMJS_TEST_REGISTRY_NAMES',
     'CONFIG_JS_FILES', 'DEBUG',
     'EXPORT_MODULE_NAMES', 'EXPORT_PACKAGE_NAMES',
@@ -130,6 +130,9 @@ BEFORE_PREPARE = 'before_prepare'
 # packages that have extra _optional_ advices supplied that have to be
 # manually included.
 ADVICE_PACKAGES = 'advice_packages'
+# listing of absolute locations on the file system where these bundled
+# artifact files are.
+ARTIFACT_PATHS = 'artifact_paths'
 # build directory
 BUILD_DIR = 'build_dir'
 # source registries that have been used
