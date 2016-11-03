@@ -351,21 +351,24 @@ class Runtime(BaseRuntime):
             )
             return None
 
-        if not isinstance(inst, BaseRuntime):
-            logger.error(
-                "bad '%s' entry point '%s' from '%s': "
-                "target not a calmjs.runtime.DriverRuntime instance; "
-                "not registering ignored entry point",
-                self.entry_point_group, entry_point, entry_point.dist,
-            )
-            return None
-
         if not valid_command_name.match(entry_point.name):
             logger.error(
                 "bad '%s' entry point '%s' from '%s': "
                 "entry point name must be a latin alphanumeric string; "
-                "not registering ignored entry point",
+                "not registering bad entry point",
                 self.entry_point_group, entry_point, entry_point.dist,
+            )
+            return None
+
+        basecls = BaseRuntime
+        if not isinstance(inst, basecls):
+            logger.error(
+                "'%s' entry point '%s' from '%s' invalid for instance of "
+                "'%s.%s': target not an instance of '%s.%s' or its subclass; "
+                "not registering invalid entry point",
+                self.entry_point_group, entry_point, entry_point.dist,
+                self.__class__.__module__, self.__class__.__name__,
+                basecls.__module__, basecls.__name__,
             )
             return None
 

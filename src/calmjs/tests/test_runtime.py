@@ -656,8 +656,6 @@ class PackageManagerDriverTestCase(unittest.TestCase):
     def test_npm_description(self):
         stub_stdouts(self)
         working_set = mocks.WorkingSet({'calmjs.runtime': [
-            'foo = calmjs.nosuchmodule:no.where',
-            'bar = calmjs.npm:npm',
             'npm = calmjs.npm:npm.runtime',
         ]})
         rt = runtime.Runtime(working_set=working_set)
@@ -700,6 +698,30 @@ class RuntimeGoingWrongTestCase(unittest.TestCase):
         self.assertNotIn('badname:likethis', out)
         # command listing naturally not available.
         self.assertNotIn('npm', out)
+
+    def test_runtime_group_not_runtime_reported(self):
+        stub_stdouts(self)
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.runtime]\n'
+            'bs = calmjs.testing.module3.runtime:fake_bootstrap\n'
+        ),), 'example.package', '1.0')
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+        with self.assertRaises(SystemExit):
+            runtime.main(
+                ['-h'],
+                runtime_cls=lambda: runtime.Runtime(working_set=working_set)
+            )
+
+        self.assertIn(
+            "'calmjs.runtime' entry point "
+            "'bs = calmjs.testing.module3.runtime:fake_bootstrap' from "
+            "'example.package 1.0' invalid for instance of "
+            "'calmjs.runtime.Runtime': target not an instance of "
+            "'calmjs.runtime.BaseRuntime' or its subclass; not registering "
+            "invalid entry point", sys.stderr.getvalue()
+        )
 
     def test_duplication_and_runtime_duplicated(self):
         """

@@ -19,3 +19,9 @@ class BadSimpleRuntime(runtime.DriverRuntime, runtime.Runtime):
             # it turns out.
             raise RuntimeError('maximum recursion depth exceeded')
         super(BadSimpleRuntime, self).init_argparser(argparser)
+
+
+class FakeBootstrapRuntime(runtime.BootstrapRuntime):
+    pass
+
+fake_bootstrap = FakeBootstrapRuntime()
