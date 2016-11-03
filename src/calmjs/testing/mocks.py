@@ -20,7 +20,8 @@ class WorkingSet(object):
     def iter_entry_points(self, name):
         items = self.items.get(name, [])
         for item in items:
-            entry_point = EntryPoint.parse(item)
+            entry_point = item if isinstance(
+                item, EntryPoint) else EntryPoint.parse(item)
             entry_point.dist = self.dist
             yield entry_point
 

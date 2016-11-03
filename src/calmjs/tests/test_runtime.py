@@ -47,6 +47,14 @@ def advice_order(spec, extras):
     spec.advise(toolchain.CLEANUP, verify_build_dir)
 
 
+class BrokenRuntime(runtime.DriverRuntime):
+
+    def init_argparser(self, argparser):
+        raise ImportError('a fake import error')
+
+broken = BrokenRuntime(None)
+
+
 class BaseRuntimeTestCase(unittest.TestCase):
 
     def tearDown(self):
@@ -123,6 +131,75 @@ class BaseRuntimeTestCase(unittest.TestCase):
         self.assertEqual('', sys.stdout.getvalue())
         stderr = sys.stderr.getvalue()
         self.assertNotIn('unexpected', stderr)
+
+    def test_runtime_entry_point_load_logging(self):
+        # sometimes the ImportError may be due to the target module
+        # failing to load its imports, not that the target module being
+        # absent
+        ep = pkg_resources.EntryPoint.parse('broken = some.broken:instance')
+        ep.load = fake_error(ImportError)
+
+        rt = runtime.Runtime()
+        with pretty_logging(stream=mocks.StringIO()) as stream:
+            rt.entry_point_load_validated(ep)
+
+        err = stream.getvalue()
+        self.assertIn(
+            "bad 'calmjs.runtime' entry point 'broken = some.broken:instance'",
+            err
+        )
+        self.assertIn(': ImportError', err)
+        self.assertNotIn('Traceback', err)
+
+        # again, with more stringent logging
+        runtime._global_runtime_attrs.update({'debug': 1})
+        with pretty_logging(stream=mocks.StringIO()) as stream:
+            rt.entry_point_load_validated(ep)
+        err = stream.getvalue()
+        self.assertIn('Traceback', err)
+
+        # of course, if that module misbehaves completely, it shouldn't
+        # blow our stuff up.
+        ep.load = fake_error(Exception)
+        runtime._global_runtime_attrs.update({'debug': 0})
+        with pretty_logging(stream=mocks.StringIO()) as stream:
+            rt.entry_point_load_validated(ep)
+        err = stream.getvalue()
+        # traceback logged even without debug.
+        self.assertNotIn('Traceback', err)
+        self.assertIn(': Exception', err)
+
+    def test_runtime_entry_point_broken_at_main(self):
+        # try the above, but do this through main
+        stub_stdouts(self)
+        ep = pkg_resources.EntryPoint.parse('broken = some.broken:instance')
+        ep.load = fake_error(ImportError)
+        working_set = mocks.WorkingSet({'calmjs.runtime': [ep]})
+        with self.assertRaises(SystemExit):
+            runtime.main(
+                ['-h'],
+                runtime_cls=lambda: runtime.Runtime(working_set=working_set)
+            )
+        out = sys.stdout.getvalue()
+        err = sys.stderr.getvalue()
+        self.assertNotIn('broken', out)
+        self.assertIn('broken', err)
+
+    def test_runtime_main_with_broken_runtime(self):
+        stub_stdouts(self)
+        working_set = mocks.WorkingSet({'calmjs.runtime': [
+            'broken = calmjs.tests.test_runtime:broken',
+        ]})
+        with self.assertRaises(SystemExit):
+            runtime.main(
+                ['-vvd', '-h'],
+                runtime_cls=lambda: runtime.Runtime(working_set=working_set)
+            )
+        out = sys.stdout.getvalue()
+        err = sys.stderr.getvalue()
+        self.assertIn('broken', err)
+        self.assertIn('Traceback', err)
+        self.assertIn('a fake import error', err)
 
 
 class ToolchainRuntimeTestCase(unittest.TestCase):
@@ -983,13 +1060,8 @@ class PackageManagerDriverTestCase(unittest.TestCase):
                     raise RuntimeError('maximum recursion depth exceeded')
                 super(BadSimpleRuntime, self).init_argparser(argparser)
 
-        class BadDummy(runtime.DriverRuntime):
-            # again, needed by Python 2...
-            pass
-
         def cleanup():
             del utils.badsimple
-            del utils.baddummy
         self.addCleanup(cleanup)
 
         stub_stdouts(self)
@@ -999,12 +1071,10 @@ class PackageManagerDriverTestCase(unittest.TestCase):
             'entry_points.txt',
             '[calmjs.runtime]\n'
             'badsimple = calmjs.testing.utils:badsimple\n'
-            'baddummy = calmjs.testing.utils:baddummy\n'
         ),), 'example.badsimple', '1.0')
 
         working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
         utils.badsimple = BadSimpleRuntime(None, working_set=working_set)
-        utils.baddummy = BadDummy(None, working_set=working_set)
 
         with pretty_logging(
                 logger='calmjs.runtime', stream=mocks.StringIO()) as s:
@@ -1018,6 +1088,22 @@ class PackageManagerDriverTestCase(unittest.TestCase):
             "'badsimple = calmjs.testing.utils:badsimple' is implemented "
             "without a proper 'entry_point_load_validated'", stderr
         )
+
+        # as much as I like explosions, the lord of the castle^W console
+        # generally dislikes it when an explosion of stack traces get
+        # splatter all over the place.  Ensure they are contained, even
+        # if the debug mode is enabled.
+        stub_stdouts(self)
+
+        with self.assertRaises(SystemExit):
+            runtime.main(
+                ['-h', '-dvv'],
+                runtime_cls=lambda: runtime.Runtime(working_set=working_set),
+            )
+
+        stderr = sys.stderr.getvalue()
+        stdout = sys.stdout.getvalue()
+        self.assertNotIn("maximum recursion depth exceeded", stderr)
 
     def test_duplication_and_runtime_not_recursion(self):
         """
@@ -1042,15 +1128,21 @@ class PackageManagerDriverTestCase(unittest.TestCase):
             'entry_points.txt',
             '[calmjs.runtime]\n'
             'badatinit = calmjs.testing.utils:badatinit\n'
-            'baddummy = calmjs.testing.utils:baddummy\n'
         ),), 'example.badsimple', '1.0')
 
         working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
         utils.badatinit = BadAtInit(None)
 
         # and here lies the crimson magician, all out of hp.
-        with self.assertRaises(RuntimeError):
+        with pretty_logging(
+                logger='calmjs.runtime', stream=mocks.StringIO()) as s:
             runtime.Runtime(working_set=working_set).argparser
+
+        self.assertIn(
+            "cannot register entry_point "
+            "'badatinit = calmjs.testing.utils:badatinit' from "
+            "'example.badsimple 1.0' ", s.getvalue()
+        )
 
 
 class ArgumentHandlingTestCase(unittest.TestCase):

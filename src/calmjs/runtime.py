@@ -128,7 +128,8 @@ class BootstrapRuntime(object):
         self.global_opts = argparser.add_argument_group('global options')
         self.global_opts.add_argument(
             '-d', '--debug', action='count', default=0,
-            help="show traceback on error; twice for post_mortem '--debugger'")
+            help="show traceback on error; twice for post_mortem '--debugger' "
+                 "when execution cannot continue")
         self.global_opts.add_argument(
             '--debugger', action='store_const', const=2, dest='debug',
             help=SUPPRESS)
@@ -334,14 +335,19 @@ class Runtime(BaseRuntime):
             'subparsers', 'runtimes', 'entry_points'])
         super(Runtime, self).__init__(*a, **kw)
 
+    def log_debug_error(self, *a, **kw):
+        f = logger.exception if self.debug else logger.error
+        f(*a, **kw)
+
     def entry_point_load_validated(self, entry_point):
         try:
             # load the runtime instance
             inst = entry_point.load()
-        except ImportError:
-            logger.error(
-                "bad '%s' entry point '%s' from '%s': ImportError",
+        except Exception as e:
+            self.log_debug_error(
+                "bad '%s' entry point '%s' from '%s': %s: %s",
                 self.entry_point_group, entry_point, entry_point.dist,
+                e.__class__.__name__, e,
             )
             return None
 
@@ -400,8 +406,9 @@ class Runtime(BaseRuntime):
                 name, help=inst.description,
                 formatter_class=HyphenNoBreakFormatter,
             )
-            # Have to specify this separately because otherwise the root
-            # parser will not have a proper description.
+            # Have to specify this separately because otherwise the
+            # subparser will not have a proper description when it is
+            # invoked as the root.
             subparser.description = inst.description
 
             # Assign values for version reporting system
@@ -413,19 +420,30 @@ class Runtime(BaseRuntime):
             setattr(subparser, ATTR_INFO, subp_info)
 
             try:
-                runtime.init_argparser(subparser)
-            except RuntimeError as e:
-                # assume that we have a recursion error
-                frame = currentframe()
-                if not frame or 'maximum recursion depth' not in str(e.args):
-                    raise
+                try:
+                    runtime.init_argparser(subparser)
+                except RuntimeError as e:
+                    # first attempt to filter out recursion errors; also if
+                    # the stack frame isn't available the complaint about
+                    # bad validation doesn't apply anyway.
+                    frame = currentframe()
+                    if (not frame or 'maximum recursion depth' not in str(
+                            e.args)):
+                        raise
 
-                logger.critical(
-                    "Runtime subclass at entry_point '%s' is implemented "
-                    "without a proper 'entry_point_load_validated' to filter "
-                    "out its higher level Runtime classes; it should at least "
-                    "not override that, or override that with the checking "
-                    "in place.", entry_point
+                    logger.critical(
+                        "Runtime subclass at entry_point '%s' is implemented "
+                        "without a proper 'entry_point_load_validated' to "
+                        "filter out its higher level Runtime classes; it "
+                        "should at least not override that, or override that "
+                        "with the checking in place.", entry_point
+                    )
+            except Exception as e:
+                self.log_debug_error(
+                    "cannot register entry_point '%s' from '%s' as a "
+                    "subcommand to '%s': %s: %s",
+                    entry_point, entry_point.dist, argparser.prog,
+                    e.__class__.__name__, e
                 )
             else:
                 # finally record the completely initialized subparser
@@ -941,12 +959,20 @@ def main(args=None, runtime_cls=CalmJSRuntime):
     if not extras:
         args = args + ['-h']
 
+    # all the minimum arguments acquired, bootstrap the execution.
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
+        # log down the construction of the bootstrap class.
         with pretty_logging(
                 logger='', level=bootstrap.log_level, stream=sys.stderr):
-            # pass in the extra arguments that bootstrap cannot handle.
             runtime = runtime_cls()
+            # access the argparser property to trigger its construction
+            # inside this logger context, so that any messages passed to
+            # the logger will be correctly handled.
+            runtime.argparser
+
+        # Running this outside of the logger, as the BaseRuntime will do
+        # its logging.
         if runtime(args):
             sys.exit(0)
         else:
