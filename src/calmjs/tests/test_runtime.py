@@ -49,6 +49,9 @@ def advice_order(spec, extras):
 
 class BaseRuntimeTestCase(unittest.TestCase):
 
+    def tearDown(self):
+        runtime._reset_global_runtime_attrs()
+
     def test_base_version(self):
         # The version information should be missing but shouldn't result
         # in catastrophic errors.
@@ -81,6 +84,18 @@ class BaseRuntimeTestCase(unittest.TestCase):
         self.assertEqual(rt.verbosity, 1)
         self.assertEqual(rt.debug, 1)
         self.assertEqual(rt.log_level, INFO)
+
+    def test_bad_global_flags(self):
+        stub_stdouts(self)
+        runtime._global_runtime_attrs.update({'debug': 'string'})
+        runtime._global_runtime_attrs.update({'trash': 'string'})
+        # it doesn't belong, but show that it's here.
+        self.assertIn('trash', runtime._global_runtime_attrs)
+        rt = runtime.BaseRuntime()
+        # always return an integer.
+        self.assertEqual(rt.debug, 0)
+        runtime._reset_global_runtime_attrs()
+        self.assertNotIn('trash', runtime._global_runtime_attrs)
 
     def test_error_msg(self):
         # not normally triggered, but implementing just in case

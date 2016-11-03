@@ -59,7 +59,17 @@ valid_command_name = re.compile('^[0-9a-zA-Z]*$')
 _global_runtime_attrs = {}
 
 
+def _global_runtime_attrs_get(key):
+    result = _global_runtime_attrs.get(key)
+    if isinstance(result, int):
+        return result
+    # should probably log this, however due to certain checking in place
+    # this message may end up being swallowed.
+    return 0
+
+
 def _reset_global_runtime_attrs():
+    _global_runtime_attrs.clear()
     _global_runtime_attrs.update({
         'debug': 0,
         'log_level': 0,
@@ -135,15 +145,15 @@ class BootstrapRuntime(object):
     # should be able to not duplicate all these property definitions
     @property
     def debug(self):
-        return _global_runtime_attrs.get('debug')
+        return _global_runtime_attrs_get('debug')
 
     @property
     def log_level(self):
-        return _global_runtime_attrs.get('log_level')
+        return _global_runtime_attrs_get('log_level')
 
     @property
     def verbosity(self):
-        return _global_runtime_attrs.get('verbosity')
+        return _global_runtime_attrs_get('verbosity')
 
     def run(self, argparser=None, **kwargs):
         self.prepare_keywords(kwargs)
