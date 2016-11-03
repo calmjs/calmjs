@@ -431,13 +431,38 @@ class Runtime(BaseRuntime):
                             e.args)):
                         raise
 
+                    if (not isinstance(runtime, Runtime) or (type(
+                            runtime).entry_point_load_validated.__code__ is
+                            Runtime.entry_point_load_validated.__code__)):
+                        # welp, guess some other thing blew up then, or
+                        # that the problem is definitely not caused by
+                        # this runtime implementation.
+                        # TODO figure out how to log this nicer via the
+                        # self.log_debug_error without exploding the
+                        # console like Megumin would have done.
+                        raise
+
+                    # assume the overridden method didn't do everything
+                    # correctly then; would be great if there is a way
+                    # to ensure that our thing would have been called.
+                    cls = type(runtime)
                     logger.critical(
-                        "Runtime subclass at entry_point '%s' is implemented "
-                        "without a proper 'entry_point_load_validated' to "
-                        "filter out its higher level Runtime classes; it "
-                        "should at least not override that, or override that "
-                        "with the checking in place.", entry_point
+                        "Runtime subclass at entry_point '%s' has overide "
+                        "'entry_point_load_validated' without filtering out "
+                        "its parent classes; this can be addressed by calling "
+                        "super(%s.%s, self).entry_point_load_validated("
+                        "entry_point) in its implementation, or simply don't "
+                        "override that method to avoid infinite recursion.",
+                        entry_point, cls.__module__, cls.__name__,
                     )
+                    exc = RuntimeError(
+                        "%r has an invalid 'entry_point_load_validated' "
+                        "implementation: insufficient protection against "
+                        "infinite recursion into self not provided" % runtime
+                    )
+                    # for Python 3 to not blow it up.
+                    exc.__suppress_context__ = True
+                    raise exc
             except Exception as e:
                 self.log_debug_error(
                     "cannot register entry_point '%s' from '%s' as a "

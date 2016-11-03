@@ -5,7 +5,6 @@ import os
 import sys
 from argparse import ArgumentParser
 from inspect import currentframe
-from inspect import getouterframes
 from os.path import join
 from os.path import exists
 from logging import DEBUG
@@ -667,6 +666,13 @@ class PackageManagerDriverTestCase(unittest.TestCase):
         out = sys.stdout.getvalue()
         self.assertIn('npm support for the calmjs framework', out)
 
+
+class RuntimeGoingWrongTestCase(unittest.TestCase):
+    """
+    Test cases for handling the various things that can potentially go
+    wrong from being so accepting of setup code from other packages.
+    """
+
     def test_root_runtime_bad_names(self):
         working_set = mocks.WorkingSet({'calmjs.runtime': [
             'bad name = calmjs.npm:npm.runtime',
@@ -1041,25 +1047,8 @@ class PackageManagerDriverTestCase(unittest.TestCase):
         Nested runtime registration running.
         """
 
+        from calmjs.testing.module3.runtime import BadSimpleRuntime
         from calmjs.testing import utils
-
-        # at least minimally greater than expected extra frames
-        recursionlimit = min(sys.getrecursionlimit(), 100) - 3
-
-        class BadSimpleRuntime(runtime.DriverRuntime, runtime.Runtime):
-            def entry_point_load_validated(self, entry_point):
-                # skip the rest of the checks.
-                return entry_point.load()
-
-            def init_argparser(self, argparser):
-                level = len(getouterframes(currentframe()))
-                if level > recursionlimit:
-                    # turns out we need to emulate this to make pypy not
-                    # blow up coverage reporting; also make it die
-                    # quicker, and this emulation works good enough as
-                    # it turns out.
-                    raise RuntimeError('maximum recursion depth exceeded')
-                super(BadSimpleRuntime, self).init_argparser(argparser)
 
         def cleanup():
             del utils.badsimple
@@ -1073,9 +1062,10 @@ class PackageManagerDriverTestCase(unittest.TestCase):
             '[calmjs.runtime]\n'
             'badsimple = calmjs.testing.utils:badsimple\n'
         ),), 'example.badsimple', '1.0')
-
         working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
         utils.badsimple = BadSimpleRuntime(None, working_set=working_set)
+        # at least minimally greater than expected extra frames
+        utils.badsimple.recursionlimit = min(sys.getrecursionlimit(), 100) - 3
 
         with pretty_logging(
                 logger='calmjs.runtime', stream=mocks.StringIO()) as s:
@@ -1086,8 +1076,14 @@ class PackageManagerDriverTestCase(unittest.TestCase):
         # Yame... YAMEROOOOOOOO
         self.assertIn("CRITICAL", stderr)
         self.assertIn(
-            "'badsimple = calmjs.testing.utils:badsimple' is implemented "
-            "without a proper 'entry_point_load_validated'", stderr
+            "Runtime subclass at entry_point 'badsimple = "
+            "calmjs.testing.utils:badsimple' has overide "
+            "'entry_point_load_validated' without filtering out "
+            "its parent classes; this can be addressed by calling "
+            "super(calmjs.testing.module3.runtime.BadSimpleRuntime, self)."
+            "entry_point_load_validated(entry_point) "
+            "in its implementation, or simply don't override that method",
+            stderr
         )
 
         # as much as I like explosions, the lord of the castle^W console
@@ -1129,7 +1125,7 @@ class PackageManagerDriverTestCase(unittest.TestCase):
 
         stub_stdouts(self)
 
-        # create a dummy based
+        # create a dummy dist
         make_dummy_dist(self, ((
             'entry_points.txt',
             '[calmjs.runtime]\n'
@@ -1149,6 +1145,72 @@ class PackageManagerDriverTestCase(unittest.TestCase):
             "'badatinit = calmjs.testing.utils:badatinit' from "
             "'example.badsimple 1.0' ", s.getvalue()
         )
+
+    def test_runtime_recursion_that_is_totally_our_fault(self):
+        """
+        If stuff does blow up, don't blame the wrong party if we can
+        help it.
+        """
+
+        from calmjs.testing import utils
+        stub_stdouts(self)
+
+        # We kind of have to punt this, so punt it with a stupid
+        # override using an EntryPoint that explodes.
+
+        class TrulyBadAtInit(runtime.Runtime):
+            def init_argparser(self, argparser):
+                raise RuntimeError('maximum recursion depth exceeded')
+
+        def cleanup():
+            del utils.trulybad
+        self.addCleanup(cleanup)
+
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.runtime]\n'
+            'trulybad = calmjs.testing.utils:trulybad\n'
+        ),), 'example.badsimple', '1.0')
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+        utils.trulybad = TrulyBadAtInit(None)
+
+        with pretty_logging(
+                logger='calmjs.runtime', stream=mocks.StringIO()) as s:
+            runtime.Runtime(working_set=working_set).argparser
+
+        self.assertIn("maximum recursion depth exceeded", s.getvalue())
+
+    def test_runtime_recursion_that_is_totally_our_fault_checks_safe(self):
+        """
+        If stuff does blow up, don't blame the wrong party if we can
+        help it.
+        """
+
+        from calmjs.testing import utils
+        stub_stdouts(self)
+
+        # this does not actually have entry_point_load_validated
+        class TrulyBadAtInit(runtime.DriverRuntime):
+            def init_argparser(self, argparser):
+                raise RuntimeError('maximum recursion depth exceeded')
+
+        def cleanup():
+            del utils.trulybad
+        self.addCleanup(cleanup)
+
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.runtime]\n'
+            'trulybad = calmjs.testing.utils:trulybad\n'
+        ),), 'example.badsimple', '1.0')
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+        utils.trulybad = TrulyBadAtInit(None)
+
+        with pretty_logging(
+                logger='calmjs.runtime', stream=mocks.StringIO()) as s:
+            runtime.Runtime(working_set=working_set).argparser
+
+        self.assertIn("maximum recursion depth exceeded", s.getvalue())
 
 
 class ArgumentHandlingTestCase(unittest.TestCase):
