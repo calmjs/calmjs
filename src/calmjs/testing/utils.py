@@ -323,7 +323,7 @@ def generate_integration_environment(
             makedirs(base)
         with open(target, 'w') as fd:
             # return a module that returns the name of the file.
-            fd.write("define([], function () { return '%s' });" % source)
+            fd.write("define([], function () { return '%s'; });" % source)
 
     makedirs(join(working_dir, '_bad_dir_'))
     with open(join(working_dir, '_bad_dir_', 'unsupported'), 'w') as fd:
