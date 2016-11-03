@@ -445,6 +445,12 @@ class Runtime(BaseRuntime):
                     entry_point, entry_point.dist, argparser.prog,
                     e.__class__.__name__, e
                 )
+                # this is where naughty things happen: will be poking at
+                # the parser internals to undo the damage that was done
+                # first, pop the choices_actions as a help was provided
+                commands._choices_actions.pop()
+                # then pop the name that was mapped.
+                commands._name_parser_map.pop(name)
             else:
                 # finally record the completely initialized subparser
                 # into the structure here if successful.

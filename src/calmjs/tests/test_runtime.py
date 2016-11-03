@@ -200,6 +200,7 @@ class BaseRuntimeTestCase(unittest.TestCase):
         self.assertIn('broken', err)
         self.assertIn('Traceback', err)
         self.assertIn('a fake import error', err)
+        self.assertNotIn('broken', out)
 
 
 class ToolchainRuntimeTestCase(unittest.TestCase):
@@ -1104,6 +1105,11 @@ class PackageManagerDriverTestCase(unittest.TestCase):
         stderr = sys.stderr.getvalue()
         stdout = sys.stdout.getvalue()
         self.assertNotIn("maximum recursion depth exceeded", stderr)
+        # as much as this broken command should be filtered out, the
+        # error actually happened way down the stack, so it's actually
+        # available all the way down until where the exception cut it
+        # out.
+        self.assertIn('badsimple', stdout)
 
     def test_duplication_and_runtime_not_recursion(self):
         """
