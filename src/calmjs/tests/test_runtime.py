@@ -36,16 +36,6 @@ from calmjs.testing.utils import stub_stdouts
 which_npm = which('npm')
 
 
-def advice_order(spec, extras):
-    def verify_build_dir():
-        build_dir = spec.get('build_dir')
-        if not build_dir or not exists(build_dir):
-            # should NEVER be called.
-            raise toolchain.ToolchainAbort()  # pragma: no cover
-
-    spec.advise(toolchain.CLEANUP, verify_build_dir)
-
-
 class BrokenRuntime(runtime.DriverRuntime):
 
     def init_argparser(self, argparser):
@@ -559,7 +549,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
             'entry_points.txt',
             '[calmjs.toolchain.advice]\n'
             'calmjs.toolchain:NullToolchain = '
-            'calmjs.tests.test_runtime:advice_order\n'
+            'calmjs.testing.spec:advice_order\n'
         ),), 'example.package', '1.0')
         working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
 

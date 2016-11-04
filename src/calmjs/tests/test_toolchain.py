@@ -202,7 +202,7 @@ class SpecAdviceTestCase(unittest.TestCase):
             create_spec_advise_fault(spec, 'broken')
 
         self.assertIn("advise 'broken' invoked by ", s.getvalue())
-        self.assertIn("spec.py:11", s.getvalue())
+        self.assertIn("spec.py:13", s.getvalue())
 
         with pretty_logging(stream=StringIO()) as s:
             spec.handle('broken')
@@ -216,12 +216,12 @@ class SpecAdviceTestCase(unittest.TestCase):
             create_spec_advise_fault(spec, 'broken')
 
         self.assertIn("advise 'broken' invoked by ", s.getvalue())
-        self.assertIn("spec.py:11", s.getvalue())
+        self.assertIn("spec.py:13", s.getvalue())
 
         with pretty_logging(stream=StringIO()) as s:
             spec.handle('broken')
         self.assertIn('Traceback for original advice', s.getvalue())
-        self.assertIn('line 15, in create_spec_advise_fault', s.getvalue())
+        self.assertIn('line 17, in create_spec_advise_fault', s.getvalue())
 
     # infinite loop protection checks.
 
