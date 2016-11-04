@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 Extensions to the argparse library for calmjs.
+
+a.k.a. nyanpasu
 """
 
 from __future__ import absolute_import
@@ -22,20 +24,32 @@ ATTR_INFO = '_calmjs_runtime_info'
 ATTR_ROOT_PKG = '_calmjs_root_pkg_name'
 
 
-class ArgumentParser(argparse.ArgumentParser):
-
-    # In Python 3, this particular error message was removed, so we will
-    # do this for Python 2 in this blunt manner.
-    def error(self, message):
-        if message != _('too few arguments'):
-            super(ArgumentParser, self).error(message)
-
-
-class HyphenNoBreakFormatter(HelpFormatter):
+class HyphenNoBreakHelpFormatter(HelpFormatter):
 
     def _split_lines(self, text, width):
         text = self._whitespace_matcher.sub(' ', text).strip()
         return textwrap.wrap(text, width, break_on_hyphens=False)
+
+
+class SortedHelpFormatter(HelpFormatter):
+
+    def add_arguments(self, actions):
+        def key_func(action):
+            option_strings = getattr(action, 'option_strings', None)
+            if not option_strings:
+                return option_strings
+            # normalize it to lower case.
+            arg = option_strings[0]
+            return arg.startswith('--'), arg.lower()
+
+        actions = sorted(actions, key=key_func)
+        super(SortedHelpFormatter, self).add_arguments(actions)
+
+
+class CalmJSHelpFormatter(SortedHelpFormatter, HyphenNoBreakHelpFormatter):
+    """
+    The official formatter for this project
+    """
 
 
 class Version(Action):
@@ -150,3 +164,16 @@ class StoreRequirementList(StoreDelimitedListBase):
 
     def __call__(self, parser, namespace, values, option_string=None):
         setattr(namespace, self.dest, requirement_comma_list.split(values[0]))
+
+
+class ArgumentParser(argparse.ArgumentParser):
+
+    def __init__(self, formatter_class=CalmJSHelpFormatter, **kw):
+        super(ArgumentParser, self).__init__(
+            formatter_class=formatter_class, **kw)
+
+    # In Python 3, this particular error message was removed, so we will
+    # do this for Python 2 in this blunt manner.
+    def error(self, message):
+        if message != _('too few arguments'):
+            super(ArgumentParser, self).error(message)

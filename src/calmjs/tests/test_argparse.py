@@ -3,17 +3,87 @@ import unittest
 import sys
 from os.path import pathsep
 
+import argparse
 from argparse import Namespace
 from argparse import _
 
 from calmjs.argparse import ArgumentParser
+from calmjs.argparse import HyphenNoBreakHelpFormatter
+from calmjs.argparse import SortedHelpFormatter
 from calmjs.argparse import StoreCommaDelimitedList
 from calmjs.argparse import StoreDelimitedListBase
 from calmjs.argparse import StorePathSepDelimitedList
 from calmjs.argparse import StoreRequirementList
 # test for Version done as part of the runtime.
 
+from calmjs.testing.mocks import StringIO
 from calmjs.testing.utils import stub_stdouts
+
+
+class HelpFormatterTestCase(unittest.TestCase):
+    """
+    Test the various help formatters, possibly through Argumentparser
+    """
+
+    def test_hyphen(self):
+        formatter = HyphenNoBreakHelpFormatter(prog='prog')
+        result = formatter._split_lines('the flag is --flag', 15)
+        self.assertEqual(result, ['the flag is', '--flag'])
+
+    def test_sorted_standard(self):
+        parser = argparse.ArgumentParser(
+            formatter_class=SortedHelpFormatter, add_help=False)
+        parser.add_argument('-z', '--zebra', help='make zebras')
+        parser.add_argument('-a', '--alpaca', help='make alpacas')
+        parser.add_argument('-s', '--sheep', help='make sheep')
+        parser.add_argument('-g', '--goat', help='make goats')
+        stream = StringIO()
+        parser.print_help(file=stream)
+        options = [
+            line.split()[0]
+            for line in stream.getvalue().splitlines() if
+            '--' in line
+        ]
+        self.assertEqual(options, ['-a', '-g', '-s', '-z'])
+
+    def test_sorted_case_insensitivity(self):
+        parser = argparse.ArgumentParser(
+            formatter_class=SortedHelpFormatter, add_help=False)
+        parser.add_argument('-z', '--zebra', help='make zebras')
+        parser.add_argument('-a', '--alpaca', help='make alpacas')
+        parser.add_argument('-A', '--anteater', help='make anteater')
+        parser.add_argument('-S', '--SNAKE', help='make snake')
+        parser.add_argument('-s', '--sheep', help='make sheep')
+        parser.add_argument('-g', '--goat', help='make goats')
+        stream = StringIO()
+        parser.print_help(file=stream)
+        options = [
+            line.split()[0]
+            for line in stream.getvalue().splitlines() if
+            '--' in line
+        ]
+        # the case is unspecified due to in-place sorting
+        self.assertEqual(options, ['-a', '-A', '-g', '-S', '-s', '-z'])
+
+    def test_sorted_simple_first(self):
+        parser = argparse.ArgumentParser(
+            formatter_class=SortedHelpFormatter, add_help=False)
+        parser.add_argument('-z', '--zebra', help='make zebras')
+        parser.add_argument('-a', '--alpaca', help='make alpacas')
+        parser.add_argument('-A', '--anteater', help='make anteater')
+        parser.add_argument('--SNAKE', help='make snake')
+        parser.add_argument('--sheep', help='make sheep')
+        parser.add_argument('--goat', help='make goats')
+        stream = StringIO()
+        parser.print_help(file=stream)
+        options = [
+            line.split()[0]
+            for line in stream.getvalue().splitlines() if
+            '--' in line and '[' not in line
+        ]
+        # the case is unspecified due to in-place sorting
+        self.assertEqual(options, [
+            '-a', '-A', '-z', '--goat', '--sheep', '--SNAKE'])
 
 
 class ArgumentParserTestCase(unittest.TestCase):

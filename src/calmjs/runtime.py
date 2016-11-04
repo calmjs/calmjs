@@ -18,7 +18,6 @@ from os.path import exists
 from pkg_resources import working_set as default_working_set
 
 from calmjs.argparse import ArgumentParser
-from calmjs.argparse import HyphenNoBreakFormatter
 from calmjs.argparse import StoreRequirementList
 from calmjs.argparse import Version
 from calmjs.argparse import ATTR_INFO
@@ -121,7 +120,6 @@ class BootstrapRuntime(object):
 
         return ArgumentParser(
             prog=self.prog, description=self.__doc__, add_help=False,
-            formatter_class=HyphenNoBreakFormatter,
         )
 
     def init_argparser(self, argparser):
@@ -212,7 +210,6 @@ class BaseRuntime(BootstrapRuntime):
     def argparser_factory(self):
         argparser = ArgumentParser(
             prog=self.prog, description=self.description,
-            formatter_class=HyphenNoBreakFormatter,
         )
         setattr(argparser, ATTR_ROOT_PKG, self.package_name)
         return argparser
@@ -407,7 +404,6 @@ class Runtime(BaseRuntime):
         def register(name, runtime, entry_point):
             subparser = commands.add_parser(
                 name, help=inst.description,
-                formatter_class=HyphenNoBreakFormatter,
             )
             # Have to specify this separately because otherwise the
             # subparser will not have a proper description when it is
