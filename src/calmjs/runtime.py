@@ -384,8 +384,8 @@ class Runtime(BaseRuntime):
         return inst
 
     def iter_entry_points(self):
-        for entry_point in self.working_set.iter_entry_points(
-                self.entry_point_group):
+        for entry_point in sorted(self.working_set.iter_entry_points(
+                self.entry_point_group), key=lambda e: e.name):
             yield entry_point
 
     def init_argparser(self, argparser):

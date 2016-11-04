@@ -191,6 +191,42 @@ class BaseRuntimeTestCase(unittest.TestCase):
         self.assertIn('a fake import error', err)
         self.assertNotIn('broken', out)
 
+    def test_runtime_command_list_ordered(self):
+        def cleanup():
+            del mocks.a_tool
+            del mocks.b_tool
+            del mocks.h_tool
+        self.addCleanup(cleanup)
+        stub_stdouts(self)
+
+        mocks.a_tool = runtime.DriverRuntime(None, description='a tool.')
+        mocks.b_tool = runtime.DriverRuntime(None, description='base tool.')
+        mocks.h_tool = runtime.DriverRuntime(None, description='help tool.')
+
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.runtime]\n'
+            'base = calmjs.testing.mocks:b_tool\n'
+            'tool = calmjs.testing.mocks:a_tool\n'
+            'helper = calmjs.testing.mocks:h_tool\n'
+        ),), 'example.package', '1.0')
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+
+        with self.assertRaises(SystemExit):
+            runtime.main(
+                ['-h'],
+                runtime_cls=lambda: runtime.Runtime(working_set=working_set)
+            )
+
+        self.assertIn('tool.', sys.stdout.getvalue())
+        lines = [
+            line.strip().split()[0]
+            for line in sys.stdout.getvalue().splitlines()
+            if ' tool.' in line
+        ]
+
+        self.assertEqual(lines, ['base', 'helper', 'tool'])
+
 
 class ToolchainRuntimeTestCase(unittest.TestCase):
     """
