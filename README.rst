@@ -2,9 +2,9 @@ calmjs
 ======
 
 A Python framework for building toolchains and utilities for working
-with the JavaScript/Node.js ecosystem from within a Python environment,
-done in a way that facilitates the creation and execution of tests for
-proving the successful integration of the two.
+with the Node.js ecosystem from within a Python environment, done in a
+way that facilitates the creation and execution of tests for proving the
+successful integration of the two.
 
 .. image:: https://travis-ci.org/calmjs/calmjs.svg?branch=master
     :target: https://travis-ci.org/calmjs/calmjs
@@ -33,20 +33,40 @@ proving the successful integration of the two.
 Introduction
 ------------
 
-In essence, |calmjs| defines an extensible framework that enables Python
-packages to declare dependencies on JavaScript package or sources that
-are required for their complete functionality, and a set of tools to
-work with these declarations in order to generate the build and
-execution environment for them.  This common framework will ensure the
-accessibility of these metadata under a common protocol, instead of
-being otherwise scattered across different tools or locations or be
-duplicated between the working environments.  Ultimately, this permits
-better `Node.js`_ integration with a given Python environment, lowering
-the amount of effort needed to achieve continuous integration and/or
-delivery of Python packages in conjunction with Node.js/JavaScript
-packages in a reproducible manner.
+Calmjs defines an extensible framework for interoperability between
+Python and `Node.js`_ runtime for Python packages, so they can
+interoperate with all aspects of Node.js/JavaScript development
+ecosystems.
 
-In order to achieve this, the calmjs framework provides a set of
+Methodology
+-----------
+
+First, this is achieved by providing Python packages the ability to
+declare dependencies on Node.js/JavaScript packages or source files that
+are required to complete their functionality.  This common framework
+will ensure the accessibility of these metadata under a common protocol,
+to avoid incompatible declarations that are not portable between
+different projects and environments, or being otherwise scattered across
+different tools or locations or be duplicated within the same working
+environments by different sets of tools that are unable to communicate
+states between each other, which are common sources of errors and
+hardships for building and deployment.
+
+Second, by offering a set of tools built on top of this extensible
+framework to work with these declarations for generating the
+configuration files for required Node.js tools, so that they can
+construct the required the build and/or runtime environment for their
+functionality.
+
+Ultimately, this permits better Node.js integration with a given Python
+environment, lowering the amount of effort needed to achieve continuous
+integration and/or delivery of Python packages in conjunction with
+Node.js/JavaScript packages in a reproducible manner.
+
+Implementation
+~~~~~~~~~~~~~~
+
+In order to achieve this, the Calmjs framework provides a set of
 extension to |setuptools|_ that assists with the tracking and management
 of dependencies of JavaScript or Node.js based packages (such as ones
 through |npm|_) for a given Python package.  It also provides a number
@@ -59,7 +79,7 @@ These extra functionalities will be provided by other Python packages
 under the |calmjs| namespace in order to realize this modular
 architecture.
 
-The name |calmjs| was originally derived from the steps in the first
+The name Calmjs was originally derived from the steps in the first
 iteration of the toolchain which involves the steps compile, assemble,
 and linkage into a module of JavaScript using the namespace from the
 host Python package.  The `m` in the logo is the ear of a rabbit.  The
@@ -109,7 +129,7 @@ Export JavaScript code out of Python packages with the same namespace
     separator for the names due to established naming conventions in
     JavaScript (and in ES6 towards the future).
 
-    Other tools that works with the |calmjs| framework can then make use
+    Other tools that works with the Calmjs framework can then make use
     of these raw JavaScript source files, turning them into actual
     usable Node.js modules for local consumption, or |AMD|_ artifacts
     for consumption over the web.  This leads to...
@@ -383,7 +403,7 @@ to extract all the available JavaScript source files from within the
 given Python module.
 
 To get around this, it is possible to declare new module registries
-through the |calmjs| framework.  Provided that the ``ModuleRegistry``
+through the Calmjs framework.  Provided that the ``ModuleRegistry``
 subclass was set up correctly to generate the desired modules from a
 given package, simply declare this as a ``calmjs.registry`` entry point
 like so:
@@ -423,7 +443,7 @@ with this package.
         ...
     )
 
-Within the |calmjs| framework, tools can be explicitly specified to
+Within the Calmjs framework, tools can be explicitly specified to
 capture modules from any or all module registries registered to the
 framework.  One other registry was also defined.  If the entry point was
 declared like so:
@@ -595,7 +615,7 @@ bad entry point
 Environmental variables being ignored/not passed to underlying tools
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Generally speaking, the |calmjs| framework filters out all environmental
+Generally speaking, the Calmjs framework filters out all environmental
 variables except for the bare minimum by default, and only passes a
 limited number to the underlying tool.  These are the ``PATH`` and the
 ``NODE_PATH`` variables, plus platform specific variables to enable
@@ -634,6 +654,6 @@ Contribute
 Legal
 -----
 
-The calmjs project is copyright (c) 2016 Auckland Bioengineering
+The Calmjs project is copyright (c) 2016 Auckland Bioengineering
 Institute, University of Auckland.  |calmjs| is licensed under the terms
 of the GPLv2 or later.
