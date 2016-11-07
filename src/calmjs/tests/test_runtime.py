@@ -632,6 +632,33 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         )
 
 
+class SourcePackageToolchainRuntimeTestCase(unittest.TestCase):
+    """
+    Test cases for the toolchain runtime that provides interaction with
+    source registry and source packages.
+    """
+
+    def test_source_package_toolchain_basic(self):
+        tc = toolchain.NullToolchain()
+        rt = runtime.SourcePackageToolchainRuntime(tc)
+        text = rt.argparser.format_help()
+        self.assertIn("--source-registry", text)
+        self.assertTrue(isinstance(rt.create_spec(), toolchain.Spec))
+
+    def test_source_package_toolchain_argparser(self):
+        stub_stdouts(self)
+        parser = ArgumentParser()
+        tc = toolchain.NullToolchain()
+        rt = runtime.SourcePackageToolchainRuntime(tc)
+        rt.init_argparser(parser)
+        known, extras = parser.parse_known_args(
+            ['--source-registry', 'reg1,reg2', 'example.package'])
+        self.assertEqual(
+            known.calmjs_module_registry_names, ['reg1', 'reg2'])
+        self.assertEqual(
+            known.source_package_names, ['example.package'])
+
+
 class PackageManagerDriverTestCase(unittest.TestCase):
     """
     Test cases for the package manager driver and argparse usage.

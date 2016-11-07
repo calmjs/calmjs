@@ -19,6 +19,7 @@ from pkg_resources import working_set as default_working_set
 
 from calmjs.argparse import ArgumentParser
 from calmjs.argparse import StoreRequirementList
+from calmjs.argparse import StoreDelimitedList
 from calmjs.argparse import Version
 from calmjs.argparse import ATTR_INFO
 from calmjs.argparse import ATTR_ROOT_PKG
@@ -29,11 +30,13 @@ from calmjs.toolchain import ToolchainCancel
 from calmjs.toolchain import ADVICE_PACKAGES
 from calmjs.toolchain import AFTER_PREPARE
 from calmjs.toolchain import BUILD_DIR
+from calmjs.toolchain import CALMJS_MODULE_REGISTRY_NAMES
 from calmjs.toolchain import CALMJS_TOOLCHAIN_ADVICE
 from calmjs.toolchain import DEBUG
 from calmjs.toolchain import EXPORT_TARGET
 from calmjs.toolchain import EXPORT_TARGET_OVERWRITE
 from calmjs.toolchain import SETUP
+from calmjs.toolchain import SOURCE_PACKAGE_NAMES
 from calmjs.toolchain import WORKING_DIR
 from calmjs.ui import prompt_overwrite_json
 from calmjs.ui import prompt
@@ -832,6 +835,58 @@ class ToolchainRuntime(DriverRuntime):
         spec = self.kwargs_to_spec(**kwargs)
         self.toolchain(spec)
         return spec
+
+
+class SourcePackageToolchainRuntime(ToolchainRuntime):
+    """
+    Include the argument parser setup using the standardized keywords
+    and flag names for specifying the source registry and package names
+    via the command line.
+    """
+
+    def init_argparser_source_registry(
+            self, argparser, default=None, help=(
+                'comma separated list of registries to use for gathering '
+                'JavaScript sources from the given Python packages'
+            )):
+        """
+        For setting up the source registry flag.
+        """
+
+        argparser.add_argument(
+            '--source-registry', default=None,
+            dest=CALMJS_MODULE_REGISTRY_NAMES, action=StoreDelimitedList,
+            help=help,
+        )
+
+        argparser.add_argument(
+            '--source-registries', default=None,
+            dest=CALMJS_MODULE_REGISTRY_NAMES, action=StoreDelimitedList,
+            help=SUPPRESS,
+        )
+
+    def init_argparser_package_names(
+            self, argparser, help='names of the python packages to use'):
+        """
+        Set up option for package names
+        """
+
+        argparser.add_argument(
+            SOURCE_PACKAGE_NAMES, help=help,
+            metavar='package_names', nargs='+',
+        )
+
+    def init_argparser(self, argparser):
+        """
+        Other runtimes (or users of ArgumentParser) can pass their
+        subparser into here to collect the arguments here for a
+        subcommand.
+        """
+
+        super(SourcePackageToolchainRuntime, self).init_argparser(argparser)
+
+        self.init_argparser_source_registry(argparser)
+        self.init_argparser_package_names(argparser)
 
 
 class PackageManagerAction(Action):
