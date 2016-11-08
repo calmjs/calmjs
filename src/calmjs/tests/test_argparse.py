@@ -43,7 +43,7 @@ class NamespaceTestCase(unittest.TestCase):
         self.assertEqual(ns.a, ['value1', 'value2'])
 
         # overridden.
-        ns.a = None  # should there be a mode that preserves this?
+        ns.a = None
         self.assertEqual(ns.a, None)
         ns.a = ['value1']
         ns.a = 'b'
@@ -57,7 +57,7 @@ class NamespaceTestCase(unittest.TestCase):
         self.assertEqual(ns.a, {'a': '1', 'b': '2'})
 
         # overridden.
-        ns.a = None  # should there be a mode that preserves this?
+        ns.a = None
         self.assertEqual(ns.a, None)
         ns.a = {'b': '1'}
         ns.a = 'b'

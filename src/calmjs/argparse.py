@@ -159,7 +159,8 @@ class StoreDelimitedListBase(Action):
         result = value + self._convert(values)
         if self.maxlen:
             result = result[:self.maxlen]
-        setattr(namespace, self.dest, result)
+        # use the root object's version to be sure that is reset.
+        object.__setattr__(namespace, self.dest, result)
 
 
 class StoreCommaDelimitedList(StoreDelimitedListBase):
@@ -180,8 +181,8 @@ class StorePathSepDelimitedList(StoreDelimitedListBase):
 
 class StoreRequirementList(StoreDelimitedListBase):
 
-    def __call__(self, parser, namespace, values, option_string=None):
-        setattr(namespace, self.dest, requirement_comma_list.split(values[0]))
+    def _convert(self, values):
+        return requirement_comma_list.split(values[0])
 
 
 class ArgumentParser(argparse.ArgumentParser):
@@ -195,3 +196,8 @@ class ArgumentParser(argparse.ArgumentParser):
     def error(self, message):
         if message != _('too few arguments'):
             super(ArgumentParser, self).error(message)
+
+    def parse_known_args(self, args=None, namespace=None):
+        if namespace is None:
+            namespace = Namespace()
+        return super(ArgumentParser, self).parse_known_args(args, namespace)
