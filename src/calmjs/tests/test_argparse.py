@@ -4,11 +4,11 @@ import sys
 from os.path import pathsep
 
 import argparse
-from argparse import Namespace
 from argparse import _
 
 from calmjs.argparse import ArgumentParser
 from calmjs.argparse import HyphenNoBreakHelpFormatter
+from calmjs.argparse import Namespace
 from calmjs.argparse import SortedHelpFormatter
 from calmjs.argparse import StoreCommaDelimitedList
 from calmjs.argparse import StoreDelimitedListBase
@@ -18,6 +18,50 @@ from calmjs.argparse import StoreRequirementList
 
 from calmjs.testing.mocks import StringIO
 from calmjs.testing.utils import stub_stdouts
+
+
+class NamespaceTestCase(unittest.TestCase):
+    """
+    Test the namespace assignment operates with special consideration
+    for list of values.
+    """
+
+    def test_assigment_standard(self):
+        ns = Namespace()
+        ns.a = 'a'
+        self.assertEqual(ns.a, 'a')
+        ns.a = 'b'
+        self.assertEqual(ns.a, 'b')
+        ns.a = 'b'
+        self.assertEqual(ns.a, 'b')
+
+    def test_assigment_list(self):
+        ns = Namespace()
+        ns.a = ['value1']
+        self.assertEqual(ns.a, ['value1'])
+        ns.a = ['value2']
+        self.assertEqual(ns.a, ['value1', 'value2'])
+
+        # overridden.
+        ns.a = None  # should there be a mode that preserves this?
+        self.assertEqual(ns.a, None)
+        ns.a = ['value1']
+        ns.a = 'b'
+        self.assertEqual(ns.a, 'b')
+
+    def test_assigment_dict(self):
+        ns = Namespace()
+        ns.a = {'a': '1'}
+        self.assertEqual(ns.a, {'a': '1'})
+        ns.a = {'b': '2'}
+        self.assertEqual(ns.a, {'a': '1', 'b': '2'})
+
+        # overridden.
+        ns.a = None  # should there be a mode that preserves this?
+        self.assertEqual(ns.a, None)
+        ns.a = {'b': '1'}
+        ns.a = 'b'
+        self.assertEqual(ns.a, 'b')
 
 
 class HelpFormatterTestCase(unittest.TestCase):
@@ -247,14 +291,28 @@ class StoreRequirementListTestCase(unittest.TestCase):
         action(parser, namespace, ['singlevalue'])
         self.assertEqual(namespace.basic, ['singlevalue'])
 
+        # this is accumulative since previous existing values exist in
+        # namespace.
         action(parser, namespace, ['single,value'])
-        self.assertEqual(namespace.basic, ['single', 'value'])
+        self.assertEqual(namespace.basic, ['singlevalue', 'single', 'value'])
 
+    def test_extras_not_split(self):
+        namespace = Namespace()
+        parser = None
+        action = StoreRequirementList('', dest='basic')
         action(parser, namespace, ['single[1,2,3],value'])
         self.assertEqual(namespace.basic, ['single[1,2,3]', 'value'])
 
+    def test_dotted_not_split(self):
+        namespace = Namespace()
+        parser = None
+        action = StoreRequirementList('', dest='basic')
         action(parser, namespace, ['single.value'])
         self.assertEqual(namespace.basic, ['single.value'])
 
+    def test_single_extras(self):
+        namespace = Namespace()
+        parser = None
+        action = StoreRequirementList('', dest='basic')
         action(parser, namespace, ['single[1,2,3]'])
         self.assertEqual(namespace.basic, ['single[1,2,3]'])

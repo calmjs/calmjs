@@ -24,6 +24,24 @@ ATTR_INFO = '_calmjs_runtime_info'
 ATTR_ROOT_PKG = '_calmjs_root_pkg_name'
 
 
+class Namespace(argparse.Namespace):
+    """
+    This implementation retains existing parsed value for matched types,
+    in the context of sub-parsers.
+    """
+
+    def __setattr__(self, name, value):
+        if hasattr(self, name):
+            original_value = getattr(self, name)
+            if isinstance(original_value, dict) and isinstance(value, dict):
+                original_value.update(value)
+                value = original_value
+            elif isinstance(original_value, list) and isinstance(value, list):
+                original_value.extend(value)
+                value = original_value
+        super(Namespace, self).__setattr__(name, value)
+
+
 class HyphenNoBreakHelpFormatter(HelpFormatter):
 
     def _split_lines(self, text, width):
