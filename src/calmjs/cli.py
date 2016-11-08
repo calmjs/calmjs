@@ -487,6 +487,8 @@ class PackageManagerDriver(NodeDriver):
             # Still raise the exception as this is a lower level API.
             raise
 
+        return True
+
     def _prodev_flag(self, production, development, has_devkey):
         if production is True:
             return ['--production=true']

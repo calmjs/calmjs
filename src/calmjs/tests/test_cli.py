@@ -206,7 +206,7 @@ class CliDriverTestCase(unittest.TestCase):
         self.assertIn('no_such_attr_here', str(e.exception))
         self.assertIsNot(driver.mgr_init, None)
         self.assertIsNot(driver.get_mgr_version, None)
-        driver.mgr_install(['calmjs'])
+        self.assertTrue(driver.mgr_install(['calmjs']))
         self.assertEqual(self.call_args[0], (['mgr', 'install'],))
 
     def test_install_failure(self):
@@ -623,11 +623,18 @@ class CliDriverTestCase(unittest.TestCase):
 
         with pretty_logging(stream=mocks.StringIO()) as err:
             driver.pkg_manager_init('calmpy.pip', overwrite=False)
+
         self.assertIn('not overwriting existing ', err.getvalue())
         self.assertIn('requirements.json', err.getvalue())
         with open(target) as fd:
             result = json.load(fd)
         self.assertNotEqual(result, {"require": {"setuptools": "25.1.6"}})
+
+        stub_mod_call(self, cli)
+        with pretty_logging(stream=mocks.StringIO()) as err:
+            # ensure the return value is False
+            self.assertFalse(
+                driver.pkg_manager_install('calmpy.pip', overwrite=False))
 
         driver.pkg_manager_init('calmpy.pip', overwrite=True)
         with open(target) as fd:
@@ -657,6 +664,13 @@ class CliDriverTestCase(unittest.TestCase):
             },
             "name": "calmpy.pip",
         })
+
+        stub_mod_call(self, cli)
+        stub_base_which(self)
+        with pretty_logging(stream=mocks.StringIO()):
+            # ensure the return value is True, assuming successful
+            self.assertTrue(
+                driver.pkg_manager_install('calmpy.pip', overwrite=True))
 
     def test_pkg_manager_view_requires(self):
         working_set = self.setup_requirements_json()
