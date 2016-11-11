@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import unittest
+import json
 import tempfile
 from inspect import currentframe
 from os import makedirs
@@ -786,6 +787,28 @@ class NullToolchainTestCase(unittest.TestCase):
             result = fd.read()
 
         self.assertEqual(js_code, result)
+
+    def test_null_transpiler_sourcemap(self):
+        # a kind of silly test but shows concept
+        tmpdir = mkdtemp(self)
+        js_code = 'var dummy = function () {};\n'
+        source = join(tmpdir, 'source.js')
+        target = 'target.js'
+
+        with open(source, 'w') as fd:
+            fd.write(js_code)
+
+        spec = Spec(build_dir=tmpdir, generate_source_map=True)
+        modname = 'dummy'
+        self.toolchain.transpile_modname_source_target(
+            spec, modname, source, target)
+
+        with open(join(tmpdir, target + '.map')) as fd:
+            result = json.load(fd)
+
+        self.assertEqual(result['mappings'], 'AAAA;')
+        self.assertEqual(result['sources'], [source])
+        self.assertEqual(result['file'], join(tmpdir, target))
 
     def test_toolchain_naming(self):
         s = Spec()

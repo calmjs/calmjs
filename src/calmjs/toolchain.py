@@ -64,6 +64,7 @@ from inspect import currentframe
 from traceback import format_stack
 from os import mkdir
 from os import makedirs
+from os.path import basename
 from os.path import join
 from os.path import dirname
 from os.path import exists
@@ -82,6 +83,8 @@ from calmjs.exc import ValueSkip
 from calmjs.exc import ToolchainAbort
 from calmjs.exc import ToolchainCancel
 from calmjs.utils import raise_os_error
+from calmjs.vlqsm import SourceWriter
+from calmjs.vlqsm import create_sourcemap
 
 logger = logging.getLogger(__name__)
 
@@ -152,6 +155,8 @@ EXPORT_PACKAGE_NAMES = 'export_package_names'
 EXPORT_TARGET = 'export_target'
 # specify that export target is safe to be overwritten.
 EXPORT_TARGET_OVERWRITE = 'export_target_overwrite'
+# if true, generate source map
+GENERATE_SOURCE_MAP = 'generate_source_map'
 # source module names; currently not supported by any part of the
 # library, but reserved nonetheless
 SOURCE_MODULE_NAMES = 'source_module_names'
@@ -607,8 +612,23 @@ class Toolchain(BaseDriver):
         if not exists(dirname(bd_target)):
             makedirs(dirname(bd_target))
         opener = self.opener
-        with opener(source, 'r') as reader, opener(bd_target, 'w') as writer:
+        with opener(source, 'r') as reader, opener(bd_target, 'w') as _writer:
+            writer = SourceWriter(_writer)
             self.transpiler(spec, reader, writer)
+            if writer.mappings and spec.get(GENERATE_SOURCE_MAP):
+                source_map_path = bd_target + '.map'
+                with open(source_map_path, 'w') as sm_fd:
+                    self.dump(create_sourcemap(
+                        filename=bd_target,
+                        mappings=writer.mappings,
+                        sources=[source],
+                    ), sm_fd)
+
+                # just use basename
+                source_map_url = basename(source_map_path)
+                _writer.write('\n//# sourceMappingURL=')
+                _writer.write(source_map_url)
+                _writer.write('\n')
 
     def compile_transpile(self, spec, entries):
         """
