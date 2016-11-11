@@ -13,6 +13,9 @@ utils
     inherit from other calmjs modules.  As a result this is safe to be
     imported from any ``test_`` modules.
 
+vlqsm
+    VLQ and source map module.
+
 argparse
     Extensions to the built-in ``argparse`` module.  Due to this name,
     ``absolute_import`` must be used.
