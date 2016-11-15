@@ -43,6 +43,7 @@ class npm(PackageManagerCommand):
     )
     description = cli_driver.description
 
+
 npm._initialize_user_options()
 
 if __name__ == '__main__':  # pragma: no cover

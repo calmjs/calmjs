@@ -41,6 +41,7 @@ class BrokenRuntime(runtime.DriverRuntime):
     def init_argparser(self, argparser):
         raise ImportError('a fake import error')
 
+
 broken = BrokenRuntime(None)
 
 

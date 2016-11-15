@@ -61,6 +61,7 @@ def get_bin_version(bin_path, version_flag='-v', kw={}):
     logger.info("found '%s' version '%s'", bin_path, version_str)
     return version
 
+
 _get_bin_version = get_bin_version  # BBB backward compat
 
 

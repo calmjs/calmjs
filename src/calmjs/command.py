@@ -46,6 +46,7 @@ class DistutilsLogHandler(logging.Handler):
             # LogRecord.__str__ shouldn't fail... probably.
             self.log.warn('Failed to convert %s' % record)
 
+
 distutils_log_handler = DistutilsLogHandler()
 
 

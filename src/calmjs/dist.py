@@ -339,6 +339,7 @@ def flatten_extras_calmjs(pkg_names, working_set=None):
         dep_keys=dep_keys, working_set=working_set
     )
 
+
 write_extras_calmjs = partial(write_json_file, EXTRAS_CALMJS_FIELD)
 
 
@@ -409,6 +410,7 @@ def flatten_module_registry_names(pkg_names, working_set=None):
     for dist in find_packages_requirements_dists(pkg_names, working_set=ws):
         result.extend(read_dist_line_list(dist, CALMJS_MODULE_REGISTRY_TXT))
     return _uniq(result)
+
 
 write_module_registry_names = partial(
     write_line_list, CALMJS_MODULE_REGISTRY_FIELD)
