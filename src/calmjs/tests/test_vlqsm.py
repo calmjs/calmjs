@@ -34,8 +34,12 @@ class VLQTestCase(unittest.TestCase):
         self.assertEqual(vlqsm.encode_vlq(-789), 'rxB')
 
     def test_encode_vlqs(self):
-        self.assertEqual(vlqsm.encode_vlqs([0, 1, 2, 3, 4]), 'ACEGI')
-        self.assertEqual(vlqsm.encode_vlqs([123, 456, 789]), '2HwcqxB')
+        self.assertEqual(vlqsm.encode_vlqs((0, 1, 2, 3, 4)), 'ACEGI')
+        self.assertEqual(vlqsm.encode_vlqs((123, 456, 789)), '2HwcqxB')
+
+    def test_decode_vlqs(self):
+        self.assertEqual((0, 1, 2, 3, 4), vlqsm.decode_vlqs('ACEGI'))
+        self.assertEqual((123, 456, 789), vlqsm.decode_vlqs('2HwcqxB'))
 
     def test_encode_mappings(self):
         self.assertEqual(vlqsm.encode_mappings([
@@ -61,6 +65,31 @@ class VLQTestCase(unittest.TestCase):
             [],
             [],
         ]), ';;QAAA;;QAEA;QACA;QACA;;')
+
+    def test_decode_mappings(self):
+        self.assertEqual([
+            [(0, 0, 0, 0,), (6, 0, 0, 6,), (6, 0, 0, 6,)],
+            []
+        ], vlqsm.decode_mappings('AAAA,MAAM,MAAM;'))
+
+        self.assertEqual([
+            [(0, 0, 0, 0,)],
+            [(0, 0, 1, 0,)],
+            [(0, 0, 1, 0,)],
+            []
+        ], vlqsm.decode_mappings('AAAA;AACA;AACA;'))
+
+        self.assertEqual([
+            [],
+            [],
+            [(8, 0, 0, 0,)],
+            [],
+            [(8, 0, 2, 0,)],
+            [(8, 0, 1, 0,)],
+            [(8, 0, 1, 0,)],
+            [],
+            [],
+        ], vlqsm.decode_mappings(';;QAAA;;QAEA;QACA;QACA;;'))
 
 
 class SourceWriterTestCase(unittest.TestCase):
