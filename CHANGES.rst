@@ -1,7 +1,7 @@
 Changelog
 =========
 
-2.0.0 (Unreleased)
+2.0.0 (2016-11-16)
 ------------------
 
 - Expose the indexer module functions mapper and modgen as public.
@@ -43,6 +43,7 @@ Changelog
   calmjs framework, which is formally defined and enforce by the
   registry itself.
 - Corrected interactive-mode detection.
+- Helpers for source map generation for simple transpilation.
 
 1.0.3 (2016-09-07)
 ------------------
