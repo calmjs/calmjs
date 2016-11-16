@@ -5,12 +5,12 @@ A Python framework for building toolchains and utilities for working
 with the Node.js ecosystem from within a Python environment for
 development, testing, and deployment.
 
-.. image:: https://travis-ci.org/calmjs/calmjs.svg?branch=master
+.. image:: https://travis-ci.org/calmjs/calmjs.svg?branch=2.0.x
     :target: https://travis-ci.org/calmjs/calmjs
-.. image:: https://ci.appveyor.com/api/projects/status/45054tm9cfk7ryam/branch/master?svg=true
-    :target: https://ci.appveyor.com/project/metatoaster/calmjs/branch/master
-.. image:: https://coveralls.io/repos/github/calmjs/calmjs/badge.svg?branch=master
-    :target: https://coveralls.io/github/calmjs/calmjs?branch=master
+.. image:: https://ci.appveyor.com/api/projects/status/45054tm9cfk7ryam/branch/2.0.x?svg=true
+    :target: https://ci.appveyor.com/project/metatoaster/calmjs/branch/2.0.x
+.. image:: https://coveralls.io/repos/github/calmjs/calmjs/badge.svg?branch=2.0.x
+    :target: https://coveralls.io/github/calmjs/calmjs?branch=2.0.x
 
 .. |AMD| replace:: AMD (Asynchronous Module Definition)
 .. |calmjs.bower| replace:: ``calmjs.bower``
