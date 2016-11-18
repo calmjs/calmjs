@@ -246,6 +246,9 @@ class CliDriverTestCase(unittest.TestCase):
     def test_install_other_environ(self):
         stub_mod_call(self, cli)
         stub_base_which(self)
+        stub_os_environ(self)
+        # pop out NODE_PATH if available
+        os.environ.pop('NODE_PATH', '')
         driver = cli.PackageManagerDriver(pkg_manager_bin='mgr')
         with pretty_logging(stream=mocks.StringIO()):
             driver.pkg_manager_install(['calmjs'], env={
