@@ -1532,7 +1532,7 @@ class PackageManagerRuntimeAlternativeIntegrationTestCase(unittest.TestCase):
         result = json.loads(sys.stdout.getvalue().strip())
         self.assertEqual(result, {
             "require": {"setuptools": "25.1.6"},
-            "name": "site[dev]",
+            "name": "site",
         })
 
     def test_pkg_manager_view_malformed(self):

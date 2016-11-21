@@ -16,6 +16,7 @@ from os.path import exists
 
 from subprocess import check_output
 from subprocess import call
+from pkg_resources import Requirement
 
 from calmjs.dist import convert_package_names
 from calmjs.dist import find_packages_requirements_dists
@@ -287,7 +288,8 @@ class PackageManagerDriver(NodeDriver):
         if pkgdef_json.get(
                 self.pkg_name_field, NotImplemented) is NotImplemented:
             # use the last item.
-            pkgdef_json[self.pkg_name_field] = pkg_names[-1]
+            pkg_name = Requirement.parse(pkg_names[-1]).project_name
+            pkgdef_json[self.pkg_name_field] = pkg_name
 
         if stream:
             self.dump(pkgdef_json, stream)

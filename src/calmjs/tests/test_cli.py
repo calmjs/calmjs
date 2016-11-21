@@ -721,7 +721,8 @@ class CliDriverTestCase(unittest.TestCase):
         result = driver.pkg_manager_view('site[dev]')
         self.assertEqual(result, {
             "require": {"setuptools": "25.1.6"},
-            "name": "site[dev]",
+            # should be "site[dev]", but npm fails on that.
+            "name": "site",
         })
 
     def test_pkg_manager_view_bad_entry_point(self):
