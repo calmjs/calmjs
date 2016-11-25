@@ -7,6 +7,7 @@ from __future__ import absolute_import
 
 import fnmatch
 import pkg_resources
+import warnings
 
 from logging import getLogger
 from glob import iglob
@@ -28,7 +29,7 @@ _utils = {
 
 
 def modgen(
-        module,
+        module, entry_point=None,
         modpath='last', globber='root', fext=JS_EXT,
         registry=_utils):
     """
@@ -74,7 +75,15 @@ def modgen(
     )
 
     module_frags = module.__name__.split('.')
-    module_base_paths = modpath_f(module)
+    try:
+        module_base_paths = modpath_f(module, entry_point)
+    except TypeError:
+        # missing entry_point argument; legacy calling.
+        module_base_paths = modpath_f(module)
+        warnings.warn(
+            'provided modpath %r method will need to accept entry_point '
+            'argument by calmjs-3.0.0' % modpath_f
+        )
 
     for module_base_path in module_base_paths:
         logger.debug('searching for *%s files in %s', fext, module_base_path)
@@ -104,7 +113,7 @@ def register(util_type, registry=_utils):
 
 
 @register('modpath')
-def modpath_all(module):
+def modpath_all(module, entry_point=None):
     """
     Provides the raw __path__.  Incompatible with PEP 302-based import
     hooks and incompatible with zip_safe packages.
@@ -123,7 +132,7 @@ def modpath_all(module):
 
 
 @register('modpath')
-def modpath_last(module):
+def modpath_last(module, entry_point=None):
     """
     Provides the raw __path__.  Incompatible with PEP 302-based import
     hooks and incompatible with zip_safe packages.
@@ -141,7 +150,7 @@ def modpath_last(module):
 
 
 @register('modpath')
-def modpath_pkg_resources(module):
+def modpath_pkg_resources(module, entry_point=None):
     """
     Goes through pkg_resources for compliance with various PEPs.
 
@@ -188,7 +197,8 @@ def modname_python(fragments):
     return '.'.join(fragments)
 
 
-def mapper(module, modpath='last', globber='root', modname='es6',
+def mapper(module, entry_point=None,
+           modpath='last', globber='root', modname='es6',
            fext=JS_EXT, registry=_utils):
     """
     General mapper
@@ -201,12 +211,14 @@ def mapper(module, modpath='last', globber='root', modname='es6',
     return {
         modname_f(modname_fragments): join(base, subpath)
         for modname_fragments, base, subpath in modgen(
-            module, modpath, globber, fext=fext, registry=_utils)
+            module, entry_point=entry_point,
+            modpath=modpath, globber=globber,
+            fext=fext, registry=_utils)
     }
 
 
 @register('mapper')
-def mapper_es6(module):
+def mapper_es6(module, entry_point=None):
     """
     Default mapper
 
@@ -214,11 +226,13 @@ def mapper_es6(module):
     a list of importable JS modules using the es6 module import format.
     """
 
-    return mapper(module, 'pkg_resources', 'root', 'es6')
+    return mapper(
+        module, entry_point=entry_point, modpath='pkg_resources',
+        globber='root', modname='es6')
 
 
 @register('mapper')
-def mapper_python(module):
+def mapper_python(module, entry_point=None):
     """
     Default mapper using python style globber
 
@@ -226,4 +240,6 @@ def mapper_python(module):
     a list of importable JS modules using the es6 module import format.
     """
 
-    return mapper(module, 'pkg_resources', 'root', 'python')
+    return mapper(
+        module, entry_point=entry_point, modpath='pkg_resources',
+        globber='root', modname='python')

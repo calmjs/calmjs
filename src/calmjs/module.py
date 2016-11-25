@@ -50,7 +50,7 @@ class ModuleRegistry(BaseModuleRegistry):
         self.mapper = mapper_es6
 
     def _map_entry_point_module(self, entry_point, module):
-        return {module.__name__: self.mapper(module)}
+        return {module.__name__: self.mapper(module, entry_point)}
 
 
 class PythonicModuleRegistry(ModuleRegistry):

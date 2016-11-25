@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import unittest
+import warnings
 
 from os.path import abspath
 from os.path import join
@@ -116,6 +117,39 @@ class IndexerTestCase(unittest.TestCase):
             k: relpath(v, calmjs_base_dir)
             for k, v in indexer.mapper(module2, globber='recursive').items()
         }
+        self.assertEqual(results, {
+            'calmjs/testing/module2/index':
+                to_os_sep_path('calmjs/testing/module2/index.js'),
+            'calmjs/testing/module2/helper':
+                to_os_sep_path('calmjs/testing/module2/helper.js'),
+            'calmjs/testing/module2/mod/helper':
+                to_os_sep_path('calmjs/testing/module2/mod/helper.js'),
+        })
+
+    def test_module2_recursive_es6_legacy(self):
+        # ensure legacy behavior is maintained, where a single argument
+        # is accepted by the modpath function.
+
+        def modpath_last(module):
+            return indexer.modpath_last(module)
+
+        from calmjs.testing import module2
+        calmjs_base_dir = abspath(join(
+            indexer.modpath_pkg_resources(indexer)[0], pardir))
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter('always')
+            results = {
+                k: relpath(v, calmjs_base_dir)
+                for k, v in indexer.mapper(
+                    module2, modpath=modpath_last, globber='recursive').items()
+            }
+
+            self.assertIn(
+                "method will need to accept entry_point argument by calmjs-",
+                str(w[-1].message)
+            )
+
         self.assertEqual(results, {
             'calmjs/testing/module2/index':
                 to_os_sep_path('calmjs/testing/module2/index.js'),
