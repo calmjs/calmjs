@@ -123,10 +123,12 @@ def modgen(
     except TypeError:
         # missing entry_point argument; legacy calling.
         module_base_paths = modpath_f(module)
-        warnings.warn(
+        msg = (
             'provided modpath %r method will need to accept entry_point '
             'argument by calmjs-3.0.0' % modpath_f
         )
+        warnings.warn(msg, DeprecationWarning)
+        logger.warning(msg)
 
     for module_base_path in module_base_paths:
         logger.debug('searching for *%s files in %s', fext, module_base_path)
