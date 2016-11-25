@@ -643,6 +643,20 @@ in this case, ``calmjs subcmd1 --flag item subcmd2``), otherwise consult
 the help at the correct level by appending ``-h`` to each of the valid
 subcommands.
 
+Module registry not locating files from namespace packages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There are a number of edge cases associated with namespace packages in
+Python, especially if they are provided on the system through different
+methods (i.e. mix of zipped eggs, wheels and development packages).
+While workarounds for handling of namespace modules for the given
+packages are provided, there are limitations in place.  One such cause
+is due to complexity in dealing with zipped eggs; if this is an issue,
+please ensure that the affected package has ``zip_safe`` declared as
+false, or alternatively generate a Python wheel then install that wheel,
+if the target Python environment has that as the standard installation
+format.
+
 
 Contribute
 ----------

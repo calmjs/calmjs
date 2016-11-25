@@ -1,25 +1,225 @@
 # -*- coding: utf-8 -*-
 import unittest
+import os
+import sys
 import warnings
 
 from os.path import abspath
 from os.path import join
+from os.path import normcase
 from os.path import pardir
 from os.path import relpath
 from os.path import sep
 
 from types import ModuleType
+import pkg_resources
 
 from calmjs import indexer
 from calmjs.utils import pretty_logging
 
+from calmjs.testing.utils import make_dummy_dist
 from calmjs.testing.utils import make_multipath_module3
+from calmjs.testing.utils import stub_item_attr_value
+from calmjs.testing.utils import mkdtemp
 from calmjs.testing.mocks import StringIO
 
 
 def to_os_sep_path(p):
     # turn the given / separated path into an os specific path
     return sep.join(p.split('/'))
+
+
+class PkgResourcesIndexTestCase(unittest.TestCase):
+    """
+    This series of tests muck with python module internals.
+    """
+
+    def setUp(self):
+        # `dummyns.submod` emulates a package that also provide the
+        # `dummyns` namespace package that got installed after the
+        # other package `dummyns`.
+        ds_egg_root = join(mkdtemp(self), 'dummyns.submod')
+        dummyns_path = join(ds_egg_root, 'dummyns')
+        dummyns = ModuleType('dummyns')
+        dummyns.__file__ = join(dummyns_path, '__init__.py')
+        dummyns.__path__ = [dummyns_path]
+        sys.modules['dummyns'] = dummyns
+
+        dummyns_submod_path = join(ds_egg_root, 'dummyns', 'submod')
+        dummyns_submod = ModuleType('dummyns.submod')
+        dummyns_submod.__file__ = join(dummyns_submod_path, '__init__.py')
+        dummyns_submod.__path__ = [dummyns_submod_path]
+        sys.modules['dummyns.submod'] = dummyns_submod
+
+        os.makedirs(dummyns_submod_path)
+
+        with open(join(dummyns_path, '__init__.py'), 'w') as fd:
+            fd.write('')
+
+        with open(join(dummyns_submod_path, '__init__.py'), 'w') as fd:
+            fd.write('')
+
+        # create the package proper
+        self.dummyns_submod_dist = make_dummy_dist(self, ((
+            'namespace_packages.txt',
+            'dummyns\n',
+        ), (
+            'entry_points.txt',
+            '[dummyns.submod]\n'
+            'dummyns.submod = dummyns.submod:attr\n',
+        ),), 'dummyns.submod', '1.0', working_dir=ds_egg_root)
+
+        self.ds_egg_root = ds_egg_root
+        self.dummyns_path = dummyns_path
+
+        self.mod_dummyns = dummyns
+        self.mod_dummyns_submod = dummyns_submod
+
+    def test_not_defined(self):
+        working_set = pkg_resources.WorkingSet([
+            self.ds_egg_root,
+        ])
+        stub_item_attr_value(self, pkg_resources, 'working_set', working_set)
+        p = indexer.resource_filename_mod_entry_point(self.mod_dummyns, None)
+        self.assertEqual(normcase(p), normcase(self.dummyns_path))
+
+    def test_mismatched_ns(self):
+        # mismatch includes a package that doesn't actually have the
+        # directory created
+        d_egg_root = join(mkdtemp(self), 'dummyns')
+
+        make_dummy_dist(self, ((
+            'namespace_packages.txt',
+            'not_ns\n',
+        ), (
+            'entry_points.txt',
+            '[dummyns]\n'
+            'dummyns = dummyns:attr\n',
+        ),), 'dummyns', '1.0', working_dir=d_egg_root)
+        working_set = pkg_resources.WorkingSet([
+            d_egg_root,
+            self.ds_egg_root,
+        ])
+        stub_item_attr_value(self, pkg_resources, 'working_set', working_set)
+
+        dummyns_ep = next(working_set.iter_entry_points('dummyns'))
+        p = indexer.resource_filename_mod_entry_point(
+            self.mod_dummyns, dummyns_ep)
+        self.assertEqual(normcase(p), normcase(self.dummyns_path))
+
+    def test_mismatched(self):
+        # mismatch includes a package that doesn't actually have the
+        # directory created
+        d_egg_root = join(mkdtemp(self), 'dummyns')
+
+        make_dummy_dist(self, ((
+            'namespace_packages.txt',
+            'dummyns\n',
+        ), (
+            'entry_points.txt',
+            '[dummyns]\n'
+            'dummyns = dummyns:attr\n',
+        ),), 'dummyns', '1.0', working_dir=d_egg_root)
+        working_set = pkg_resources.WorkingSet([
+            d_egg_root,
+            self.ds_egg_root,
+        ])
+        stub_item_attr_value(self, pkg_resources, 'working_set', working_set)
+
+        dummyns_ep = next(working_set.iter_entry_points('dummyns'))
+        p = indexer.resource_filename_mod_entry_point(
+            self.mod_dummyns, dummyns_ep)
+        self.assertEqual(normcase(p), normcase(self.dummyns_path))
+
+    def test_not_namespace(self):
+        d_egg_root = join(mkdtemp(self), 'dummyns')
+
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[dummyns]\n'
+            'dummyns = dummyns:attr\n',
+        ),), 'dummyns', '1.0', working_dir=d_egg_root)
+        working_set = pkg_resources.WorkingSet([
+            d_egg_root,
+            self.ds_egg_root,
+        ])
+        stub_item_attr_value(self, pkg_resources, 'working_set', working_set)
+
+        moddir = join(d_egg_root, 'dummyns')
+        os.makedirs(moddir)
+
+        dummyns_ep = next(working_set.iter_entry_points('dummyns'))
+        p = indexer.resource_filename_mod_entry_point(
+            self.mod_dummyns, dummyns_ep)
+        self.assertEqual(normcase(p), normcase(self.dummyns_path))
+
+    def test_standard(self):
+        d_egg_root = join(mkdtemp(self), 'dummyns')
+
+        make_dummy_dist(self, ((
+            'namespace_packages.txt',
+            'dummyns\n',
+        ), (
+            'entry_points.txt',
+            '[dummyns]\n'
+            'dummyns = dummyns:attr\n',
+        ),), 'dummyns', '1.0', working_dir=d_egg_root)
+        working_set = pkg_resources.WorkingSet([
+            d_egg_root,
+            self.ds_egg_root,
+        ])
+        stub_item_attr_value(self, pkg_resources, 'working_set', working_set)
+
+        moddir = join(d_egg_root, 'dummyns')
+        os.makedirs(moddir)
+
+        # make this also a proper thing
+        with open(join(moddir, '__init__.py'), 'w') as fd:
+            fd.write('')
+
+        dummyns_ep = next(working_set.iter_entry_points('dummyns'))
+        p = indexer.resource_filename_mod_entry_point(
+            self.mod_dummyns, dummyns_ep)
+
+        # finally, this should work.
+        self.assertEqual(normcase(p), normcase(moddir))
+
+    def test_standard_not_stubbed(self):
+        d_egg_root = join(mkdtemp(self), 'dummyns')
+
+        make_dummy_dist(self, ((
+            'namespace_packages.txt',
+            'dummyns\n',
+        ), (
+            'entry_points.txt',
+            '[dummyns]\n'
+            'dummyns = dummyns:attr\n',
+        ),), 'dummyns', '1.0', working_dir=d_egg_root)
+        working_set = pkg_resources.WorkingSet([
+            d_egg_root,
+            self.ds_egg_root,
+        ])
+        # not stubbing will result in the loader failing to actuall work
+
+        moddir = join(d_egg_root, 'dummyns')
+        os.makedirs(moddir)
+
+        # make this also a proper thing
+        with open(join(moddir, '__init__.py'), 'w') as fd:
+            fd.write('')
+
+        dummyns_ep = next(working_set.iter_entry_points('dummyns'))
+
+        with pretty_logging(stream=StringIO()) as fd:
+            p = indexer.resource_filename_mod_entry_point(
+                self.mod_dummyns, dummyns_ep)
+
+        self.assertIn(
+            "resolved by entry_point 'dummyns = dummyns:attr' resulted in "
+            "unexpected error", fd.getvalue()
+        )
+
+        self.assertEqual(normcase(p), normcase(self.dummyns_path))
 
 
 class IndexerTestCase(unittest.TestCase):

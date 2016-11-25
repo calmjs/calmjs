@@ -11,6 +11,7 @@ import warnings
 
 from logging import getLogger
 from glob import iglob
+from os.path import exists
 from os.path import join
 from os.path import relpath
 from os.path import sep
@@ -26,6 +27,48 @@ _utils = {
     'modname': {},
     'mapper': {},
 }
+
+
+def resource_filename_mod_entry_point(module, entry_point):
+    """
+    If a given package declares a namespace and also provide submodules
+    nested at that namespace level, and for whatever reason that module
+    is needed, Python's import mechanism will not have a path associated
+    with that module.  However, if given an entry_point, this path can
+    be resolved through its distribution.  That said, the default
+    resource_filename function does not accept an entry_point, and so we
+    have to chain that back together manually.
+    """
+
+    if not entry_point:
+        return pkg_resources.resource_filename(module.__name__, '')
+
+    try:
+        namespaces = entry_point.dist.get_metadata(
+            'namespace_packages.txt').split()
+    except (OSError, IOError, AttributeError):
+        return pkg_resources.resource_filename(module.__name__, '')
+
+    if module.__name__ not in namespaces:
+        return pkg_resources.resource_filename(module.__name__, '')
+
+    try:
+        result = pkg_resources.resource_filename(
+            entry_point.dist.as_requirement(), module.__name__)
+        if exists(result):
+            return result
+        else:
+            return pkg_resources.resource_filename(module.__name__, '')
+    except Exception:
+        # either not a properly registered requirement (somehow), not a
+        # proper module, or that the namespace does not exist in the
+        # provided module.
+        logger.warning(
+            "module '%s' resolved by entry_point '%s' resulted in unexpected "
+            "error when trying to resolve resources; falling back to standard "
+            "retrival", module, entry_point,
+        )
+        return pkg_resources.resource_filename(module.__name__, '')
 
 
 def modgen(
@@ -158,7 +201,7 @@ def modpath_pkg_resources(module, entry_point=None):
     """
 
     try:
-        return [pkg_resources.resource_filename(module.__name__, '')]
+        return [resource_filename_mod_entry_point(module, entry_point)]
     except ImportError:
         logger.warning("%r could not be located as a module", module)
     except Exception:
