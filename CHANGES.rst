@@ -1,6 +1,17 @@
 Changelog
 =========
 
+2.1.0 (Unreleased)
+------------------
+
+- Namespace packages that have a module explicitly provided should still
+  be able to be looked up if a valid entry point is provided; naturally
+  if the module isn't declared correctly then the behavior remains
+  unchanged (github issue #5)
+- Name field in ``package.json`` should only have standard project names
+  stripped of extras that may have been specified, so that that ``npm``
+  will not choke on it with a warning and die. (github issue #4)
+
 2.0.0 (2016-11-16)
 ------------------
 
