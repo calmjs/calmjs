@@ -20,7 +20,10 @@ Programming Language :: Python :: 3.5
 setup(
     name='calmjs',
     version=version,
-    description="Toolchain for deploying JavaScript with Python modules.",
+    description=(
+        'A Python framework for building toolchains and utilities for working '
+        'with the Node.js ecosystem from within a Python environment.'
+    ),
     long_description=(
         open('README.rst').read() + "\n" +
         open('CHANGES.rst').read()

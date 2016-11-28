@@ -8,9 +8,10 @@ Changelog
   be able to be looked up if a valid entry point is provided; naturally
   if the module isn't declared correctly then the behavior remains
   unchanged (github issue #5)
-- Name field in ``package.json`` should only have standard project names
-  stripped of extras that may have been specified, so that that ``npm``
-  will not choke on it with a warning and die. (github issue #4)
+- Name field in ``package.json`` should contain project names standard
+  to Node.js, i.e. if extras are specified, it should be stripped.  This
+  is done so that that ``npm`` will not choke on it with a warning and
+  die. (github issue #4)
 
 2.0.0 (2016-11-16)
 ------------------

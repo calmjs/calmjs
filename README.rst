@@ -2,8 +2,7 @@ calmjs
 ======
 
 A Python framework for building toolchains and utilities for working
-with the Node.js ecosystem from within a Python environment for
-development, testing, and deployment.
+with the Node.js ecosystem from within a Python environment.
 
 .. image:: https://travis-ci.org/calmjs/calmjs.svg?branch=master
     :target: https://travis-ci.org/calmjs/calmjs
@@ -35,7 +34,8 @@ Introduction
 Calmjs defines an extensible framework for interoperability between
 Python and `Node.js`_ runtime for Python packages, so they can
 interoperate with all aspects of Node.js/JavaScript development
-ecosystems.
+ecosystems.  The goal of the Calmjs framework is to aid the development,
+testing, and deployment of Python packages that also include JavaScript.
 
 
 Methodology
