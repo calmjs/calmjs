@@ -34,7 +34,7 @@ setup(
     packages=find_packages('src', exclude=['ez_setup']),
     package_dir={'': 'src'},
     namespace_packages=['calmjs'],
-    zip_safe=True,
+    zip_safe=False,
     install_requires=[
         'setuptools>=12',
     ],
