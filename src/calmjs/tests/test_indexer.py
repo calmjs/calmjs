@@ -5,6 +5,7 @@ import sys
 import warnings
 
 from os.path import abspath
+from os.path import exists
 from os.path import join
 from os.path import normcase
 from os.path import pardir
@@ -59,10 +60,16 @@ class PkgResourcesIndexTestCase(unittest.TestCase):
         with open(join(dummyns_submod_path, '__init__.py'), 'w') as fd:
             fd.write('')
 
+        self.nested_res = join(dummyns_submod_path, 'data.txt')
+        self.nested_data = 'data'
+        with open(self.nested_res, 'w') as fd:
+            fd.write(self.nested_data)
+
         # create the package proper
         self.dummyns_submod_dist = make_dummy_dist(self, ((
             'namespace_packages.txt',
-            'dummyns\n',
+            'dummyns\n'
+            'dummyns.submod\n',
         ), (
             'entry_points.txt',
             '[dummyns.submod]\n'
@@ -220,6 +227,29 @@ class PkgResourcesIndexTestCase(unittest.TestCase):
         )
 
         self.assertEqual(normcase(p), normcase(self.dummyns_path))
+
+    def test_nested_namespace(self):
+        self.called = None
+
+        def _exists(p):
+            self.called = p
+            return exists(p)
+
+        working_set = pkg_resources.WorkingSet([
+            self.ds_egg_root,
+        ])
+        stub_item_attr_value(self, pkg_resources, 'working_set', working_set)
+        stub_item_attr_value(self, indexer, 'exists', _exists)
+
+        dummyns_ep = next(working_set.iter_entry_points('dummyns.submod'))
+        p = indexer.resource_filename_mod_entry_point(
+            self.mod_dummyns_submod, dummyns_ep)
+        self.assertEqual(p, self.called)
+
+        with open(join(p, 'data.txt')) as fd:
+            data = fd.read()
+
+        self.assertEqual(data, self.nested_data)
 
 
 class IndexerTestCase(unittest.TestCase):

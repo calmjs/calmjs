@@ -54,16 +54,23 @@ def resource_filename_mod_entry_point(module, entry_point):
 
     try:
         result = pkg_resources.resource_filename(
-            entry_point.dist.as_requirement(), module.__name__)
+            entry_point.dist.as_requirement(),
+            join(*module.__name__.split('.')),
+        )
         if exists(result):
             return result
         else:
+            logger.warning(
+                "module '%s' resolved by entry_point '%s' leads to no path; "
+                "falling back to default resolution method",
+                module, entry_point,
+            )
             return pkg_resources.resource_filename(module.__name__, '')
     except Exception:
         # either not a properly registered requirement (somehow), not a
         # proper module, or that the namespace does not exist in the
         # provided module.
-        logger.warning(
+        logger.exception(
             "module '%s' resolved by entry_point '%s' resulted in unexpected "
             "error when trying to resolve resources; falling back to standard "
             "retrival", module, entry_point,
