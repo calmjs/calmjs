@@ -29,7 +29,7 @@ _utils = {
 }
 
 
-def resource_filename_mod_entry_point(module, entry_point):
+def resource_filename_mod_entry_point(module_name, entry_point):
     """
     If a given package declares a namespace and also provide submodules
     nested at that namespace level, and for whatever reason that module
@@ -41,21 +41,21 @@ def resource_filename_mod_entry_point(module, entry_point):
     """
 
     if not entry_point:
-        return pkg_resources.resource_filename(module.__name__, '')
+        return pkg_resources.resource_filename(module_name, '')
 
     try:
         namespaces = entry_point.dist.get_metadata(
             'namespace_packages.txt').split()
     except (OSError, IOError, AttributeError):
-        return pkg_resources.resource_filename(module.__name__, '')
+        return pkg_resources.resource_filename(module_name, '')
 
-    if module.__name__ not in namespaces:
-        return pkg_resources.resource_filename(module.__name__, '')
+    if module_name not in namespaces:
+        return pkg_resources.resource_filename(module_name, '')
 
     try:
         result = pkg_resources.resource_filename(
             entry_point.dist.as_requirement(),
-            join(*module.__name__.split('.')),
+            join(*module_name.split('.')),
         )
         if exists(result):
             return result
@@ -63,9 +63,9 @@ def resource_filename_mod_entry_point(module, entry_point):
             logger.warning(
                 "module '%s' resolved by entry_point '%s' leads to no path; "
                 "falling back to default resolution method",
-                module, entry_point,
+                module_name, entry_point,
             )
-            return pkg_resources.resource_filename(module.__name__, '')
+            return pkg_resources.resource_filename(module_name, '')
     except Exception:
         # either not a properly registered requirement (somehow), not a
         # proper module, or that the namespace does not exist in the
@@ -73,9 +73,9 @@ def resource_filename_mod_entry_point(module, entry_point):
         logger.exception(
             "module '%s' resolved by entry_point '%s' resulted in unexpected "
             "error when trying to resolve resources; falling back to standard "
-            "retrival", module, entry_point,
+            "retrival", module_name, entry_point,
         )
-        return pkg_resources.resource_filename(module.__name__, '')
+        return pkg_resources.resource_filename(module_name, '')
 
 
 def modgen(
@@ -210,7 +210,9 @@ def modpath_pkg_resources(module, entry_point=None):
     """
 
     try:
-        return [resource_filename_mod_entry_point(module, entry_point)]
+        return [
+            resource_filename_mod_entry_point(module.__name__, entry_point)
+        ]
     except ImportError:
         logger.warning("%r could not be located as a module", module)
     except Exception:

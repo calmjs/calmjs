@@ -87,7 +87,7 @@ class PkgResourcesIndexTestCase(unittest.TestCase):
             self.ds_egg_root,
         ])
         stub_item_attr_value(self, pkg_resources, 'working_set', working_set)
-        p = indexer.resource_filename_mod_entry_point(self.mod_dummyns, None)
+        p = indexer.resource_filename_mod_entry_point('dummyns', None)
         self.assertEqual(normcase(p), normcase(self.dummyns_path))
 
     def test_mismatched_ns(self):
@@ -110,8 +110,7 @@ class PkgResourcesIndexTestCase(unittest.TestCase):
         stub_item_attr_value(self, pkg_resources, 'working_set', working_set)
 
         dummyns_ep = next(working_set.iter_entry_points('dummyns'))
-        p = indexer.resource_filename_mod_entry_point(
-            self.mod_dummyns, dummyns_ep)
+        p = indexer.resource_filename_mod_entry_point('dummyns', dummyns_ep)
         self.assertEqual(normcase(p), normcase(self.dummyns_path))
 
     def test_mismatched(self):
@@ -134,8 +133,7 @@ class PkgResourcesIndexTestCase(unittest.TestCase):
         stub_item_attr_value(self, pkg_resources, 'working_set', working_set)
 
         dummyns_ep = next(working_set.iter_entry_points('dummyns'))
-        p = indexer.resource_filename_mod_entry_point(
-            self.mod_dummyns, dummyns_ep)
+        p = indexer.resource_filename_mod_entry_point('dummyns', dummyns_ep)
         self.assertEqual(normcase(p), normcase(self.dummyns_path))
 
     def test_not_namespace(self):
@@ -156,8 +154,7 @@ class PkgResourcesIndexTestCase(unittest.TestCase):
         os.makedirs(moddir)
 
         dummyns_ep = next(working_set.iter_entry_points('dummyns'))
-        p = indexer.resource_filename_mod_entry_point(
-            self.mod_dummyns, dummyns_ep)
+        p = indexer.resource_filename_mod_entry_point('dummyns', dummyns_ep)
         self.assertEqual(normcase(p), normcase(self.dummyns_path))
 
     def test_standard(self):
@@ -185,8 +182,7 @@ class PkgResourcesIndexTestCase(unittest.TestCase):
             fd.write('')
 
         dummyns_ep = next(working_set.iter_entry_points('dummyns'))
-        p = indexer.resource_filename_mod_entry_point(
-            self.mod_dummyns, dummyns_ep)
+        p = indexer.resource_filename_mod_entry_point('dummyns', dummyns_ep)
 
         # finally, this should work.
         self.assertEqual(normcase(p), normcase(moddir))
@@ -219,7 +215,7 @@ class PkgResourcesIndexTestCase(unittest.TestCase):
 
         with pretty_logging(stream=StringIO()) as fd:
             p = indexer.resource_filename_mod_entry_point(
-                self.mod_dummyns, dummyns_ep)
+                'dummyns', dummyns_ep)
 
         self.assertIn(
             "resolved by entry_point 'dummyns = dummyns:attr' resulted in "
@@ -243,7 +239,7 @@ class PkgResourcesIndexTestCase(unittest.TestCase):
 
         dummyns_ep = next(working_set.iter_entry_points('dummyns.submod'))
         p = indexer.resource_filename_mod_entry_point(
-            self.mod_dummyns_submod, dummyns_ep)
+            'dummyns.submod', dummyns_ep)
         self.assertEqual(p, self.called)
 
         with open(join(p, 'data.txt')) as fd:
