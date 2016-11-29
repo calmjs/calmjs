@@ -133,7 +133,14 @@ class PkgResourcesIndexTestCase(unittest.TestCase):
         stub_item_attr_value(self, pkg_resources, 'working_set', working_set)
 
         dummyns_ep = next(working_set.iter_entry_points('dummyns'))
-        p = indexer.resource_filename_mod_entry_point('dummyns', dummyns_ep)
+        with pretty_logging(stream=StringIO()) as fd:
+            p = indexer.resource_filename_mod_entry_point(
+                'dummyns', dummyns_ep)
+
+        self.assertIn(
+            "'dummyns' resolved by entry_point 'dummyns = dummyns:attr' leads "
+            "to no path", fd.getvalue()
+        )
         self.assertEqual(normcase(p), normcase(self.dummyns_path))
 
     def test_not_namespace(self):
@@ -363,18 +370,26 @@ class IndexerTestCase(unittest.TestCase):
         calmjs_base_dir = abspath(join(
             indexer.modpath_pkg_resources(indexer)[0], pardir))
 
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter('always')
-            results = {
-                k: relpath(v, calmjs_base_dir)
-                for k, v in indexer.mapper(
-                    module2, modpath=modpath_last, globber='recursive').items()
-            }
+        with pretty_logging(stream=StringIO()) as fd:
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter('always')
+                results = {
+                    k: relpath(v, calmjs_base_dir)
+                    for k, v in indexer.mapper(
+                        module2, modpath=modpath_last,
+                        globber='recursive',
+                    ).items()
+                }
 
             self.assertIn(
                 "method will need to accept entry_point argument by calmjs-",
                 str(w[-1].message)
             )
+
+        self.assertIn(
+            "method will need to accept entry_point argument by calmjs-",
+            fd.getvalue()
+        )
 
         self.assertEqual(results, {
             'calmjs/testing/module2/index':
