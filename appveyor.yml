@@ -8,6 +8,8 @@ environment:
       nodejs_version: "6.9"
     - PYTHON: "C:\\Python35"
       nodejs_version: "6.9"
+    - PYTHON: "C:\\Python36"
+      nodejs_version: "7.4"
 
 install:
   - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
