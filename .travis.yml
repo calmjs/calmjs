@@ -54,7 +54,8 @@ before_install:
       brew outdated pyenv || brew upgrade pyenv ;
       pyenv install $TRAVIS_PYTHON_VERSION ;
       pyenv global $TRAVIS_PYTHON_VERSION ;
-      pyenv rehash ;
+      eval "$(pyenv init -)" ;
+      python --version ;
       python -m pip install --user virtualenv ;
       python -m virtualenv ~/.venv ;
       source ~/.venv/bin/activate ;
