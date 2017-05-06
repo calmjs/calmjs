@@ -71,23 +71,37 @@ setup(
             'calmjs.registry = calmjs.registry:Registry',
 
             'calmjs.extras_keys = calmjs.module:ExtrasJsonKeysRegistry',
+            'calmjs.modules = calmjs.module:ModuleRegistry',
+            'calmjs.modules.tests = calmjs.module:ModuleRegistry',
+            'calmjs.py.modules = calmjs.module:PythonicModuleRegistry',
+            'calmjs.py.modules.tests = calmjs.module:PythonicModuleRegistry',
+            'calmjs.toolchain.advice = calmjs.toolchain:AdviceRegistry',
+
+            # deprecated singular form
             'calmjs.module = calmjs.module:ModuleRegistry',
             'calmjs.module.tests = calmjs.module:ModuleRegistry',
             'calmjs.py.module = calmjs.module:PythonicModuleRegistry',
             'calmjs.py.module.tests = calmjs.module:PythonicModuleRegistry',
-            'calmjs.toolchain.advice = calmjs.toolchain:AdviceRegistry',
         ],
         'calmjs.reserved': [
-            'calmjs.dev.module = calmjs.dev',
-            'calmjs.dev.module.tests = calmjs.dev',
+            'calmjs.dev.modules = calmjs.dev',
+            'calmjs.dev.modules.tests = calmjs.dev',
             'calmjs.extras_keys = calmjs',
-            'calmjs.module = calmjs',
-            'calmjs.module.tests = calmjs',
+            'calmjs.modules = calmjs',
+            'calmjs.modules.tests = calmjs',
             'calmjs.registry = calmjs',
             'calmjs.reserved = calmjs',
+            'calmjs.py.modules = calmjs',
+            'calmjs.py.modules.tests = calmjs',
+            'calmjs.toolchain.advice = calmjs',
+
+            # to be removed when fully deprecated (removed).
+            'calmjs.dev.module = calmjs.dev',
+            'calmjs.dev.module.tests = calmjs.dev',
+            'calmjs.module = calmjs',
+            'calmjs.module.tests = calmjs',
             'calmjs.py.module = calmjs',
             'calmjs.py.module.tests = calmjs',
-            'calmjs.toolchain.advice = calmjs',
         ]
     },
     test_suite="calmjs.tests.make_suite",
