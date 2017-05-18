@@ -49,6 +49,24 @@ class BaseRegistryTestCase(unittest.TestCase):
             registry.iter_records()
 
 
+class BasePkgRefRegistryTestCase(unittest.TestCase):
+    """
+    Test the base registry.
+    """
+
+    def test_empty(self):
+        working_set = mocks.WorkingSet({__name__: []})
+        registry = base.BasePkgRefRegistry(__name__, _working_set=working_set)
+        self.assertEqual(list(registry.iter_records()), [])
+
+    def test_not_implemented(self):
+        working_set = mocks.WorkingSet({__name__: [
+            'calmjs.testing.module1 = calmjs.testing.module1',
+        ]})
+        with self.assertRaises(NotImplementedError):
+            base.BasePkgRefRegistry(__name__, _working_set=working_set)
+
+
 class BaseModuleRegistryTestCase(unittest.TestCase):
     """
     Test the base registry.
@@ -59,11 +77,6 @@ class BaseModuleRegistryTestCase(unittest.TestCase):
 
     def tearDown(self):
         base.working_set = self.original_working_set
-
-    def test_empty(self):
-        working_set = mocks.WorkingSet({__name__: []})
-        registry = base.BaseModuleRegistry(__name__, _working_set=working_set)
-        self.assertEqual(list(registry.iter_records()), [])
 
     def test_bad_record(self):
         working_set = mocks.WorkingSet({__name__: [

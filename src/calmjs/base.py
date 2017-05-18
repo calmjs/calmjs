@@ -102,14 +102,14 @@ class BaseRegistry(object):
         raise NotImplementedError
 
 
-class BaseModuleRegistry(BaseRegistry):
+class BasePkgRefRegistry(BaseRegistry):
     """
-    Extending off the BaseRegistry, ensure that there is a registration
-    step that takes place that will verify the existence of the target.
+    A common base registry that deals with references for data within
+    packages.
     """
 
     def __init__(self, registry_name, *a, **kw):
-        super(BaseModuleRegistry, self).__init__(registry_name, *a, **kw)
+        super(BasePkgRefRegistry, self).__init__(registry_name, *a, **kw)
         self.package_module_map = {}
         self.register_entry_points(self.raw_entry_points)
 
@@ -135,6 +135,44 @@ class BaseModuleRegistry(BaseRegistry):
                 continue
 
     def register_entry_point(self, entry_point):
+        raise NotImplementedError
+
+    def _dist_to_package_module_map(self, entry_point):
+        if entry_point.dist is None:
+            # it's probably manually added not through the standard
+            # setuptools procedures.
+            logger.warning(
+                "manually registering entry_point '%s' without associated "
+                "distribution to registry '%s'",
+                entry_point, self.registry_name,
+            )
+            return []  # just a dummy unconnected value.
+        else:
+            logger.debug(
+                "registering entry_point '%s' from '%s' to registry '%s'",
+                entry_point, entry_point.dist, self.registry_name,
+            )
+            if entry_point.dist.project_name not in self.package_module_map:
+                self.package_module_map[entry_point.dist.project_name] = []
+            return self.package_module_map[entry_point.dist.project_name]
+
+    def iter_records(self):
+        """
+        Iterates through the records.
+        """
+
+        for item in self.records.items():
+            yield item
+
+
+class BaseModuleRegistry(BasePkgRefRegistry):
+    """
+    Extending off the BasePkgRefRegistry, ensure that there is a
+    registration step that takes place that will verify the existence
+    of the target.
+    """
+
+    def register_entry_point(self, entry_point):
         """
         Register a lone entry_point
 
@@ -155,26 +193,11 @@ class BaseModuleRegistry(BaseRegistry):
 
         records_map = self._map_entry_point_module(entry_point, module)
 
-        if entry_point.dist is None:
-            # it's probably manually added not through the standard
-            # setuptools procedures.
-            logger.warning(
-                "manually registering entry_point '%s' without associated "
-                "distribution to registry '%s'",
-                entry_point, self.registry_name,
-            )
-        else:
-            logger.debug(
-                "registering entry_point '%s' from '%s' to registry '%s'",
-                entry_point, entry_point.dist, self.registry_name,
-            )
-            if entry_point.dist.project_name not in self.package_module_map:
-                self.package_module_map[entry_point.dist.project_name] = []
-            # if duplicates exist, it means a package declared multiple
-            # keys for the same namespace and they really shouldn't do
-            # that.
-            self.package_module_map[entry_point.dist.project_name].extend(
-                list(records_map.keys()))
+        # if duplicates exist, it means a package declared multiple
+        # keys for the same namespace and they really shouldn't do
+        # that.
+        self._dist_to_package_module_map(entry_point).extend(
+            list(records_map.keys()))
 
         for module_name, records in records_map.items():
             if module_name in self.records:
@@ -224,14 +247,6 @@ class BaseModuleRegistry(BaseRegistry):
         for name in names:
             result.update(self.get_record(name))
         return result
-
-    def iter_records(self):
-        """
-        Iterates through the records.
-        """
-
-        for item in self.records.items():
-            yield item
 
 
 class BaseDriver(object):
