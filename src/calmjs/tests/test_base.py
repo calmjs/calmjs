@@ -189,6 +189,44 @@ class BaseModuleRegistryTestCase(unittest.TestCase):
         self.assertIn("overwriting keys: ['calmjs.testing']", s.getvalue())
 
 
+class BaseExternalModuleRegistryTestCase(unittest.TestCase):
+    """
+    Similar to previous tests, except the names are references to the
+    files in locations managed by an external package manager, i.e.
+    npm and node_modules.
+    """
+
+    def setUp(self):
+        self.original_working_set = base.working_set
+
+    def tearDown(self):
+        base.working_set = self.original_working_set
+
+    def test_simple_record(self):
+        working_set = mocks.WorkingSet({__name__: [
+            'dummy/whatever/module.js = module',
+            'dummy/whatever/module-slim.js = module',
+        ]}, dist=Distribution(project_name='calmjs.testing'))
+
+        registry = base.BaseExternalModuleRegistry(
+            __name__, _working_set=working_set)
+
+        self.assertEqual(len(registry.raw_entry_points), 2)
+        self.assertEqual(registry.get_record('module'), {
+            'dummy/whatever/module.js',
+            'dummy/whatever/module-slim.js',
+        })
+        self.assertEqual(list(registry.iter_records()), [('module', {
+            'dummy/whatever/module.js',
+            'dummy/whatever/module-slim.js',
+        })])
+
+        self.assertEqual(registry.get_records_for_package('calmjs.testing'), [
+            'dummy/whatever/module.js',
+            'dummy/whatever/module-slim.js',
+        ])
+
+
 class BaseDriverClassTestCase(unittest.TestCase):
     """
     BaseDriver class test case.

@@ -249,6 +249,80 @@ class BaseModuleRegistry(BasePkgRefRegistry):
         return result
 
 
+class BaseExternalModuleRegistry(BasePkgRefRegistry):
+    """
+    A registry for storing references to scripts sourced from JavaScript
+    or Node.js module manager, i.e. node_modules.
+
+    The intent of this registry is to have register paths that point to
+    targets managed in those external systems via the key portion of the
+    entry points.  The interpretation of the values will be specific to
+    the implementation.
+
+    At the very least, a value of true can simply be used to denote that
+    a given package will want to do something with it.
+
+    Another use case might be for the referencing of prebuilt artifacts
+    and optionally give them an alias (however, it must be one that is
+    compatible to the Python module name scheme given the limitations
+    due to the entry point format).
+    """
+
+    # TODO decide on providing support for a handler, if an attribute to
+    # some provided module was provided instead, so that it will resolve
+    # the actual name with that callable - this means supplimentary info
+    # can be provided, which could be provided via something like
+    # calmjs_extras.
+
+    def register_entry_point(self, entry_point):
+        # for storing a mapping from the Python module that the
+        # declarations to the JavaScript modules themselves.
+        paths = self.process_entry_point(entry_point)
+        self.store_record(entry_point, paths)
+        self.store_records_for_package(entry_point, paths)
+
+    def store_record(self, entry_point, paths):
+        # the record is stored as an inverse mapping to the set of
+        # paths that called on that module_name.
+        self.records[entry_point.module_name] = self.records.get(
+            entry_point.module_name, set()).union(paths)
+
+    def store_records_for_package(self, entry_point, paths):
+        """
+        Store the paths in a way that permit lookup by package
+        """
+
+        pkg_module_map = self._dist_to_package_module_map(entry_point)
+        pkg_module_map.extend(paths)
+
+    def process_entry_point(self, entry_point):
+        """
+        The default implementation simply return the entry point to a
+        path.
+
+        Result type should be an iterable.
+        """
+
+        return [entry_point.name]
+
+    def get_record(self, name):
+        """
+        Get a record for the registered name, which will be a set of
+        matching desired "module names" for the given path.
+        """
+
+        return set().union(self.records.get(name, set()))
+
+    def get_records_for_package(self, package_name):
+        """
+        Get all records identified by package.
+        """
+
+        result = []
+        result.extend(self.package_module_map.get(package_name))
+        return result
+
+
 class BaseDriver(object):
     """
     The Node.js interfacing base driver class.
