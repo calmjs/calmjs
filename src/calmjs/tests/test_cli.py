@@ -112,7 +112,7 @@ class CliDriverTestCase(unittest.TestCase):
         stub_mod_check_output(self, cli)
         stub_base_which(self)
         self.check_output_answer = b'Some app v.1.2.3.4. All rights reserved'
-        results = cli._get_bin_version('some_app')
+        results = cli.get_bin_version('some_app')
         self.assertEqual(results, (1, 2, 3, 4))
 
     def test_get_bin_version_longer(self):
@@ -120,14 +120,14 @@ class CliDriverTestCase(unittest.TestCase):
         stub_base_which(self)
         # tags are ignored for now.
         self.check_output_answer = b'version.11.200.345.4928-what'
-        results = cli._get_bin_version('some_app')
+        results = cli.get_bin_version('some_app')
         self.assertEqual(results, (11, 200, 345, 4928))
 
     def test_get_bin_version_short(self):
         stub_mod_check_output(self, cli)
         stub_base_which(self)
         self.check_output_answer = b'1'
-        results = cli._get_bin_version('some_app')
+        results = cli.get_bin_version('some_app')
         self.assertEqual(results, (1,))
 
     def test_get_bin_version_unexpected(self):
@@ -135,7 +135,7 @@ class CliDriverTestCase(unittest.TestCase):
         stub_base_which(self)
         self.check_output_answer = b'Nothing'
         with pretty_logging(stream=mocks.StringIO()) as err:
-            results = cli._get_bin_version('some_app')
+            results = cli.get_bin_version('some_app')
         self.assertIn(
             "encountered unexpected error while trying to find version of "
             "'some_app'", err.getvalue())
@@ -145,7 +145,7 @@ class CliDriverTestCase(unittest.TestCase):
         stub_mod_check_output(self, cli, fake_error(OSError))
         stub_base_which(self)
         with pretty_logging(stream=mocks.StringIO()) as err:
-            results = cli._get_bin_version('some_app')
+            results = cli.get_bin_version('some_app')
         self.assertIn("failed to execute 'some_app'", err.getvalue())
         self.assertIsNone(results)
 

@@ -100,7 +100,7 @@ class NodeDriver(BaseDriver):
 
     def get_node_version(self):
         kw = self._gen_call_kws()
-        return _get_bin_version(self.node_bin, kw=kw)
+        return get_bin_version(self.node_bin, kw=kw)
 
     def node(self, source, args=(), env={}):
         """
@@ -226,7 +226,7 @@ class PackageManagerDriver(NodeDriver):
 
     def get_pkg_manager_version(self):
         kw = self._gen_call_kws()
-        return _get_bin_version(self.pkg_manager_bin, kw=kw)
+        return get_bin_version(self.pkg_manager_bin, kw=kw)
 
     def pkg_manager_view(
             self, package_names, stream=None, explicit=False, **kw):
