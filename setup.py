@@ -49,9 +49,11 @@ setup(
         ],
         'calmjs.runtime': [
             'npm = calmjs.npm:npm.runtime',
+            'yarn = calmjs.yarn:yarn.runtime',
         ],
         'distutils.commands': [
             'npm = calmjs.npm:npm',
+            'yarn = calmjs.yarn:yarn',
         ],
         'distutils.setup_keywords': [
             'package_json = calmjs.dist:validate_json_field',

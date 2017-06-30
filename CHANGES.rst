@@ -1,6 +1,11 @@
 Changelog
 =========
 
+?.?.0 (unreleased)
+------------------
+
+- The ``yarn`` subcommand is now provided as an alternative to ``npm``.
+
 2.1.0 (2016-11-29)
 ------------------
 
