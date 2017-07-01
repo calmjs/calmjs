@@ -25,6 +25,9 @@ from calmjs.toolchain import AdviceRegistry
 from calmjs.toolchain import Spec
 from calmjs.toolchain import Toolchain
 from calmjs.toolchain import NullToolchain
+from calmjs.toolchain import dict_get
+from calmjs.toolchain import dict_key_update_overwrite_check
+from calmjs.toolchain import spec_update_plugins_sourcepath_dict
 
 from calmjs.toolchain import CLEANUP
 from calmjs.toolchain import SUCCESS
@@ -63,6 +66,140 @@ def dummy(spec, extras):
     items.append('dummy')
     if extras:
         spec['extras'] = extras
+
+
+class DictGetTestCase(unittest.TestCase):
+    """
+    A special get that also creates keys.
+    """
+
+    def test_dict_get(self):
+        items = {}
+        dict_get(items, 'a_key')
+        self.assertEqual(items, {'a_key': {}})
+
+        a_key = items['a_key']
+        dict_get(items, 'a_key')
+        self.assertIs(items['a_key'], a_key)
+
+
+class DictKeyGetUpdateTestCase(unittest.TestCase):
+    """
+    A function for updating specific dict/spec via a key, and ensure
+    that any overwritten values are warned with the specified message.
+    """
+
+    def test_dict_key_update_overwrite_check_standard(self):
+        a = {}
+        a['base_key'] = {'k1': 'v1'}
+        mapping = {'k2': 'v2'}
+        with pretty_logging(stream=StringIO()) as s:
+            dict_key_update_overwrite_check(a, 'base_key', mapping)
+        self.assertEqual(s.getvalue(), '')
+        self.assertEqual(a['base_key'], {'k1': 'v1', 'k2': 'v2'})
+
+    def test_dict_key_update_overwrite_check_no_update(self):
+        a = {}
+        a['base_key'] = {'k1': 'v1'}
+        mapping = {'k1': 'v1'}
+        with pretty_logging(stream=StringIO()) as s:
+            dict_key_update_overwrite_check(a, 'base_key', mapping)
+        self.assertEqual(s.getvalue(), '')
+        self.assertEqual(a['base_key'], {'k1': 'v1'})
+
+    def test_dict_key_update_overwrite_check_overwritten_single(self):
+        a = {}
+        a['base_key'] = {'k1': 'v1'}
+        mapping = {'k1': 'v2'}
+        with pretty_logging(stream=StringIO()) as s:
+            dict_key_update_overwrite_check(a, 'base_key', mapping)
+        self.assertIn(
+            "base_key['k1'] is being rewritten from 'v1' to 'v2'; "
+            "configuration may be in an invalid state.",
+            s.getvalue())
+        self.assertEqual(a['base_key'], {'k1': 'v2'})
+
+    def test_dict_key_update_overwrite_check_overwritten_multi(self):
+        a = {}
+        a['base_key'] = {'k1': 'v1', 'k2': 'v2'}
+        mapping = {'k1': 'v2', 'k2': 'v4'}
+        with pretty_logging(stream=StringIO()) as s:
+            dict_key_update_overwrite_check(a, 'base_key', mapping, 'oops.')
+        self.assertIn(
+            "base_key['k1'] is being rewritten from 'v1' to 'v2'; oops.",
+            s.getvalue())
+        self.assertIn(
+            "base_key['k2'] is being rewritten from 'v2' to 'v4'; oops.",
+            s.getvalue())
+        self.assertEqual(a['base_key'], {'k1': 'v2', 'k2': 'v4'})
+
+
+class SpecUpdatePluginsSourcepathDictTestCase(unittest.TestCase):
+    """
+    A function for updating the spec with a source map for target keys,
+    in such a way that makes it compatible with the base system.
+    """
+
+    def test_standard_modules_base(self):
+        source_map = {
+            'standard/module': 'standard/module',
+            'standard.module': 'standard.module',
+        }
+        spec = {}
+        spec_update_plugins_sourcepath_dict(
+            spec, source_map, 'sourcepath_key', 'plugins_key')
+        self.assertEqual(spec, {
+            'sourcepath_key': {
+                'standard/module': 'standard/module',
+                'standard.module': 'standard.module',
+            }
+        })
+
+    def test_standard_modules_id(self):
+        source_map = {
+            'standard/module': 'standard/module',
+        }
+        base_map = {}
+        spec = {'sourcepath_key': base_map}
+
+        spec_update_plugins_sourcepath_dict(
+            spec, source_map, 'sourcepath_key', 'plugins_key')
+        self.assertIs(spec['sourcepath_key'], base_map)
+        self.assertEqual(base_map, {
+            'standard/module': 'standard/module',
+        })
+
+    def test_modules(self):
+        source_map = {
+            'plugin/module!argument': 'some/filesystem/path',
+            'text!argument': 'some/text/file.txt',
+        }
+        spec = {}
+
+        spec_update_plugins_sourcepath_dict(
+            spec, source_map, 'sourcepath_key', 'plugins_key')
+        self.maxDiff = 123123
+        self.assertEqual(spec, {
+            'plugins_key': {
+                'plugin/module': {
+                    'plugin/module!argument': 'some/filesystem/path',
+                },
+                'text': {
+                    'text!argument': 'some/text/file.txt',
+                },
+            },
+            'sourcepath_key': {
+            },
+        })
+
+        spec_update_plugins_sourcepath_dict(spec, {
+            'text!argument2': 'some/text/file2.txt',
+        }, 'sourcepath_key', 'plugins_key')
+
+        self.assertEqual(spec['plugins_key']['text'], {
+            'text!argument': 'some/text/file.txt',
+            'text!argument2': 'some/text/file2.txt',
+        })
 
 
 class SpecTestCase(unittest.TestCase):

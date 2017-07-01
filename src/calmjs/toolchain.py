@@ -194,6 +194,58 @@ def _check_key_exists(spec, keys):
     return False
 
 
+def dict_get(d, key):
+    value = d[key] = d.get(key, {})
+    return value
+
+
+def dict_key_update_overwrite_check(d, target, mapping, consequence=None):
+    """
+    For updating a dict with another whose keys should not already be
+    present.
+    """
+
+    msg = ("configuration may be in an invalid state."
+           if consequence is None else consequence)
+
+    keys = set(d[target].keys()) & set(mapping.keys())
+    for key in keys:
+        if d[target][key] != mapping[key]:
+            logger.warning(
+                "%s['%s'] is being rewritten from '%s' to '%s'; %s",
+                target, key, d[target][key], mapping[key], msg,
+            )
+
+    # complaints are over, finish the job.
+    d[target].update(mapping)
+
+
+def spec_update_plugins_sourcepath_dict(
+        spec, sourcepath_dict, sourcepath_dict_key,
+        plugins_sourcepath_dict_key):
+    """
+    Take an existing spec and a sourcepath mapping (that could be
+    produced via calmjs.dist.*_module_registry_dependencies functions)
+    and apply it to a dict in the spec under the key sourcepath_dict_key
+    (note: sourcepath was formerly typicaly written as source_map) in
+    the spec, with any chunks that define a loader plugin be split off
+    to the one under the plugins_sourcepath_dict_key.
+    """
+
+    default = dict_get(spec, sourcepath_dict_key)
+    for modname, sourcepath in sourcepath_dict.items():
+        parts = modname.split('!', 1)
+        if len(parts) == 1:
+            # default
+            default[modname] = sourcepath
+            continue
+
+        plugin_name, arguments = parts
+        plugins = dict_get(spec, plugins_sourcepath_dict_key)
+        plugin = dict_get(plugins, plugin_name)
+        plugin[modname] = sourcepath
+
+
 def null_transpiler(spec, reader, writer):
     writer.write(reader.read())
 
