@@ -207,7 +207,7 @@ def dict_get(d, key):
     return value
 
 
-def dict_key_update_overwrite_check(d, target, mapping, consequence=None):
+def dict_key_update_overwrite_check(d, key, mapping, consequence=None):
     """
     For updating a dict with another whose keys should not already be
     present.
@@ -216,16 +216,16 @@ def dict_key_update_overwrite_check(d, target, mapping, consequence=None):
     msg = ("configuration may be in an invalid state."
            if consequence is None else consequence)
 
-    keys = set(d[target].keys()) & set(mapping.keys())
-    for key in keys:
-        if d[target][key] != mapping[key]:
+    keys = set(d[key].keys()) & set(mapping.keys())
+    for subkey in keys:
+        if d[key][subkey] != mapping[subkey]:
             logger.warning(
                 "%s['%s'] is being rewritten from '%s' to '%s'; %s",
-                target, key, d[target][key], mapping[key], msg,
+                key, subkey, d[key][subkey], mapping[subkey], msg,
             )
 
     # complaints are over, finish the job.
-    d[target].update(mapping)
+    d[key].update(mapping)
 
 
 def spec_update_plugins_sourcepath_dict(
