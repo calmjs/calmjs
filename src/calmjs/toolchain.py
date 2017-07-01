@@ -28,20 +28,21 @@ modname
     modpaths are supported by most JavaScript/Node.js based import
     systems, its usage from within calmjs framework is discouraged.
 
-source
+sourcepath
     An absolute path on the local filesystem to the source file for a
-    given modpath.  These two values (modpath and source) serves as the
-    foundational mapping from a JavaScript module name to its
-    corresponding source file.
+    given modpath.  These two values (modpath and sourcepath) serves as
+    the foundational mapping from a JavaScript module name to its
+    corresponding source file.  Previously, this was simply named
+    'source'.
 
-target
+targetpath
     A relative path to a build_dir.  The relative path MUST not contain
-    relative references.  A mapping from modpath to target is generated
-    from a modpath to source mapping, where the source file has been
-    somehow transformed into the target at the target location.  The
-    relative path version (again, from build_dir) is typically recorded
-    by instances of ``Spec`` objects that have undergone a ``Toolchain``
-    run.
+    relative references.  A mapping from modpath to targetpath is
+    generated from a modpath to sourcepath mapping, where the source
+    file has been somehow transformed into the target at targetpath.
+    The relative path version (again, from build_dir) is typically
+    recorded by instances of ``Spec`` objects that have undergone a
+    ``Toolchain`` run.  Previously, this was simply named 'target'.
 
 modpath
     Typically identical to modname, however the slight difference is
@@ -57,8 +58,10 @@ from __future__ import unicode_literals
 import codecs
 import errno
 import logging
+import re
 import shutil
 import sys
+import warnings
 from functools import partial
 from inspect import currentframe
 from traceback import format_stack
@@ -167,7 +170,7 @@ SOURCE_PACKAGE_NAMES = 'source_package_names'
 # for testing
 # name of test modules
 TEST_MODULE_NAMES = 'test_module_names'
-# mapping of test module to their paths; i.e. a source_map, but not
+# mapping of test module to their paths; i.e. sourcepath_dict, but not
 # labled as one to prevent naming conflicts (and they ARE to be
 # standalone modules to be used directly by the toolchain and testing
 # integration layer.
@@ -192,6 +195,11 @@ def _check_key_exists(spec, keys):
         )
         return True
     return False
+
+
+def _deprecation_warning(msg):
+    warnings.warn(msg, DeprecationWarning)
+    logger.warning(msg)
 
 
 def dict_get(d, key):
@@ -227,9 +235,12 @@ def spec_update_plugins_sourcepath_dict(
     Take an existing spec and a sourcepath mapping (that could be
     produced via calmjs.dist.*_module_registry_dependencies functions)
     and apply it to a dict in the spec under the key sourcepath_dict_key
-    (note: sourcepath was formerly typicaly written as source_map) in
-    the spec, with any chunks that define a loader plugin be split off
-    to the one under the plugins_sourcepath_dict_key.
+    in the spec, with any chunks that define a loader plugin be split
+    off to the one under the plugins_sourcepath_dict_key.
+
+    Note that sourcepath was formerly typicaly written as source_map,
+    which is rather confusing when it is also the name for the VLQ
+    encoded mapping of transpiled file back to its original.
     """
 
     default = dict_get(spec, sourcepath_dict_key)
@@ -257,10 +268,47 @@ class Spec(dict):
     """
 
     def __init__(self, *a, **kw):
-        super(Spec, self).__init__(*a, **kw)
+        self._deprecation_match_4_0 = [(re.compile(p), r) for p, r in (
+            ('^((?!generate)(.*))_source_map$', '\\1_sourcepath'),
+            ('_targets$', '_targetpaths'),
+        )]
+
+        clean_kw = {
+            self.__process_deprecated_key(k): v for k, v in kw.items()}
+
+        super(Spec, self).__init__(*a, **clean_kw)
         self._advices = {}
         self._frames = {}
         self._called = set()
+
+    def __process_deprecated_key(self, key):
+        for patt, repl in self._deprecation_match_4_0:
+            if patt.search(key):
+                break
+        else:
+            return key
+
+        new_key = patt.sub(repl, key)
+        _deprecation_warning(
+            "Spec key '%s' has been remapped to '%s' in calmjs-3.0.0; this "
+            "automatic remap will be removed by calmjs-4.0.0" % (key, new_key)
+        )
+        return new_key
+
+    def get(self, key, default=NotImplemented):
+        key = self.__process_deprecated_key(key)
+        if default is NotImplemented:
+            return dict.get(self, key)
+        else:
+            return dict.get(self, key, default)
+
+    def __getitem__(self, key):
+        return dict.__getitem__(
+            self, self.__process_deprecated_key(key))
+
+    def __setitem__(self, key, value):
+        return dict.__setitem__(
+            self, self.__process_deprecated_key(key), value)
 
     def __repr__(self):
         debug = self.get(DEBUG)
@@ -586,15 +634,50 @@ class Toolchain(BaseDriver):
 
     def setup_prefix_suffix(self):
         """
-        Set up the compile prefix and the source suffix attribute, which
-        are the prefix to the function name and the suffix to retrieve
-        the values from for creating the generator function.
+        Set up the compile prefix, sourcepath and the targetpath suffix
+        attributes, which are the prefix to the function name and the
+        suffixes to retrieve the values from for creating the generator
+        function.
         """
 
         self.compile_prefix = 'compile_'
-        self.sourcemap_suffix = '_source_map'
+        self.sourcepath_suffix = '_sourcepath'
         self.modpath_suffix = '_modpaths'
-        self.target_suffix = '_targets'
+        self.targetpath_suffix = '_targetpaths'
+
+    # TODO BBB backward compat fixes
+
+    @property
+    def sourcemap_suffix(self):
+        _deprecation_warning(
+            'sourcemap_suffix has been renamed to sourcepath_suffix; '
+            'Toolchain attribute will be removed by calmjs-4.0.0',
+        )
+        return self.sourcepath_suffix
+
+    @sourcemap_suffix.setter
+    def sourcemap_suffix(self, value):
+        _deprecation_warning(
+            'sourcemap_suffix has been renamed to sourcepath_suffix; '
+            'Toolchain attribute will be removed by calmjs-4.0.0',
+        )
+        self.sourcepath_suffix = value
+
+    @property
+    def target_suffix(self):
+        _deprecation_warning(
+            'target_suffix has been renamed to targetpath_suffix; '
+            'Toolchain attribute will be removed by calmjs-4.0.0'
+        )
+        return self.targetpath_suffix
+
+    @target_suffix.setter
+    def target_suffix(self, value):
+        _deprecation_warning(
+            'target_suffix has been renamed to targetpath_suffix; '
+            'Toolchain attribute will be removed by calmjs-4.0.0'
+        )
+        self.targetpath_suffix = value
 
     def setup_compile_entries(self):
         """
@@ -617,13 +700,13 @@ class Toolchain(BaseDriver):
         alternatively a callable could be provided.  This method must
         return a 2-tuple.
 
-        second element being the read key for the source map, which is
-        the name to be read from the spec and it will be suffixed with
-        the sourcemap_suffix, default being `_source_map`.
+        second element being the read key for the sourcepath dict, which
+        is the name to be read from the spec and it will be suffixed
+        with the sourcepath_suffix, default being `_sourcepath`.
 
         third element being the write key for first return value of the
         method, it will be suffixed with the modpath_suffix, defaults to
-        `_modpaths`, and the target_suffix, default to `_targets`.
+        `_modpaths`, and the targetpath_suffix, default to `_targetpaths`.
 
         The method referenced SHOULD NOT assign values to the spec, and
         it must produce and return a 2-tuple:
@@ -637,7 +720,7 @@ class Toolchain(BaseDriver):
         """
 
         return (
-            # compile_*, *_source_map, (*_modpaths, *_targets)
+            # compile_*, *_sourcepath, (*_modpaths, *_targetpaths)
             ('transpile', 'transpile', 'transpiled'),
             ('bundle', 'bundle', 'bundled'),
         )
@@ -652,6 +735,9 @@ class Toolchain(BaseDriver):
 
         if not realpath(target).startswith(spec[BUILD_DIR]):
             raise ValueError('build_target %s is outside build_dir' % target)
+
+    # note that nearly instances of source means sourcepath, and that
+    # target means targetpath
 
     def transpile_modname_source_target(self, spec, modname, source, target):
         """
@@ -915,9 +1001,9 @@ class Toolchain(BaseDriver):
                     )
                     continue
 
-            spec_read_key = read_key + self.sourcemap_suffix
+            spec_read_key = read_key + self.sourcepath_suffix
             spec_modpath_key = store_key + self.modpath_suffix
-            spec_target_key = store_key + self.target_suffix
+            spec_target_key = store_key + self.targetpath_suffix
 
             if _check_key_exists(spec, [spec_modpath_key, spec_target_key]):
                 logger.error(
@@ -925,8 +1011,9 @@ class Toolchain(BaseDriver):
                 )
                 continue
 
-            source_map = spec.get(spec_read_key, {})
-            entries = self._gen_modname_source_target_modpath(spec, source_map)
+            sourcepath_dict = spec.get(spec_read_key, {})
+            entries = self._gen_modname_source_target_modpath(
+                spec, sourcepath_dict)
             (spec[spec_modpath_key], spec[spec_target_key],
                 new_module_names) = method(spec, entries)
             logger.debug(

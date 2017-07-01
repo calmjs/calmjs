@@ -1,10 +1,26 @@
 Changelog
 =========
 
-?.?.0 (unreleased)
+3.0.0 (unreleased)
 ------------------
 
 - The ``yarn`` subcommand is now provided as an alternative to ``npm``.
+- Some confusing internal (but public) identifiers which are used in the
+  Toolchain and Spec system have been renamed to better reflect their
+  intended use and purpose.  Deprecation code is applied to aid
+  transition, and these will be removed in 4.0.0.
+
+  - For ``Spec``:
+
+    - ``*_source_map`` -> ``*_sourcepath`` (except for the key that really
+      amplified the confusion which was ``generate_source_map``)
+    - ``*_targets`` -> ``*_targetpaths`` (to be consistent with paths on
+      the filesystem).
+
+  - On the ``Toolchain``, for the similar reasons as above:
+
+    - ``sourcemap_suffix`` -> ``sourcepath_suffix``
+    - ``target_suffix`` -> ``targetpath_suffix``
 
 2.1.0 (2016-11-29)
 ------------------

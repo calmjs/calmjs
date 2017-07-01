@@ -2,6 +2,7 @@
 import unittest
 import json
 import tempfile
+import warnings
 from inspect import currentframe
 from os import makedirs
 from os.path import basename
@@ -136,18 +137,18 @@ class DictKeyGetUpdateTestCase(unittest.TestCase):
 
 class SpecUpdatePluginsSourcepathDictTestCase(unittest.TestCase):
     """
-    A function for updating the spec with a source map for target keys,
-    in such a way that makes it compatible with the base system.
+    A function for updating the spec with a sourcepath dict for target
+    keys, in such a way that makes it compatible with the base system.
     """
 
     def test_standard_modules_base(self):
-        source_map = {
+        sourcepath_dict = {
             'standard/module': 'standard/module',
             'standard.module': 'standard.module',
         }
         spec = {}
         spec_update_plugins_sourcepath_dict(
-            spec, source_map, 'sourcepath_key', 'plugins_key')
+            spec, sourcepath_dict, 'sourcepath_key', 'plugins_key')
         self.assertEqual(spec, {
             'sourcepath_key': {
                 'standard/module': 'standard/module',
@@ -156,28 +157,28 @@ class SpecUpdatePluginsSourcepathDictTestCase(unittest.TestCase):
         })
 
     def test_standard_modules_id(self):
-        source_map = {
+        sourcepath_dict = {
             'standard/module': 'standard/module',
         }
         base_map = {}
         spec = {'sourcepath_key': base_map}
 
         spec_update_plugins_sourcepath_dict(
-            spec, source_map, 'sourcepath_key', 'plugins_key')
+            spec, sourcepath_dict, 'sourcepath_key', 'plugins_key')
         self.assertIs(spec['sourcepath_key'], base_map)
         self.assertEqual(base_map, {
             'standard/module': 'standard/module',
         })
 
     def test_modules(self):
-        source_map = {
+        sourcepath_dict = {
             'plugin/module!argument': 'some/filesystem/path',
             'text!argument': 'some/text/file.txt',
         }
         spec = {}
 
         spec_update_plugins_sourcepath_dict(
-            spec, source_map, 'sourcepath_key', 'plugins_key')
+            spec, sourcepath_dict, 'sourcepath_key', 'plugins_key')
         self.maxDiff = 123123
         self.assertEqual(spec, {
             'plugins_key': {
@@ -200,6 +201,118 @@ class SpecUpdatePluginsSourcepathDictTestCase(unittest.TestCase):
             'text!argument': 'some/text/file.txt',
             'text!argument2': 'some/text/file2.txt',
         })
+
+
+class DeprecationTestCase(unittest.TestCase):
+    """
+    Various test cases to ensure successful deprecation.
+    """
+
+    def test_construction(self):
+        with pretty_logging(stream=StringIO()) as s:
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter('always')
+                Spec(test_targets='/')
+
+        self.assertIn(
+            "Spec key 'test_targets' has been remapped to 'test_targetpaths' "
+            "in calmjs-3.0.0;", str(w[-1].message)
+        )
+        self.assertIn(
+            "Spec key 'test_targets' has been remapped to 'test_targetpaths' "
+            "in calmjs-3.0.0;", s.getvalue()
+        )
+
+    def test_set(self):
+        with pretty_logging(stream=StringIO()) as s:
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter('always')
+                spec = Spec()
+                spec['test_source_map'] = '/'
+
+        self.assertIn(
+            "Spec key 'test_source_map' has been remapped to "
+            "'test_sourcepath' in calmjs-3.0.0;", str(w[-1].message)
+        )
+        self.assertIn(
+            "Spec key 'test_source_map' has been remapped to "
+            "'test_sourcepath' in calmjs-3.0.0;", s.getvalue()
+        )
+
+    def test_get(self):
+        spec = Spec(test_sourcepath='/')
+        with pretty_logging(stream=StringIO()) as s:
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter('always')
+                self.assertEqual(spec.get('test_source_map', None), '/')
+                self.assertEqual(spec.get('test_source_map'), '/')
+
+        self.assertIn(
+            "Spec key 'test_source_map' has been remapped to "
+            "'test_sourcepath' in calmjs-3.0.0;", str(w[-1].message)
+        )
+        self.assertIn(
+            "Spec key 'test_source_map' has been remapped to "
+            "'test_sourcepath' in calmjs-3.0.0;", s.getvalue()
+        )
+
+    def test_getitem(self):
+        spec = Spec(test_sourcepath='/')
+        with pretty_logging(stream=StringIO()) as s:
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter('always')
+                self.assertEqual(spec['test_source_map'], '/')
+
+        self.assertIn(
+            "Spec key 'test_source_map' has been remapped to "
+            "'test_sourcepath' in calmjs-3.0.0;", str(w[-1].message)
+        )
+        self.assertIn(
+            "Spec key 'test_source_map' has been remapped to "
+            "'test_sourcepath' in calmjs-3.0.0;", s.getvalue()
+        )
+
+    def test_generate_source_map(self):
+        # this is an actual attribute
+        with pretty_logging(stream=StringIO()) as s:
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter('always')
+                spec = Spec(generate_source_map=True)
+                self.assertTrue(spec['generate_source_map'], '/')
+
+        self.assertEqual(len(w), 0)
+        self.assertEqual(s.getvalue(), '')
+
+    def test_toolchain_attributes(self):
+        # should really be read/write, but in generate these are not
+        # set so...
+        with pretty_logging(stream=StringIO()) as s:
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter('always')
+                toolchain = NullToolchain()
+                # assert existing via old property, then set using old
+                # property, to see it reflected in new.
+                self.assertEqual(toolchain.sourcemap_suffix, '_sourcepath')
+                toolchain.sourcemap_suffix = 'foo'
+                self.assertEqual(toolchain.sourcepath_suffix, 'foo')
+
+                self.assertEqual(toolchain.target_suffix, '_targetpaths')
+                toolchain.target_suffix = 'foo'
+                self.assertEqual(toolchain.targetpath_suffix, 'foo')
+
+        self.assertIn(
+            "sourcemap_suffix has been renamed to sourcepath_suffix",
+            str(w[0].message)
+        )
+        self.assertEqual(len(w), 4)
+        self.assertIn(
+            "sourcemap_suffix has been renamed to sourcepath_suffix",
+            s.getvalue()
+        )
+        self.assertIn(
+            "target_suffix has been renamed to targetpath_suffix",
+            s.getvalue()
+        )
 
 
 class SpecTestCase(unittest.TestCase):
@@ -665,23 +778,23 @@ class ToolchainTestCase(unittest.TestCase):
         self.toolchain.compile(spec)
         self.assertEqual(spec['transpiled_modpaths'], {})
         self.assertEqual(spec['bundled_modpaths'], {})
-        self.assertEqual(spec['transpiled_targets'], {})
-        self.assertEqual(spec['bundled_targets'], {})
+        self.assertEqual(spec['transpiled_targetpaths'], {})
+        self.assertEqual(spec['bundled_targetpaths'], {})
         self.assertEqual(spec['export_module_names'], [])
 
     def test_toolchain_standard_compile_existing_values(self):
-        # Test that in the case where existing path maps will block, and
-        # the existing module_names will be kept
+        # Test that in the case where existing path dicts will block,
+        # and the existing module_names will be kept
         transpiled_modpaths = {}
         bundled_modpaths = {}
-        transpiled_targets = {}
-        bundled_targets = {}
+        transpiled_targetpaths = {}
+        bundled_targetpaths = {}
         export_module_names = ['fake_names']
         spec = Spec(
             transpiled_modpaths=transpiled_modpaths,
             bundled_modpaths=bundled_modpaths,
-            transpiled_targets=transpiled_targets,
-            bundled_targets=bundled_targets,
+            transpiled_targetpaths=transpiled_targetpaths,
+            bundled_targetpaths=bundled_targetpaths,
             export_module_names=export_module_names,
         )
 
@@ -692,8 +805,8 @@ class ToolchainTestCase(unittest.TestCase):
         self.assertIn("attempted to write 'transpiled_modpaths' to spec", msg)
         self.assertIn("attempted to write 'bundled_modpaths' to spec", msg)
         # These are absent due to early abort
-        self.assertNotIn("attempted to write 'transpiled_targets'", msg)
-        self.assertNotIn("attempted to write 'bundled_targets'", msg)
+        self.assertNotIn("attempted to write 'transpiled_targetpaths'", msg)
+        self.assertNotIn("attempted to write 'bundled_targetpaths'", msg)
 
         # compile step error messages
         self.assertIn(
@@ -706,18 +819,18 @@ class ToolchainTestCase(unittest.TestCase):
         # All should be same identity
         self.assertIs(spec['transpiled_modpaths'], transpiled_modpaths)
         self.assertIs(spec['bundled_modpaths'], bundled_modpaths)
-        self.assertIs(spec['transpiled_targets'], transpiled_targets)
-        self.assertIs(spec['bundled_targets'], bundled_targets)
+        self.assertIs(spec['transpiled_targetpaths'], transpiled_targetpaths)
+        self.assertIs(spec['bundled_targetpaths'], bundled_targetpaths)
         self.assertIs(spec['export_module_names'], export_module_names)
 
     def test_toolchain_standard_compile_existing_values_altarnate(self):
         # Test that in the case where existing path maps will block, and
         # the existing export_module_names will be kept
-        transpiled_targets = {}
-        bundled_targets = {}
+        transpiled_targetpaths = {}
+        bundled_targetpaths = {}
         spec = Spec(
-            transpiled_targets=transpiled_targets,
-            bundled_targets=bundled_targets,
+            transpiled_targetpaths=transpiled_targetpaths,
+            bundled_targetpaths=bundled_targetpaths,
         )
 
         with pretty_logging(stream=StringIO()) as s:
@@ -726,17 +839,17 @@ class ToolchainTestCase(unittest.TestCase):
         msg = s.getvalue()
         # These are filtered first
         self.assertIn(
-            "attempted to write 'transpiled_targets' to spec but key already "
-            "exists; not overwriting, skipping", msg)
+            "attempted to write 'transpiled_targetpaths' to spec but key "
+            "already exists; not overwriting, skipping", msg)
         self.assertIn(
-            "attempted to write 'bundled_targets' to spec but key already "
+            "attempted to write 'bundled_targetpaths' to spec but key already "
             "exists; not overwriting, skipping", msg)
 
         # These first couple won't be written since code never hit it
         self.assertNotIn('transpiled_modpaths', spec)
         self.assertNotIn('bundled_modpaths', spec)
-        self.assertIs(spec['bundled_targets'], bundled_targets)
-        self.assertIs(spec['transpiled_targets'], transpiled_targets)
+        self.assertIs(spec['bundled_targetpaths'], bundled_targetpaths)
+        self.assertIs(spec['transpiled_targetpaths'], transpiled_targetpaths)
 
     def test_toolchain_standard_compile_bad_export_module_names_type(self):
         export_module_names = {}
@@ -758,10 +871,10 @@ class ToolchainTestCase(unittest.TestCase):
 
         self.assertNotIn('transpiled_modpaths', spec)
         self.assertNotIn('bundled_modpaths', spec)
-        self.assertNotIn('transpiled_targets', spec)
-        self.assertNotIn('bundled_targets', spec)
+        self.assertNotIn('transpiled_targetpaths', spec)
+        self.assertNotIn('bundled_targetpaths', spec)
         self.assertEqual(spec['faked_modpaths'], {'fake': 'nothing'})
-        self.assertEqual(spec['faked_targets'], {'fake': 'nothing.js'})
+        self.assertEqual(spec['faked_targetpaths'], {'fake': 'nothing.js'})
         self.assertEqual(spec['export_module_names'], ['fake'])
 
     def test_toolchain_standard_compile_alternate_entries_not_callable(self):
@@ -778,8 +891,8 @@ class ToolchainTestCase(unittest.TestCase):
 
         self.assertNotIn('transpiled_modpaths', spec)
         self.assertNotIn('bundled_modpaths', spec)
-        self.assertNotIn('transpiled_targets', spec)
-        self.assertNotIn('bundled_targets', spec)
+        self.assertNotIn('transpiled_targetpaths', spec)
+        self.assertNotIn('bundled_targetpaths', spec)
 
     def test_toolchain_standard_good(self):
         # good, with a mock
@@ -852,7 +965,7 @@ class ToolchainTestCase(unittest.TestCase):
 
         spec = Spec(
             build_dir=build_dir,
-            transpile_source_map={
+            transpile_sourcepath={
                 # lol ``.`` being valid char for namespace in node
                 '../source': join(source, 'source'),
             },
@@ -1068,7 +1181,7 @@ class NullToolchainTestCase(unittest.TestCase):
 
         spec = Spec(
             build_dir=build_dir,
-            transpile_source_map={
+            transpile_sourcepath={
                 'namespace.dummy.source': source_file,
             },
         )
@@ -1077,16 +1190,16 @@ class NullToolchainTestCase(unittest.TestCase):
         # name, and relative filename to the build_path
         self.assertEqual(spec, {
             'build_dir': build_dir,
-            'transpile_source_map': {
+            'transpile_sourcepath': {
                 'namespace.dummy.source': source_file,
             },
 
             'bundled_modpaths': {},
-            'bundled_targets': {},
+            'bundled_targetpaths': {},
             'transpiled_modpaths': {
                 'namespace.dummy.source': 'namespace.dummy.source',
             },
-            'transpiled_targets': {
+            'transpiled_targetpaths': {
                 'namespace.dummy.source': 'namespace.dummy.source.js',
             },
             'export_module_names': ['namespace.dummy.source'],
@@ -1111,7 +1224,7 @@ class NullToolchainTestCase(unittest.TestCase):
 
         spec = Spec(
             build_dir=build_dir,
-            bundle_source_map={
+            bundle_sourcepath={
                 'bundle1': source_file,  # bundle as source file.
                 'bundle2': bundle_dir,  # bundle as dir.
             },
@@ -1121,7 +1234,7 @@ class NullToolchainTestCase(unittest.TestCase):
         # name, and relative filename to the build_path
         self.assertEqual(spec, {
             'build_dir': build_dir,
-            'bundle_source_map': {
+            'bundle_sourcepath': {
                 'bundle1': source_file,
                 'bundle2': bundle_dir,
             },
@@ -1130,12 +1243,12 @@ class NullToolchainTestCase(unittest.TestCase):
                 'bundle1': 'bundle1',
                 'bundle2': 'bundle2',
             },
-            'bundled_targets': {
+            'bundled_targetpaths': {
                 'bundle1': 'bundle1.js',
                 'bundle2': 'bundle2',  # dir does NOT get appended.
             },
             'transpiled_modpaths': {},
-            'transpiled_targets': {},
+            'transpiled_targetpaths': {},
             'export_module_names': ['bundle1'],
             'prepare': 'prepared',
             'assemble': 'assembled',
@@ -1165,7 +1278,7 @@ class NullToolchainTestCase(unittest.TestCase):
 
         spec = Spec(
             build_dir=build_dir,
-            transpile_source_map={
+            transpile_sourcepath={
                 'namespace/dummy/source': source_file,
             },
         )
@@ -1174,16 +1287,16 @@ class NullToolchainTestCase(unittest.TestCase):
         # name, and relative filename to the build_path
         self.assertEqual(spec, {
             'build_dir': build_dir,
-            'transpile_source_map': {
+            'transpile_sourcepath': {
                 'namespace/dummy/source': source_file,
             },
 
             'bundled_modpaths': {},
-            'bundled_targets': {},
+            'bundled_targetpaths': {},
             'transpiled_modpaths': {
                 'namespace/dummy/source': 'namespace/dummy/source',
             },
-            'transpiled_targets': {
+            'transpiled_targetpaths': {
                 'namespace/dummy/source': 'namespace/dummy/source.js',
             },
             'export_module_names': ['namespace/dummy/source'],
