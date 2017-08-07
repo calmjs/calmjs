@@ -6,6 +6,7 @@ version = '3.0.0'
 classifiers = """
 Development Status :: 5 - Production/Stable
 Environment :: Console
+Environment :: Plugins
 Framework :: Setuptools Plugin
 Intended Audience :: Developers
 License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)
@@ -15,6 +16,11 @@ Programming Language :: Python :: 2.7
 Programming Language :: Python :: 3.3
 Programming Language :: Python :: 3.4
 Programming Language :: Python :: 3.5
+Programming Language :: Python :: 3.6
+Topic :: Software Development :: Build Tools
+Topic :: Software Development :: Libraries
+Topic :: System :: Software Distribution
+Topic :: Utilities
 """.strip().splitlines()
 
 setup(
