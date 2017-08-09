@@ -171,6 +171,22 @@ def find_packages_requirements_dists(pkg_names, working_set=None):
     return list(reversed(working_set.resolve(requirements)))
 
 
+def find_packages_parents_requirements_dists(pkg_names, working_set=None):
+    """
+    Leverages the `find_packages_requirements_dists` but strip out the
+    distributions that matches pkg_names.
+    """
+
+    dists = []
+    # opting for a naive implementation
+    targets = set(pkg_names)
+    for dist in find_packages_requirements_dists(pkg_names, working_set):
+        if dist.project_name in targets:
+            continue
+        dists.append(dist)
+    return dists
+
+
 def read_dist_egginfo_json(dist, filename=DEFAULT_JSON):
     """
     Safely get a json within an egginfo from a distribution.

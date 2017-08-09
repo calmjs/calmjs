@@ -598,6 +598,91 @@ class DistTestCase(unittest.TestCase):
             ['app'], working_set=working_set)
         self.assertEqual(result, answer)
 
+    def test_package_name_to_dists(self):
+        lib1 = make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([])),
+        ), 'lib1', '1.0.0')
+        lib2 = make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([])),
+        ), 'lib2', '1.0.0')
+        lib3 = make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([
+                'lib1>=1.0.0',
+                'lib2>=1.0.0',
+            ])),
+        ), 'lib3', '1.0.0')
+
+        app = make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([
+                'lib3>=1.0.0',
+            ])),
+        ), 'app', '2.0')
+
+        extra = make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([
+            ])),
+        ), 'extra', '2.0')
+
+        working_set = pkg_resources.WorkingSet()
+        working_set.add(lib1, self._calmjs_testing_tmpdir)
+        working_set.add(lib2, self._calmjs_testing_tmpdir)
+        working_set.add(lib3, self._calmjs_testing_tmpdir)
+        working_set.add(app, self._calmjs_testing_tmpdir)
+        working_set.add(extra, self._calmjs_testing_tmpdir)
+
+        # finding individual packages
+        self.assertEqual(['app'], [
+            d.project_name
+            for d in calmjs_dist.pkg_names_to_dists(
+                ['app'], working_set=working_set)])
+
+        self.assertEqual(['lib3'], [
+            d.project_name
+            for d in calmjs_dist.pkg_names_to_dists(
+                ['lib3'], working_set=working_set)])
+
+        # finding everything
+        self.assertEqual(['lib1', 'lib2', 'lib3', 'app'], [
+            d.project_name
+            for d in calmjs_dist.find_packages_requirements_dists(
+                ['app'], working_set=working_set)])
+
+        self.assertEqual(['lib1', 'lib2', 'lib3', 'extra'], [
+            d.project_name
+            for d in calmjs_dist.find_packages_requirements_dists(
+                ['lib3', 'extra'], working_set=working_set)])
+
+        # only find the parents
+        self.assertEqual(['lib1', 'lib2', 'lib3'], [
+            d.project_name
+            for d in calmjs_dist.find_packages_parents_requirements_dists(
+                ['app'], working_set=working_set)])
+
+        self.assertEqual(['lib1', 'lib2'], [
+            d.project_name
+            for d in calmjs_dist.find_packages_parents_requirements_dists(
+                ['app', 'lib3'], working_set=working_set)])
+
+        self.assertEqual(['lib1', 'lib2'], [
+            d.project_name
+            for d in calmjs_dist.find_packages_parents_requirements_dists(
+                ['lib3', 'app'], working_set=working_set)])
+
+        self.assertEqual(['lib1', 'lib2'], [
+            d.project_name
+            for d in calmjs_dist.find_packages_parents_requirements_dists(
+                ['lib3'], working_set=working_set)])
+
+        self.assertEqual([], [
+            d.project_name
+            for d in calmjs_dist.find_packages_parents_requirements_dists(
+                ['lib1'], working_set=working_set)])
+
+        self.assertEqual([], [
+            d.project_name
+            for d in calmjs_dist.find_packages_parents_requirements_dists(
+                ['lib2', 'lib1'], working_set=working_set)])
+
     # While it really is for node/npm, the declaration is almost generic
     # enough that the particular method should be used here.
     def test_node_modules_registry_flattening(self):
@@ -639,17 +724,11 @@ class DistTestCase(unittest.TestCase):
         working_set.add(lib, self._calmjs_testing_tmpdir)
         working_set.add(app, self._calmjs_testing_tmpdir)
 
-        self.assertEqual(1, len(calmjs_dist.pkg_names_to_dists(
-            ['app'], working_set=working_set)))
-
         single = calmjs_dist.get_extras_calmjs(
             ['app'], working_set=working_set)
         self.assertEqual(single['node_modules'], {
             'jquery': 'jquery/dist/jquery.min.js',
         })
-
-        self.assertEqual(2, len(calmjs_dist.find_packages_requirements_dists(
-            ['app'], working_set=working_set)))
 
         results = calmjs_dist.flatten_extras_calmjs(
             ['app'], working_set=working_set)
