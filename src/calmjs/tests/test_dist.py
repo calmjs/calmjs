@@ -739,9 +739,21 @@ class DistTestCase(unittest.TestCase):
         # child takes precedences as this was not specified to be merged
         self.assertEqual(results['something_else'], {'child': 'named'})
 
+        results = calmjs_dist.flatten_parents_extras_calmjs(
+            ['app'], working_set=working_set)
+        self.assertEqual(results['node_modules'], {
+            'jquery': 'jquery/dist/jquery.js',
+            'underscore': 'underscore/underscore-min.js',
+        })
+        self.assertEqual(results['something_else'], {'parent': 'lib'})
+
     def test_module_registry_dependencies_failure_no_reg(self):
         self.assertEqual(calmjs_dist.flatten_module_registry_dependencies(
             ['calmjs'], registry_name='calmjs.no_reg',), {})
+
+        self.assertEqual(
+            calmjs_dist.flatten_parents_module_registry_dependencies(
+                ['calmjs'], registry_name='calmjs.no_reg',), {})
 
         self.assertEqual(calmjs_dist.get_module_registry_dependencies(
             ['calmjs'], registry_name='calmjs.no_reg',), {})
@@ -831,6 +843,17 @@ class DistTestCase(unittest.TestCase):
             'forms/ui': '/home/src/forms/ui.js',
         })
 
+        self.assertEqual(
+            calmjs_dist.flatten_parents_module_registry_dependencies(
+                ['site'], registry_name=dummy_regid, working_set=working_set
+            ), {
+                'widget/ui': '/home/src/widget/ui.js',
+                'widget/widget': '/home/src/widget/widget.js',
+                'service/lib': '/home/src/forms/lib.js',
+                'forms/ui': '/home/src/forms/ui.js',
+            }
+        )
+
         service = calmjs_dist.flatten_module_registry_dependencies(
             ['service'], registry_name=dummy_regid, working_set=working_set)
         self.assertEqual(service, {
@@ -855,6 +878,16 @@ class DistTestCase(unittest.TestCase):
             'widget/widget': '/home/src/widget/widget.js',
             'service/lib': '/home/src/forms/lib.js',
         })
+
+        self.assertEqual(
+            calmjs_dist.flatten_parents_module_registry_dependencies(
+                ['forms', 'service', 'app'], registry_name=dummy_regid,
+                working_set=working_set
+            ), {
+                'widget/ui': '/home/src/widget/ui.js',
+                'widget/widget': '/home/src/widget/widget.js',
+            }
+        )
 
         # no declared exports/registry entries in security.
         security = calmjs_dist.flatten_module_registry_dependencies(
