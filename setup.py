@@ -78,6 +78,7 @@ setup(
         'calmjs.registry': [
             'calmjs.registry = calmjs.registry:Registry',
 
+            'calmjs.artifacts = calmjs.artifact:ArtifactRegistry',
             'calmjs.extras_keys = calmjs.module:ExtrasJsonKeysRegistry',
             'calmjs.module = calmjs.module:ModuleRegistry',
             'calmjs.module.tests = calmjs.module:ModuleRegistry',
@@ -86,6 +87,7 @@ setup(
             'calmjs.toolchain.advice = calmjs.toolchain:AdviceRegistry',
         ],
         'calmjs.reserved': [
+            'calmjs.artifacts = calmjs',
             'calmjs.dev.module = calmjs.dev',
             'calmjs.dev.module.tests = calmjs.dev',
             'calmjs.extras_keys = calmjs',

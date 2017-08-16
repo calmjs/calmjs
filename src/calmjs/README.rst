@@ -54,6 +54,10 @@ dist
     provides the functions that interfaces with the registry system that
     setuptools provide.
 
+artifact
+    Defines artifact related registries.  Uses dist to resolve the
+    dependency of packages.
+
 toolchain
     The exported primitive of this project.  Provides the skeleton
     Toolchain class for other packages to extend upon.  While some
