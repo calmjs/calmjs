@@ -5,13 +5,35 @@ Classes for tracking of built artifacts.
 
 from __future__ import absolute_import
 
+from inspect import getcallargs
+from logging import getLogger
+from os.path import dirname
+from os.path import exists
+from os.path import isdir
 from os.path import join
+from os import makedirs
+from os import unlink
 
 from calmjs.base import BaseRegistry
 from calmjs.dist import find_packages_requirements_dists
 from calmjs.dist import pkg_names_to_dists
 
 ARTIFACT_BASENAME = 'calmjs_artifacts'
+
+logger = getLogger(__name__)
+
+
+def verify_builder(builder):
+    """
+    To ensure that the provided builder has a signature that is at least
+    compatible.
+    """
+
+    try:
+        d = getcallargs(builder, package_names=[], export_target='some_path')
+    except TypeError:
+        return False
+    return d == {'package_names': [], 'export_target': 'some_path'}
 
 
 class ArtifactRegistry(BaseRegistry):
@@ -21,6 +43,9 @@ class ArtifactRegistry(BaseRegistry):
     """
 
     def _init(self):
+        # default (self.records) is a map of package + name to path
+        # this is the reverse lookup for that
+        self.reverse = {}
         self.packages = {}
         # for storing builders that are assumed to be compatible due to
         # their identical attribute names.
@@ -48,11 +73,19 @@ class ArtifactRegistry(BaseRegistry):
             # standard get_artifact_filename lookup for standalone,
             # complete artifacts at some path.
             self.records[(ep.dist.project_name, ep.name)] = path
+            self.reverse[path] = ep
 
     def iter_records(self):
         # not especially useful, but implementing for completeness.
         for k in self.records.keys():
             yield k
+
+    def belongs_to(self, path):
+        """
+        Lookup which entry point generated this path.
+        """
+
+        return self.reverse.get(path)
 
     def get_artifact_filename(self, package_name, artifact_name):
         """
@@ -109,3 +142,56 @@ class ArtifactRegistry(BaseRegistry):
             path = paths.get(distribution.project_name)
             if path:
                 yield path
+
+    def build_artifacts(self, package_name):
+        """
+        Build artifacts declared for the given package.
+        """
+
+        entry_points = self.packages.get(package_name, [])
+        logger.debug(
+            "package '%s' has %d entry points for the '%s' registry",
+            package_name, len(entry_points), self.registry_name,
+        )
+
+        for ep in entry_points.values():
+            try:
+                builder = ep.resolve()
+            except ImportError:
+                logger.error(
+                    "unable to import the target builder for the entry point "
+                    "'%s' from package '%s'", ep, ep.dist,
+                )
+                continue
+
+            export_target = self.records[(ep.dist.project_name, ep.name)]
+            target_dir = dirname(export_target)
+            if not exists(target_dir):
+                makedirs(target_dir)
+            elif not isdir(target_dir):
+                logger.error(
+                    "cannot export to '%s' as this target's parent is not a "
+                    "directory", export_target
+                )
+                continue
+
+            if not verify_builder(builder):
+                logger.error(
+                    "the builder referenced by the entry point '%s' "
+                    "from package '%s' has an incompatible signature",
+                    ep, ep.dist,
+                )
+                continue
+
+            if exists(export_target):
+                logger.debug(
+                    "unlinking existing export target at '%s'", export_target)
+                unlink(export_target)
+
+            builder([ep.dist.project_name], export_target=export_target)
+
+            if not exists(export_target):
+                logger.error(
+                    "the entry point '%s' from package '%s' failed to "
+                    "generate an artifact at '%s'", ep, ep.dist, export_target
+                )
