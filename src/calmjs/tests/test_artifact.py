@@ -8,8 +8,11 @@ from os.path import join
 from os.path import normcase
 from types import ModuleType
 
+from pkg_resources import Distribution
+from pkg_resources import EntryPoint
 from pkg_resources import WorkingSet
 
+from calmjs import artifact
 from calmjs import dist
 from calmjs.utils import pretty_logging
 from calmjs.registry import get
@@ -157,6 +160,69 @@ class ArtifactRegistryTestCase(unittest.TestCase):
         ))
         self.assertEqual('base', entry_point.dist.project_name)
         self.assertEqual('base.lib.js', entry_point.name)
+
+    def test_conflict_registration(self):
+        # create an empty working set for a clean-slate test.
+        cwd = utils.mkdtemp(self)
+        mock_ws = WorkingSet([])
+        registry = ArtifactRegistry('calmjs.artifacts', _working_set=mock_ws)
+        # using named case for case sensitivity test.
+        st = join(cwd, 'calmjs_artifacts', 'Simple.js')
+        dist_ = Distribution(cwd, project_name='pkg', version='1.0')
+        dist_.egg_info = cwd  # just lazy
+        s1 = EntryPoint.parse('Simple.js = dummy_builder:builder1')
+        s1.dist = dist_
+        s2 = EntryPoint.parse('Simple.js = dummy_builder:builder2')
+        s2.dist = dist_
+
+        with pretty_logging(stream=mocks.StringIO()) as stream:
+            registry.register_entry_point(s1)
+            # normal registry usage shouldn't do this.
+            registry.register_entry_point(s2)
+
+        log = stream.getvalue()
+        self.assertIn(
+            "entry point 'Simple.js = dummy_builder:builder2' from package "
+            "'pkg 1.0' will generate an artifact at '%s' but it was already "
+            "registered to entry point 'Simple.js = dummy_builder:builder1'; "
+            "conflicting entry point registration will be ignored." % st,
+            log
+        )
+
+    def test_normcase_registration(self):
+        # create an empty working set for a clean-slate test.
+        cwd = utils.mkdtemp(self)
+        mock_ws = WorkingSet([])
+        dist_ = Distribution(cwd, project_name='pkg', version='1.0')
+        dist_.egg_info = cwd  # just lazy
+        registry = ArtifactRegistry('calmjs.artifacts', _working_set=mock_ws)
+        # case sensitive test; have to patch the normcase at artifact
+        # module with the nt version
+        from ntpath import normcase as nt_normcase
+        utils.stub_item_attr_value(self, artifact, 'normcase', nt_normcase)
+        # using named case for case sensitivity test.
+        c1 = EntryPoint.parse('case.js = dummy_builder:builder1')
+        c1.dist = dist_
+        c2 = EntryPoint.parse('Case.js = dummy_builder:builder2')
+        c2.dist = dist_
+        # use the error one
+        ct = join(cwd, 'calmjs_artifacts', 'Case.js')
+        with pretty_logging(stream=mocks.StringIO()) as stream:
+            registry.register_entry_point(c1)
+            registry.register_entry_point(c2)
+
+        log = stream.getvalue()
+        self.assertIn(
+            "entry point 'Case.js = dummy_builder:builder2' from package "
+            "'pkg 1.0' will generate an artifact at '%s' but it was already "
+            "registered to entry point 'case.js = dummy_builder:builder1'; "
+            "conflicting entry point registration will be ignored." % ct,
+            log
+        )
+        self.assertIn(
+            "the file mapping error is caused by this platform's case-"
+            "insensitive filename", log
+        )
 
     def test_build_artifacts_success(self):
         # dummy builder

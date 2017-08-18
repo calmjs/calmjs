@@ -11,6 +11,7 @@ from os.path import dirname
 from os.path import exists
 from os.path import isdir
 from os.path import join
+from os.path import normcase
 from os import makedirs
 from os import unlink
 
@@ -56,24 +57,44 @@ class ArtifactRegistry(BaseRegistry):
 
         for ep in self.raw_entry_points:
             # the expected path to the artifact.
-            path = join(ep.dist.egg_info, ARTIFACT_BASENAME, ep.name)
+            self.register_entry_point(ep)
 
-            # for lookup of the generator(s) for the given package
-            p = self.packages[ep.dist.project_name] = self.packages.get(
-                ep.dist.project_name, {})
-            p[ep.name] = ep
+    def register_entry_point(self, ep):
+        path = join(ep.dist.egg_info, ARTIFACT_BASENAME, ep.name)
+        nc_path = normcase(path)
 
-            # for lookup of the path by the builder identified by the
-            # compat name for Python packages.
-            cb_key = '.'.join(ep.attrs)
-            cb = self.compat_builders[cb_key] = self.compat_builders.get(
-                cb_key, {})
-            cb[ep.dist.project_name] = path
+        if nc_path in self.reverse:
+            logger.error(
+                "entry point '%s' from package '%s' will generate an artifact "
+                "at '%s' but it was already registered to entry point '%s'; "
+                "conflicting entry point registration will be ignored.",
+                ep, ep.dist, path, self.reverse[nc_path]
+            )
+            if normcase(ep.name) != ep.name:
+                logger.error(
+                    "the file mapping error is caused by this platform's case-"
+                    "insensitive filename and the package '%s' defined case-"
+                    "sensitive names for the affected artifact"
+                )
+            return
 
-            # standard get_artifact_filename lookup for standalone,
-            # complete artifacts at some path.
-            self.records[(ep.dist.project_name, ep.name)] = path
-            self.reverse[path] = ep
+        # for lookup of the generator(s) for the given package
+        p = self.packages[ep.dist.project_name] = self.packages.get(
+            ep.dist.project_name, {})
+        p[ep.name] = ep
+
+        # for lookup of the path by the builder identified by the
+        # compat name for Python packages.
+        cb_key = '.'.join(ep.attrs)
+        cb = self.compat_builders[cb_key] = self.compat_builders.get(
+            cb_key, {})
+        cb[ep.dist.project_name] = path
+
+        # standard get_artifact_filename lookup for standalone,
+        # complete artifacts at some path.
+        self.records[(ep.dist.project_name, ep.name)] = path
+        # only the reverse lookup must be normalized
+        self.reverse[nc_path] = ep
 
     def iter_records(self):
         # not especially useful, but implementing for completeness.
@@ -85,7 +106,7 @@ class ArtifactRegistry(BaseRegistry):
         Lookup which entry point generated this path.
         """
 
-        return self.reverse.get(path)
+        return self.reverse.get(normcase(path))
 
     def get_artifact_filename(self, package_name, artifact_name):
         """
