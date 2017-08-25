@@ -22,6 +22,14 @@ Changelog
     - ``sourcemap_suffix`` -> ``sourcepath_suffix``
     - ``target_suffix`` -> ``targetpath_suffix``
 
+- Changed the order of binary resolution for Driver instances with
+  configured NODE_PATH and current working directory to align with how
+  Node.js inject them internally (in ``module.paths``, current working
+  directory has higher order of precedence over NODE_PATH), for the
+  method ``BaseDriver.find_node_modules_basedir``.
+- Also split off the directory resolution from the above method to
+  ``BaseDriver.which_with_node_modules``.
+
 2.1.0 (2016-11-29)
 ------------------
 

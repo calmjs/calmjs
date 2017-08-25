@@ -13,11 +13,11 @@ import errno
 import json
 from os import getcwd
 from os.path import dirname
-from os.path import exists
 from os.path import isdir
 from os.path import join
 from os.path import pathsep
 from os.path import realpath
+from os.path import sep
 
 from collections import OrderedDict
 from logging import getLogger
@@ -29,6 +29,9 @@ from calmjs.utils import fork_exec
 from calmjs.utils import raise_os_error
 
 NODE_PATH = 'NODE_PATH'
+NODE_MODULES = 'node_modules'
+# the usual path to binary within node modules.
+NODE_MODULES_BIN = '.bin'
 NODE = 'node'
 
 logger = getLogger(__name__)
@@ -385,6 +388,32 @@ class BaseDriver(object):
 
         return which(self.binary, path=self.env_path)
 
+    def find_node_modules_basedir(self):
+        """
+        Find all node_modules directories configured to be accessible
+        through this driver instance.
+
+        This is typically used for adding the direct instance, and does
+        not traverse the parent directories like what Node.js does.
+
+        Returns a list of directories that contain a 'node_modules'
+        directory.
+        """
+
+        paths = []
+
+        # First do the working dir.
+        local_node_path = self.join_cwd(NODE_MODULES)
+        if isdir(local_node_path):
+            paths.append(local_node_path)
+
+        # do the NODE_PATH environment variable last, as Node.js seem to
+        # have these resolving just before the global.
+        if self.node_path:
+            paths.extend(self.node_path.split(pathsep))
+
+        return paths
+
     def which_with_node_modules(self):
         """
         Which with node_path and node_modules
@@ -393,25 +422,33 @@ class BaseDriver(object):
         if self.binary is None:
             return None
 
-        paths = []
-        if self.node_path:
-            paths.extend(self.node_path.split(pathsep))
+        # first, log down the pedantic things...
+        if isdir(self.join_cwd(NODE_MODULES)):
             logger.debug(
-                "environment variable '%s' defined '%s'; "
-                "their bin directories will be searched.",
+                "'%s' instance will attempt to locate '%s' binary from "
+                "%s%s%s%s%s, located through the working directory",
+                self.__class__.__name__, self.binary,
+                self.join_cwd(), sep, NODE_MODULES, sep, NODE_MODULES_BIN,
+            )
+        if self.node_path:
+            logger.debug(
+                "'%s' instance will attempt to locate '%s' binary from "
+                "its %s of %s",
+                self.__class__.__name__, self.binary,
                 NODE_PATH, self.node_path,
             )
-        local_node_path = self.join_cwd('node_modules')
-        if exists(local_node_path):
-            logger.debug(
-                "including instance's working directory's '%s' for location "
-                "of '%s'",
-                local_node_path, self.binary,
-            )
-            paths.append(local_node_path)
 
-        return which(self.binary, path=pathsep.join(
-            join(p, '.bin') for p in paths))
+        paths = self.find_node_modules_basedir()
+        whichpaths = pathsep.join(join(p, NODE_MODULES_BIN) for p in paths)
+
+        if paths:
+            logger.debug(
+                "'%s' instance located %d possible paths to the '%s' binary, "
+                "which are %s",
+                self.__class__.__name__, len(paths), self.binary, whichpaths,
+            )
+
+        return which(self.binary, path=whichpaths)
 
     @classmethod
     def create(cls):

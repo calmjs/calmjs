@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 import unittest
 import os
+from os.path import join
 from os.path import normcase
+from os.path import pathsep
 
 from pkg_resources import EntryPoint
 from pkg_resources import Distribution
@@ -261,10 +263,85 @@ class BaseDriverClassTestCase(unittest.TestCase):
         # no binary, no nothing.
         self.assertIsNone(driver.which())
 
+    def test_find_node_modules_basedir(self):
+        driver = base.BaseDriver()
+        # ensure that NODE_PATH is initially None
+        driver.node_path = None
+        driver.working_dir = mkdtemp(self)
+        # initially should be empty, since no node_modules in either
+        # directories that it should check
+        self.assertEqual([], driver.find_node_modules_basedir())
+
+        # having the NODE_PATH defined will result in such
+        p1 = mkdtemp(self)
+        p2 = mkdtemp(self)
+        driver.node_path = pathsep.join([p1, p2])
+        self.assertEqual([p1, p2], driver.find_node_modules_basedir())
+
+        # create the node_modules in the working directory defined for
+        # the driver instance, and unset NODE_PATH
+        driver.node_path = None
+        dwd_wd_nm = join(driver.working_dir, 'node_modules')
+        os.mkdir(dwd_wd_nm)
+        self.assertEqual([dwd_wd_nm], driver.find_node_modules_basedir())
+
+        # combine the two, they should be in this order, where the
+        # working directory has higher precedence over NODE_PATH
+        driver.node_path = p1
+        self.assertEqual([dwd_wd_nm, p1], driver.find_node_modules_basedir())
+
     def test_which_with_node_modules(self):
         driver = base.BaseDriver()
-        # no binary, no nothing.
-        self.assertIsNone(driver.which_with_node_modules())
+        # ensure that NODE_PATH is initially None
+        driver.node_path = None
+        driver.working_dir = mkdtemp(self)
+        # initially should be empty, since no node_modules in either
+        # directories that it should check
+        with pretty_logging(stream=mocks.StringIO()) as s:
+            self.assertIsNone(driver.which_with_node_modules())
+        # should not generate extra log messages.
+        self.assertNotIn('will attempt', s.getvalue())
+
+        # having the NODE_PATH defined will result in such
+        p1 = mkdtemp(self)
+        p2 = mkdtemp(self)
+        driver.node_path = pathsep.join([p1, p2])
+        with pretty_logging(stream=mocks.StringIO()) as s:
+            self.assertIsNone(driver.which_with_node_modules())
+
+        # should not generate extra log messages, binary still not
+        # assigned.
+        self.assertNotIn('will attempt', s.getvalue())
+
+        driver.binary = 'dummy'
+        with pretty_logging(stream=mocks.StringIO()) as s:
+            self.assertIsNone(driver.which_with_node_modules())
+
+        # now the log should show what attempted.
+        log = s.getvalue()
+        self.assertIn(
+            "'BaseDriver' instance will attempt to locate 'dummy' binary from "
+            "its NODE_PATH of", log)
+        self.assertIn(p1, log)
+        self.assertIn(p2, log)
+        self.assertIn("'BaseDriver' instance located 2 possible paths", log)
+
+        # try again with working directory
+        driver.node_path = None
+        dwd_wd_nm = join(driver.working_dir, 'node_modules')
+        os.mkdir(dwd_wd_nm)
+        with pretty_logging(stream=mocks.StringIO()) as s:
+            self.assertIsNone(driver.which_with_node_modules())
+
+        log = s.getvalue()
+        # now the log should show what attempted.
+        self.assertIn(
+            "'BaseDriver' instance will attempt to locate 'dummy' binary from",
+            log,
+        )
+        self.assertIn(dwd_wd_nm, log)
+        self.assertIn("located through the working directory", log)
+        self.assertIn("'BaseDriver' instance located 1 possible paths", log)
 
     def test_dump(self):
         driver = base.BaseDriver()
