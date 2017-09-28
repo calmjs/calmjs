@@ -118,7 +118,7 @@ before_install:
   - npm --version
 
 install:
-  - pip install nose coverage flake8
+  - pip install coverage flake8
   - python setup.py develop
 script: 
   - flake8 setup.py src
@@ -128,12 +128,8 @@ script:
   # when errors happen) with CPython.  This happened on the prior
   # changeset (ee599b4d) where checks and testing with callbacks that
   # lead to recursive calling of functions were added.
-  - if [[ $TRAVIS_PYTHON_VERSION == pypy* ]]; then
-      coverage run --include=src/* -m unittest calmjs.tests.make_suite ;
-      coverage report -m ;
-    else
-      nosetests --with-coverage --cover-package=calmjs --with-doctest ;
-    fi
+  - coverage run --include=src/* -m unittest calmjs.tests.make_suite
+  - coverage report -m
 # Alternatively without nose
 after_success:
   # only submit coverage when testing under linux.
