@@ -46,6 +46,7 @@ setup(
     zip_safe=False,
     install_requires=[
         'setuptools>=12',
+        'calmjs.parse>=1.0.0,<2',
     ],
     include_package_data=True,
     python_requires='>=2.7,!=3.0.*,!=3.1.*,!=3.2.*',

@@ -89,6 +89,8 @@ from calmjs.utils import raise_os_error
 from calmjs.vlqsm import SourceWriter
 from calmjs.vlqsm import create_sourcemap
 
+from calmjs.parse.unparsers.base import BaseUnparser
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -739,17 +741,53 @@ class Toolchain(BaseDriver):
     # note that nearly instances of source means sourcepath, and that
     # target means targetpath
 
+    def _generate_transpile_target(self, spec, target):
+        bd_target = join(spec[BUILD_DIR], target)
+        self._validate_build_target(spec, bd_target)
+        if not exists(dirname(bd_target)):
+            logger.debug("creating dir '%s'", dirname(bd_target))
+            makedirs(dirname(bd_target))
+
+        return bd_target
+
     def transpile_modname_source_target(self, spec, modname, source, target):
         """
         The function that gets called by
         """
 
-        bd_target = join(spec[BUILD_DIR], target)
-        self._validate_build_target(spec, bd_target)
-        logger.info('Transpiling %s to %s', source, bd_target)
-        if not exists(dirname(bd_target)):
-            makedirs(dirname(bd_target))
+        if not isinstance(self.transpiler, BaseUnparser):
+            _deprecation_warning(
+                'transpiler callable assigned to %r must be an instance of '
+                'calmjs.parse.unparsers.base.BaseUnparser by calmjs-4.0.0; '
+                'if the original transpile behavior is to be retained, the '
+                'subclass may instead override this method to call '
+                '`simple_transpile_modname_source_target` directly, as '
+                'this fallback behavior will be removed by calmjs-4.0.0' % (
+                    self,
+                )
+            )
+            return self.simple_transpile_modname_source_target(
+                spec, modname, source, target)
+
+        # do the new thing here.
+        # return self._transpile_modname_source_target(
+        #     spec, modname, source, target)
+
+    def _transpile_modname_source_target(self, spec, modname, source, target):
+        """
+        TODO
+        """
+
+    def simple_transpile_modname_source_target(
+            self, spec, modname, source, target):
+        """
+        The original simple transpile method called by compile_transpile
+        on each target.
+        """
+
         opener = self.opener
+        bd_target = self._generate_transpile_target(spec, target)
+        logger.info('Transpiling %s to %s', source, bd_target)
         with opener(source, 'r') as reader, opener(bd_target, 'w') as _writer:
             writer = SourceWriter(_writer)
             self.transpiler(spec, reader, writer)
@@ -1139,6 +1177,14 @@ class NullToolchain(Toolchain):
 
     def setup_transpiler(self):
         self.transpiler = null_transpiler
+
+    def transpile_modname_source_target(self, spec, modname, source, target):
+        """
+        Calls the original version.
+        """
+
+        return self.simple_transpile_modname_source_target(
+            spec, modname, source, target)
 
     def prepare(self, spec):
         """

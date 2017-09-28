@@ -970,8 +970,15 @@ class ToolchainTestCase(unittest.TestCase):
                 '../source': join(source, 'source'),
             },
         )
-        with self.assertRaises(ValueError):
-            self.toolchain(spec)
+        with pretty_logging(stream=StringIO()) as s:
+            with warnings.catch_warnings(record=True):
+                with self.assertRaises(ValueError):
+                    self.toolchain(spec)
+
+        self.assertIn(
+            "transpiler callable assigned to",
+            s.getvalue(),
+        )
 
     def test_toolchain_compile_bundle(self):
         """

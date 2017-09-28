@@ -29,6 +29,10 @@ Changelog
   method ``BaseDriver.find_node_modules_basedir``.
 - Also split off the directory resolution from the above method to
   ``BaseDriver.which_with_node_modules``.
+- Deprecated the existing toolchain.transpiler function as a standard
+  callable.  The new version must be an instance of ``BaseUnparser``
+  provided by the ``calmjs.parse`` package.  The NullToolchain will
+  retain the usage of the legacy transpiler.
 
 2.1.0 (2016-11-29)
 ------------------
