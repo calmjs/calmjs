@@ -78,6 +78,13 @@ from tempfile import mkdtemp
 
 from pkg_resources import Requirement
 
+from calmjs.parse.exceptions import ECMASyntaxError
+from calmjs.parse.io import read
+from calmjs.parse.io import write
+from calmjs.parse.parsers.es5 import parse
+from calmjs.parse.unparsers.base import BaseUnparser
+from calmjs.parse.unparsers.es5 import pretty_printer
+
 from calmjs.base import BaseDriver
 from calmjs.base import BaseRegistry
 from calmjs.exc import AdviceAbort
@@ -88,8 +95,6 @@ from calmjs.exc import ToolchainCancel
 from calmjs.utils import raise_os_error
 from calmjs.vlqsm import SourceWriter
 from calmjs.vlqsm import create_sourcemap
-
-from calmjs.parse.unparsers.base import BaseUnparser
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +190,10 @@ WORKING_DIR = 'working_dir'
 
 def _opener(*a):
     return codecs.open(*a, encoding='utf-8')
+
+
+def partial_open(*a):
+    return partial(codecs.open, *a, encoding='utf-8')
 
 
 def _check_key_exists(spec, keys):
@@ -632,6 +641,7 @@ class Toolchain(BaseDriver):
         attribute, which the compile method will invoke.
         """
 
+        self.parser = NotImplemented
         self.transpiler = NotImplemented
 
     def setup_prefix_suffix(self):
@@ -770,13 +780,25 @@ class Toolchain(BaseDriver):
                 spec, modname, source, target)
 
         # do the new thing here.
-        # return self._transpile_modname_source_target(
-        #     spec, modname, source, target)
+        return self._transpile_modname_source_target(
+            spec, modname, source, target)
 
     def _transpile_modname_source_target(self, spec, modname, source, target):
-        """
-        TODO
-        """
+        bd_target = self._generate_transpile_target(spec, target)
+        logger.info('Transpiling %s to %s', source, bd_target)
+        reader = partial_open(source, 'r')
+        writer_main = partial_open(bd_target, 'w')
+        writer_map = (
+            partial_open(bd_target + '.map', 'w')
+            if spec.get(GENERATE_SOURCE_MAP) else
+            None
+        )
+        try:
+            write(self.transpiler, [
+                read(self.parser, reader)], writer_main, writer_map)
+        except ECMASyntaxError as e:
+            logger.error('%s', e)
+            raise
 
     def simple_transpile_modname_source_target(
             self, spec, modname, source, target):
@@ -1206,3 +1228,17 @@ class NullToolchain(Toolchain):
         """
 
         spec['link'] = 'linked'
+
+
+class ES5Toolchain(Toolchain):
+    """
+    A null toolchain that does nothing except maybe move some files
+    around, using the es5 Unparser, pretty printer version.
+    """
+
+    def __init__(self):
+        super(ES5Toolchain, self).__init__()
+
+    def setup_transpiler(self):
+        self.transpiler = pretty_printer()
+        self.parser = parse

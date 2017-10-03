@@ -26,6 +26,7 @@ from calmjs.toolchain import AdviceRegistry
 from calmjs.toolchain import Spec
 from calmjs.toolchain import Toolchain
 from calmjs.toolchain import NullToolchain
+from calmjs.toolchain import ES5Toolchain
 from calmjs.toolchain import dict_get
 from calmjs.toolchain import dict_key_update_overwrite_check
 from calmjs.toolchain import spec_update_plugins_sourcepath_dict
@@ -1434,3 +1435,80 @@ class NullToolchainTestCase(unittest.TestCase):
             raise KeyboardInterrupt()
 
         self._check_toolchain_advice(interrupt, False)
+
+
+class ES5ToolchainTestCase(unittest.TestCase):
+    """
+    A null toolchain class test case.
+    """
+
+    def setUp(self):
+        self.toolchain = ES5Toolchain()
+
+    def tearDown(self):
+        pass
+
+    def test_transpiler(self):
+        # a kind of silly test but shows concept
+        tmpdir = mkdtemp(self)
+        js_code = 'var dummy = function() {\n};\n'
+        source = join(tmpdir, 'source.js')
+        target = 'target.js'
+
+        with open(source, 'w') as fd:
+            fd.write(js_code)
+
+        spec = Spec(build_dir=tmpdir)
+        modname = 'dummy'
+        self.toolchain.transpile_modname_source_target(
+            spec, modname, source, target)
+
+        with open(join(tmpdir, target)) as fd:
+            result = fd.read()
+
+        self.assertEqual(js_code, result)
+        self.assertFalse(exists(join(tmpdir, target + '.map')))
+
+    def test_transpiler_error(self):
+        # a kind of silly test but shows concept
+        tmpdir = mkdtemp(self)
+        js_code = 'function(){};\n'
+        source = join(tmpdir, 'source.js')
+        target = 'target.js'
+
+        with open(source, 'w') as fd:
+            fd.write(js_code)
+
+        spec = Spec(build_dir=tmpdir)
+        modname = 'dummy'
+        with pretty_logging(stream=StringIO()) as s:
+            with self.assertRaises(SyntaxError):
+                self.toolchain.transpile_modname_source_target(
+                    spec, modname, source, target)
+
+        self.assertIn(
+            'Function statement requires a name at 1:9 in', s.getvalue())
+
+    def test_transpiler_sourcemap(self):
+        # a kind of silly test but shows concept
+        build_dir = mkdtemp(self)
+        srcdir = mkdtemp(self)
+        js_code = 'var dummy = function() {\n};\n'
+        source = join(srcdir, 'source.js')
+        target = 'target.js'
+
+        with open(source, 'w') as fd:
+            fd.write(js_code)
+
+        spec = Spec(build_dir=build_dir, generate_source_map=True)
+        modname = 'dummy'
+        self.toolchain.transpile_modname_source_target(
+            spec, modname, source, target)
+
+        with open(join(build_dir, target + '.map')) as fd:
+            result = json.load(fd)
+
+        self.assertEqual(result['mappings'], 'AAAA;AACA;')
+        self.assertEqual(len(result['sources']), 1)
+        self.assertEqual(basename(result['sources'][0]), 'source.js')
+        self.assertEqual(result['file'], target)
