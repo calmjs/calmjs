@@ -350,7 +350,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
             % export_target,
             sys.stderr.getvalue()
         )
-        self.assertNotIn('CRITICAL', sys.stdout.getvalue())
+        self.assertNotIn('CRITICAL', sys.stderr.getvalue())
         self.assertTrue(isinstance(result, toolchain.Spec))
         # prove that it did at least run
         self.assertIn('build_dir', result)
@@ -377,7 +377,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
             % export_target,
             sys.stderr.getvalue()
         )
-        self.assertNotIn('CRITICAL', sys.stdout.getvalue())
+        self.assertNotIn('CRITICAL', sys.stderr.getvalue())
         self.assertTrue(isinstance(result, toolchain.Spec))
         # prove that it did at least run
         self.assertIn('build_dir', result)
@@ -408,7 +408,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
             "export target '%s' already exists, overwrite? " % export_target,
             sys.stdout.getvalue()
         )
-        self.assertNotIn('CRITICAL', sys.stdout.getvalue())
+        self.assertNotIn('CRITICAL', sys.stderr.getvalue())
         self.assertTrue(isinstance(result, toolchain.Spec))
         # prove that it did at least run
         self.assertIn('build_dir', result)
@@ -421,7 +421,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
             "export target '%s' already exists, overwrite? " % export_target,
             sys.stdout.getvalue()
         )
-        self.assertNotIn('CRITICAL', sys.stdout.getvalue())
+        self.assertNotIn('CRITICAL', sys.stderr.getvalue())
         self.assertTrue(isinstance(result, toolchain.Spec))
         # prove that it did at least run
         self.assertIn('build_dir', result)
@@ -443,7 +443,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
             "export target '%s' already exists, overwrite? " % export_target,
             sys.stdout.getvalue()
         )
-        self.assertNotIn('CRITICAL', sys.stdout.getvalue())
+        self.assertNotIn('CRITICAL', sys.stderr.getvalue())
         self.assertTrue(isinstance(result, toolchain.Spec))
         # prove that the cancel really happened.
         self.assertIn('build_dir', result)
