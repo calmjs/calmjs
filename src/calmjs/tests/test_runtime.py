@@ -427,6 +427,39 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         self.assertIn('build_dir', result)
         self.assertEqual(result['link'], 'linked')
 
+    def test_transpiler_error(self):
+        source_dir = mkdtemp(self)
+        malformed_js_filename = join(source_dir, 'malformed.js')
+        malformed_code = 'function(){};\n'
+
+        with open(malformed_js_filename, 'w') as fd:
+            fd.write(malformed_code)
+
+        class ES5ToolchainRuntime(runtime.ToolchainRuntime):
+            def create_spec(self, export_target=None, **kwargs):
+                return toolchain.Spec(
+                    export_target=export_target,
+                    transpile_sourcepath={
+                        'malformed': malformed_js_filename,
+                    },
+                )
+
+        stub_check_interactive(self, True)
+        stub_stdouts(self)
+
+        target_dir = mkdtemp(self)
+        export_target = join(target_dir, 'export_file')
+
+        tc = toolchain.ES5Toolchain()
+        ES5ToolchainRuntime(tc)(['--export-target', export_target])
+
+        self.assertIn('CRITICAL', sys.stderr.getvalue())
+        self.assertIn(
+            'ECMASyntaxError: Function statement requires a name at 1:9 in',
+            sys.stderr.getvalue()
+        )
+        self.assertIn('malformed.js', sys.stderr.getvalue())
+
     def test_prompted_execution_exists_cancel(self):
         stub_check_interactive(self, True)
         stub_stdouts(self)

@@ -1469,26 +1469,6 @@ class ES5ToolchainTestCase(unittest.TestCase):
         self.assertEqual(js_code, result)
         self.assertFalse(exists(join(tmpdir, target + '.map')))
 
-    def test_transpiler_error(self):
-        # a kind of silly test but shows concept
-        tmpdir = mkdtemp(self)
-        js_code = 'function(){};\n'
-        source = join(tmpdir, 'source.js')
-        target = 'target.js'
-
-        with open(source, 'w') as fd:
-            fd.write(js_code)
-
-        spec = Spec(build_dir=tmpdir)
-        modname = 'dummy'
-        with pretty_logging(stream=StringIO()) as s:
-            with self.assertRaises(SyntaxError):
-                self.toolchain.transpile_modname_source_target(
-                    spec, modname, source, target)
-
-        self.assertIn(
-            'Function statement requires a name at 1:9 in', s.getvalue())
-
     def test_transpiler_sourcemap(self):
         # a kind of silly test but shows concept
         build_dir = mkdtemp(self)

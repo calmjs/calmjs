@@ -78,7 +78,6 @@ from tempfile import mkdtemp
 
 from pkg_resources import Requirement
 
-from calmjs.parse.exceptions import ECMASyntaxError
 from calmjs.parse.io import read
 from calmjs.parse.io import write
 from calmjs.parse.parsers.es5 import parse
@@ -793,12 +792,8 @@ class Toolchain(BaseDriver):
             if spec.get(GENERATE_SOURCE_MAP) else
             None
         )
-        try:
-            write(self.transpiler, [
-                read(self.parser, reader)], writer_main, writer_map)
-        except ECMASyntaxError as e:
-            logger.error('%s', e)
-            raise
+        write(self.transpiler, [
+            read(self.parser, reader)], writer_main, writer_map)
 
     def simple_transpile_modname_source_target(
             self, spec, modname, source, target):
