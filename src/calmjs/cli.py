@@ -53,7 +53,7 @@ def get_bin_version(bin_path, version_flag='-v', kw={}):
     except OSError:
         logger.warning("failed to execute '%s'", bin_path)
         return None
-    except:
+    except Exception:
         logger.exception(
             "encountered unexpected error while trying to find version of "
             "'%s':", bin_path
