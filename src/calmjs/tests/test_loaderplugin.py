@@ -5,7 +5,8 @@ from os.path import join
 from os import makedirs
 
 from calmjs.loaderplugin import LoaderPluginRegistry
-from calmjs.loaderplugin import LoaderPluginHandler
+from calmjs.loaderplugin import BaseLoaderPluginHandler
+from calmjs.loaderplugin import NPMLoaderPluginHandler
 from calmjs.toolchain import NullToolchain
 from calmjs.toolchain import Spec
 from calmjs.utils import pretty_logging
@@ -19,13 +20,13 @@ class NotPlugin(LoaderPluginRegistry):
     """yeanah"""
 
 
-class BadPlugin(LoaderPluginHandler):
+class BadPlugin(BaseLoaderPluginHandler):
 
     def __init__(self):
         """this will not be called; missing argument"""
 
 
-class DupePlugin(LoaderPluginHandler):
+class DupePlugin(BaseLoaderPluginHandler):
     """
     Dummy duplicate plugin
     """
@@ -36,12 +37,14 @@ class LoaderPluginRegistryTestCase(unittest.TestCase):
     def test_initialize_standard(self):
         # ensure that we have a proper working registry
         working_set = WorkingSet({'calmjs.loader_plugin': [
-            'example = calmjs.loaderplugin:LoaderPluginHandler',
+            'example = calmjs.loaderplugin:BaseLoaderPluginHandler',
         ]})
         registry = LoaderPluginRegistry(
             'calmjs.loader_plugin', _working_set=working_set)
-        self.assertTrue(
-            isinstance(registry.get('example'), LoaderPluginHandler))
+        plugin = registry.get('example')
+        self.assertTrue(isinstance(plugin, BaseLoaderPluginHandler))
+        with self.assertRaises(NotImplementedError):
+            plugin.locate_plugin_source(NullToolchain(), Spec())
 
     def test_initialize_failure_missing(self):
         working_set = WorkingSet({'calmjs.loader_plugin': [
@@ -92,7 +95,7 @@ class LoaderPluginRegistryTestCase(unittest.TestCase):
         # ensure that we have a proper working registry
         working_set = WorkingSet({'calmjs.loader_plugin': [
             'example = calmjs.tests.test_loaderplugin:DupePlugin',
-            'example = calmjs.loaderplugin:LoaderPluginHandler',
+            'example = calmjs.loaderplugin:NPMLoaderPluginHandler',
         ]})
         # should not trigger import failure
         with pretty_logging(stream=StringIO()) as stream:
@@ -105,10 +108,10 @@ class LoaderPluginRegistryTestCase(unittest.TestCase):
         )
         # the second one will be registered
         self.assertTrue(
-            isinstance(registry.get('example'), LoaderPluginHandler))
+            isinstance(registry.get('example'), BaseLoaderPluginHandler))
 
 
-class PluginTestCase(unittest.TestCase):
+class NPMPluginTestCase(unittest.TestCase):
 
     def setUp(self):
         pass
@@ -117,7 +120,7 @@ class PluginTestCase(unittest.TestCase):
         pass
 
     def test_plugin_base(self):
-        base = LoaderPluginHandler(None, 'base')
+        base = NPMLoaderPluginHandler(None, 'base')
         with self.assertRaises(NotImplementedError):
             base(
                 toolchain=None, spec=None, modname='', source='', target='',
@@ -125,7 +128,7 @@ class PluginTestCase(unittest.TestCase):
             )
 
     def test_plugin_strip(self):
-        base = LoaderPluginHandler(None, 'base')
+        base = NPMLoaderPluginHandler(None, 'base')
         self.assertEqual(
             base.strip_plugin('base!some/dir/path.ext'),
             'some/dir/path.ext',
@@ -137,28 +140,28 @@ class PluginTestCase(unittest.TestCase):
         )
 
     def test_plugin_package_base(self):
-        base = LoaderPluginHandler(None, 'base')
+        base = NPMLoaderPluginHandler(None, 'base')
         toolchain = NullToolchain()
         spec = Spec(working_dir=mkdtemp(self))
         self.assertEqual(base.locate_plugin_source(toolchain, spec), {})
 
     def test_plugin_package_missing_dir(self):
-        base = LoaderPluginHandler(None, 'base')
-        base.node_module = 'dummy_pkg'
+        base = NPMLoaderPluginHandler(None, 'base')
+        base.node_module_pkg_name = 'dummy_pkg'
         toolchain = NullToolchain()
         spec = Spec(working_dir=mkdtemp(self))
         with pretty_logging(stream=StringIO()) as stream:
             self.assertEqual(base.locate_plugin_source(toolchain, spec), {})
         self.assertIn(
-            "could not locate package.json for the npm package 'dummy_pkg' "
+            "could not locate 'package.json' for the npm package 'dummy_pkg' "
             "which was specified to contain the loader plugin 'base' in the "
             "current working directory '%s'" % spec['working_dir'],
             stream.getvalue(),
         )
 
     def test_plugin_package_missing_main(self):
-        base = LoaderPluginHandler(None, 'base')
-        base.node_module = 'dummy_pkg'
+        base = NPMLoaderPluginHandler(None, 'base')
+        base.node_module_pkg_name = 'dummy_pkg'
         toolchain = NullToolchain()
         spec = Spec(working_dir=mkdtemp(self))
         pkg_dir = join(spec['working_dir'], 'node_modules', 'dummy_pkg')
@@ -170,15 +173,16 @@ class PluginTestCase(unittest.TestCase):
             self.assertEqual(base.locate_plugin_source(toolchain, spec), {})
 
         self.assertIn(
-            "package.json for the npm package 'dummy_pkg' does not "
-            "contain a main entry point: sources required for loader "
-            "plugin 'base' cannot be included automatically;",
+            "calmjs.loaderplugin 'package.json' for the npm package "
+            "'dummy_pkg' does not contain a valid entry point: sources "
+            "required for loader plugin 'base' cannot be included "
+            "automatically; the build process may fail",
             stream.getvalue(),
         )
 
     def test_plugin_package_success_main(self):
-        base = LoaderPluginHandler(None, 'base')
-        base.node_module = 'dummy_pkg'
+        base = NPMLoaderPluginHandler(None, 'base')
+        base.node_module_pkg_name = 'dummy_pkg'
         toolchain = NullToolchain()
         spec = Spec(working_dir=mkdtemp(self))
         pkg_dir = join(spec['working_dir'], 'node_modules', 'dummy_pkg')
@@ -194,8 +198,8 @@ class PluginTestCase(unittest.TestCase):
         self.assertIn("for loader plugin 'base'", stream.getvalue())
 
     def test_plugin_package_success_package(self):
-        base = LoaderPluginHandler(None, 'base')
-        base.node_module = 'dummy_pkg'
+        base = NPMLoaderPluginHandler(None, 'base')
+        base.node_module_pkg_name = 'dummy_pkg'
         toolchain = NullToolchain()
         spec = Spec(working_dir=mkdtemp(self))
         pkg_dir = join(spec['working_dir'], 'node_modules', 'dummy_pkg')

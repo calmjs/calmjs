@@ -8,7 +8,11 @@ setuptools integration of certain npm features.
 
 from __future__ import absolute_import
 
+import json
 from functools import partial
+from os.path import exists
+from os.path import join
+from logging import getLogger
 
 from calmjs.cli import PackageManagerDriver
 from calmjs.command import PackageManagerCommand
@@ -19,6 +23,7 @@ PACKAGE_FIELD = 'package_json'
 PACKAGE_JSON = package_json = 'package.json'
 NPM = 'npm'
 write_package_json = partial(write_json_file, PACKAGE_FIELD)
+logger = getLogger(__name__)
 
 
 class Driver(PackageManagerDriver):
@@ -42,6 +47,39 @@ class npm(PackageManagerCommand):
         description='npm support for the calmjs framework',
     )
     description = cli_driver.description
+
+
+def locate_package_entry_file(working_dir, package_name):
+    """
+    Locate a single npm package to return its browser or main entry.
+    """
+
+    basedir = join(working_dir, 'node_modules', package_name)
+    package_json = join(basedir, 'package.json')
+    if not exists(package_json):
+        logger.debug(
+            "could not locate package.json for the npm package '%s' in the "
+            "current working directory '%s'; the package may have been "
+            "not installed, the build process may fail",
+            package_name, working_dir,
+        )
+        return
+
+    with open(package_json) as fd:
+        package_info = json.load(fd)
+
+    if not ('browser' in package_info or 'main' in package_info):
+        logger.debug(
+            "package.json for the npm package '%s' does not contain a main "
+            "entry point", package_name,
+        )
+        return
+
+    # assume the target file exists...
+    return join(
+        basedir,
+        *(package_info.get('browser') or package_info['main']).split('/')
+    )
 
 
 npm._initialize_user_options()

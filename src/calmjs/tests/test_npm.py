@@ -6,6 +6,8 @@ import json
 import os
 import sys
 from logging import getLogger
+from logging import DEBUG
+from os import makedirs
 from os.path import join
 from os.path import exists
 
@@ -32,6 +34,70 @@ from calmjs.testing.utils import stub_stdin
 from calmjs.testing.utils import stub_stdouts
 
 which_npm = which('npm')
+
+
+class LocatePackageTestCase(unittest.TestCase):
+
+    def test_locate_package_entry_module_not_found(self):
+        working_dir = mkdtemp(self)
+        pkg_name = 'demo'
+        with pretty_logging(stream=StringIO()) as stream:
+            self.assertIsNone(
+                npm.locate_package_entry_file(working_dir, pkg_name))
+
+        self.assertIn(
+            "could not locate package.json for the npm package 'demo' "
+            "in the current working directory '%s'" % working_dir,
+            stream.getvalue(),
+        )
+
+    def test_plugin_package_missing_required_entries(self):
+        working_dir = mkdtemp(self)
+        pkg_name = 'demo'
+        pkg_dir = join(working_dir, 'node_modules', pkg_name)
+        makedirs(pkg_dir)
+
+        with open(join(pkg_dir, 'package.json'), 'w') as fd:
+            fd.write('{}')
+
+        with pretty_logging(stream=StringIO(), level=DEBUG) as stream:
+            self.assertIsNone(
+                npm.locate_package_entry_file(working_dir, pkg_name))
+
+        self.assertIn(
+            "package.json for the npm package 'demo' does not "
+            "contain a main entry point", stream.getvalue(),
+        )
+
+    def test_plugin_package_with_main(self):
+        working_dir = mkdtemp(self)
+        pkg_name = 'demo'
+        pkg_dir = join(working_dir, 'node_modules', pkg_name)
+        makedirs(pkg_dir)
+        with open(join(pkg_dir, 'package.json'), 'w') as fd:
+            fd.write('{"main": "base.js"}')
+
+        with pretty_logging(stream=StringIO(), level=DEBUG) as stream:
+            self.assertEqual(
+                join(pkg_dir, 'base.js'),
+                npm.locate_package_entry_file(working_dir, pkg_name))
+
+        self.assertEqual("", stream.getvalue())
+
+    def test_plugin_package_success_browser(self):
+        working_dir = mkdtemp(self)
+        pkg_name = 'demo'
+        pkg_dir = join(working_dir, 'node_modules', pkg_name)
+        makedirs(pkg_dir)
+        with open(join(pkg_dir, 'package.json'), 'w') as fd:
+            fd.write('{"browser": "browser/index.js"}')
+
+        with pretty_logging(stream=StringIO(), level=DEBUG) as stream:
+            self.assertEqual(
+                join(pkg_dir, 'browser', 'index.js'),
+                npm.locate_package_entry_file(working_dir, pkg_name),
+            )
+        self.assertEqual("", stream.getvalue())
 
 
 class NpmTestCase(unittest.TestCase):
