@@ -83,6 +83,7 @@ from calmjs.parse.io import write
 from calmjs.parse.parsers.es5 import parse
 from calmjs.parse.unparsers.base import BaseUnparser
 from calmjs.parse.unparsers.es5 import pretty_printer
+from calmjs.parse.sourcemap import encode_sourcemap
 
 from calmjs.base import BaseDriver
 from calmjs.base import BaseRegistry
@@ -93,7 +94,6 @@ from calmjs.exc import ToolchainAbort
 from calmjs.exc import ToolchainCancel
 from calmjs.utils import raise_os_error
 from calmjs.vlqsm import SourceWriter
-from calmjs.vlqsm import create_sourcemap
 
 logger = logging.getLogger(__name__)
 
@@ -811,7 +811,7 @@ class Toolchain(BaseDriver):
             if writer.mappings and spec.get(GENERATE_SOURCE_MAP):
                 source_map_path = bd_target + '.map'
                 with open(source_map_path, 'w') as sm_fd:
-                    self.dump(create_sourcemap(
+                    self.dump(encode_sourcemap(
                         filename=bd_target,
                         mappings=writer.mappings,
                         sources=[source],

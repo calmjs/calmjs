@@ -33,6 +33,9 @@ Changelog
   callable.  The new version must be an instance of ``BaseUnparser``
   provided by the ``calmjs.parse`` package.  The NullToolchain will
   retain the usage of the legacy transpiler.
+- Removed most of the ``vlqsm`` module as the functionality is now
+  provided by ``calmjs.parse.vlq`` and ``calmjs.parse.sourcemap``.  Only
+  the legacy ``SourceWriter`` class remain, which is deprecated.
 
 2.1.0 (2016-11-29)
 ------------------
