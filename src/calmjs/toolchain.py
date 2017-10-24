@@ -1231,8 +1231,8 @@ class ES5Toolchain(Toolchain):
     around, using the es5 Unparser, pretty printer version.
     """
 
-    def __init__(self):
-        super(ES5Toolchain, self).__init__()
+    def __init__(self, *a, **kw):
+        super(ES5Toolchain, self).__init__(*a, **kw)
 
     def setup_transpiler(self):
         self.transpiler = pretty_printer()
