@@ -83,7 +83,7 @@ class BaseLoaderPluginHandler(object):
         self.registry = registry
         self.name = name
 
-    def locate_plugin_source(self, toolchain, spec):
+    def locate_bundle_sourcepath(self, toolchain, spec, plugin_sourcepath):
         """
         Subclasses must implement this to return a mapping of modnames
         the the absolute path of the desired sourcefiles.  Example:
@@ -94,18 +94,29 @@ class BaseLoaderPluginHandler(object):
         }
 
         Implementation must also accept both the toolchain and the spec
-        argument.
+        argument, along with the plugin_sourcepath argument which will
+        be a mapping of {modname: sourcepath} that are relevant to this
+        specific plugin handler.  Instances of subclasses may then
+        derive the the bundle_sourcepath required for a successful build
+        for the given toolchain and spec.
+
+        For nested/chained plugins, the recommended handling method is
+        to also make use of the registry instance assigned to this
+        handler instance to lookup specific handler(s) that may also
+        be registered here, and use their locate_bundle_sourcepath
+        method to generate the mapping required.
         """
 
-        raise NotImplementedError
+        # default return value is an empty dictionary.
+        return {}
 
     def strip_plugin(self, value):
         """
-        Strip the first plugin fragment and return just the value.
-
-        Note that the filter chaining can be very implementation
-        specific, so the default implementation is not going to attempt
-        to consume everything in one go.
+        Strip the first plugin fragment and return just the value.  This
+        is a simple helper.  Note that the filter chaining can be very
+        implementation specific to each and every loader plugin, so the
+        default implementation is not going to attempt to consume
+        everything in one go.
         """
 
         if value.startswith(self.name + '!'):
@@ -120,9 +131,24 @@ class BaseLoaderPluginHandler(object):
         production of the final artifact, so this will need to locate
         the resources needed for this set of arguments to function.
 
-        Each of these should return the associated bundled_modpaths,
-        bundled_targets, and the export_module_name, after the copying
-        or transpilation step was done.
+        Implementations must return the associated modpaths, targets, and
+        the export_module_name as a 3-tuple, after the copying or
+        transpilation step was done.  Example:
+
+        return (
+            {'text!text_file.txt': 'text!/some/path/text_file.txt'},
+            {'text_file.txt': 'text_file.txt'},
+            ['text!text_file.txt'],
+        )
+
+        Note that implementations can trigger further lookups through
+        the registry instance attached to this instance of the plugin,
+        and implementations must also address the handling of this
+        lookup and usage of the return values.
+
+        Also note that while the toolchain and spec arguments are also
+        provided, they should only be used for lookups; out of band
+        modifications results in convoluted code flow.
         """
 
         raise NotImplementedError
@@ -144,7 +170,7 @@ class NPMLoaderPluginHandler(BaseLoaderPluginHandler):
 
     node_module_pkg_name = None
 
-    def locate_plugin_source(self, toolchain, spec):
+    def locate_bundle_sourcepath(self, toolchain, spec, plugin_sourcepath):
         """
         Attempt to locate the plugin source; returns a mapping of
         modnames to the absolute path of the located sources.
@@ -172,9 +198,13 @@ class NPMLoaderPluginHandler(BaseLoaderPluginHandler):
             logger.warning(
                 "could not locate 'package.json' for the npm package '%s' "
                 "which was specified to contain the loader plugin '%s' in the "
-                "current working directory '%s'; the missing package should "
-                "be installable through 'npm'; the build process may fail",
+                "current working directory '%s'; the missing package may "
+                "be installed by running 'npm install %s' for the mean time "
+                "as a workaround, though the package that owns that source "
+                "file that has this requirement should declare an explicit "
+                "dependency; the build process may fail",
                 self.node_module_pkg_name, self.name, spec[WORKING_DIR],
+                self.node_module_pkg_name,
             )
 
         return {}

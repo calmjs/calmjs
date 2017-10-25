@@ -43,8 +43,8 @@ class LoaderPluginRegistryTestCase(unittest.TestCase):
             'calmjs.loader_plugin', _working_set=working_set)
         plugin = registry.get('example')
         self.assertTrue(isinstance(plugin, BaseLoaderPluginHandler))
-        with self.assertRaises(NotImplementedError):
-            plugin.locate_plugin_source(NullToolchain(), Spec())
+        self.assertEqual(
+            {}, plugin.locate_bundle_sourcepath(NullToolchain(), Spec(), {}))
 
     def test_initialize_failure_missing(self):
         working_set = WorkingSet({'calmjs.loader_plugin': [
@@ -143,7 +143,8 @@ class NPMPluginTestCase(unittest.TestCase):
         base = NPMLoaderPluginHandler(None, 'base')
         toolchain = NullToolchain()
         spec = Spec(working_dir=mkdtemp(self))
-        self.assertEqual(base.locate_plugin_source(toolchain, spec), {})
+        self.assertEqual(
+            base.locate_bundle_sourcepath(toolchain, spec, {}), {})
 
     def test_plugin_package_missing_dir(self):
         base = NPMLoaderPluginHandler(None, 'base')
@@ -151,7 +152,8 @@ class NPMPluginTestCase(unittest.TestCase):
         toolchain = NullToolchain()
         spec = Spec(working_dir=mkdtemp(self))
         with pretty_logging(stream=StringIO()) as stream:
-            self.assertEqual(base.locate_plugin_source(toolchain, spec), {})
+            self.assertEqual(
+                base.locate_bundle_sourcepath(toolchain, spec, {}), {})
         self.assertIn(
             "could not locate 'package.json' for the npm package 'dummy_pkg' "
             "which was specified to contain the loader plugin 'base' in the "
@@ -170,7 +172,8 @@ class NPMPluginTestCase(unittest.TestCase):
             fd.write('{}')
 
         with pretty_logging(stream=StringIO()) as stream:
-            self.assertEqual(base.locate_plugin_source(toolchain, spec), {})
+            self.assertEqual(
+                base.locate_bundle_sourcepath(toolchain, spec, {}), {})
 
         self.assertIn(
             "calmjs.loaderplugin 'package.json' for the npm package "
@@ -193,7 +196,7 @@ class NPMPluginTestCase(unittest.TestCase):
         with pretty_logging(stream=StringIO()) as stream:
             self.assertEqual(
                 join(pkg_dir, 'base.js'),
-                base.locate_plugin_source(toolchain, spec)['base'],
+                base.locate_bundle_sourcepath(toolchain, spec, {})['base'],
             )
         self.assertIn("for loader plugin 'base'", stream.getvalue())
 
@@ -210,6 +213,6 @@ class NPMPluginTestCase(unittest.TestCase):
         with pretty_logging(stream=StringIO()) as stream:
             self.assertEqual(
                 join(pkg_dir, 'browser', 'base.js'),
-                base.locate_plugin_source(toolchain, spec)['base'],
+                base.locate_bundle_sourcepath(toolchain, spec, {})['base'],
             )
         self.assertIn("for loader plugin 'base'", stream.getvalue())
