@@ -2,6 +2,7 @@
 import unittest
 
 from os.path import join
+from os import chdir
 from os import makedirs
 
 from calmjs.loaderplugin import LoaderPluginRegistry
@@ -11,6 +12,7 @@ from calmjs.toolchain import NullToolchain
 from calmjs.toolchain import Spec
 from calmjs.utils import pretty_logging
 
+from calmjs.testing.utils import remember_cwd
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.mocks import StringIO
 from calmjs.testing.mocks import WorkingSet
@@ -216,3 +218,26 @@ class NPMPluginTestCase(unittest.TestCase):
                 base.locate_bundle_sourcepath(toolchain, spec, {})['base'],
             )
         self.assertIn("for loader plugin 'base'", stream.getvalue())
+        self.assertNotIn("missing working_dir", stream.getvalue())
+
+    def test_plugin_package_success_package_spec_missing_working_dir(self):
+        remember_cwd(self)
+        cwd = mkdtemp(self)
+        chdir(cwd)
+
+        base = NPMLoaderPluginHandler(None, 'base')
+        base.node_module_pkg_name = 'dummy_pkg'
+        toolchain = NullToolchain()
+        spec = Spec()
+        pkg_dir = join(cwd, 'node_modules', 'dummy_pkg')
+        makedirs(pkg_dir)
+        with open(join(pkg_dir, 'package.json'), 'w') as fd:
+            fd.write('{"browser": "browser/base.js"}')
+
+        with pretty_logging(stream=StringIO()) as stream:
+            self.assertEqual(
+                join(pkg_dir, 'browser', 'base.js'),
+                base.locate_bundle_sourcepath(toolchain, spec, {})['base'],
+            )
+        self.assertIn("for loader plugin 'base'", stream.getvalue())
+        self.assertIn("missing working_dir", stream.getvalue())

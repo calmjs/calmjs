@@ -179,14 +179,24 @@ class NPMLoaderPluginHandler(BaseLoaderPluginHandler):
         if not self.node_module_pkg_name:
             return {}
 
+        working_dir = spec.get(WORKING_DIR, None)
+        if working_dir is None:
+            logger.info(
+                "attempting to derive working directory using %s, as the "
+                "provided spec is missing working_dir", toolchain
+            )
+            working_dir = toolchain.join_cwd()
+
+        logger.debug("deriving npm loader plugin from '%s'", working_dir)
+
         target = locate_package_entry_file(
-            spec[WORKING_DIR], self.node_module_pkg_name)
+            working_dir, self.node_module_pkg_name)
         if target:
             logger.debug('picked %r for loader plugin %r', target, self.name)
             return {self.name: target}
 
         if exists(join(
-                spec[WORKING_DIR], 'node_modules', self.node_module_pkg_name,
+                working_dir, 'node_modules', self.node_module_pkg_name,
                 'package.json')):
             logger.warning(
                 "'package.json' for the npm package '%s' does not contain a "
@@ -203,7 +213,7 @@ class NPMLoaderPluginHandler(BaseLoaderPluginHandler):
                 "as a workaround, though the package that owns that source "
                 "file that has this requirement should declare an explicit "
                 "dependency; the build process may fail",
-                self.node_module_pkg_name, self.name, spec[WORKING_DIR],
+                self.node_module_pkg_name, self.name, working_dir,
                 self.node_module_pkg_name,
             )
 
