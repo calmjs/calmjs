@@ -747,8 +747,9 @@ class Toolchain(BaseDriver):
         if not realpath(target).startswith(spec[BUILD_DIR]):
             raise ValueError('build_target %s is outside build_dir' % target)
 
-    # note that nearly instances of source means sourcepath, and that
-    # target means targetpath
+    # note that in the following methods, a shorthand notation is used
+    # for some of the arguments: nearly all occurrences of source means
+    # sourcepath, and target means targetpath.
 
     def _generate_transpile_target(self, spec, target):
         bd_target = join(spec[BUILD_DIR], target)
@@ -761,7 +762,9 @@ class Toolchain(BaseDriver):
 
     def transpile_modname_source_target(self, spec, modname, source, target):
         """
-        The function that gets called by
+        The function that gets called by compile_transpile_entry for
+        processing the provided JavaScript source file provided by some
+        Python package through the transpiler instance.
         """
 
         if not isinstance(self.transpiler, BaseUnparser):
@@ -823,57 +826,79 @@ class Toolchain(BaseDriver):
                 _writer.write(source_map_url)
                 _writer.write('\n')
 
-    def compile_transpile(self, spec, entries):
+    def base_compile_entries(self, spec, entries, process_name):
         """
-        The transpile method for the compile process.  This invokes the
-        transpiler that was set up to transpile the input files into the
-        build directory.
+        The generic compile entries method for the compile process.
         """
 
         # Contains a mapping of the module name to the compiled file's
         # relative path starting from the base build_dir.
-        transpiled_modpaths = {}
-        transpiled_targets = {}
+        all_modpaths = {}
+        all_targets = {}
         # List of exported module names, should be equal to all keys of
         # the compiled and bundled sources.
-        export_module_names = []
+        all_export_module_names = []
+        process = getattr(self, 'compile_%s_entry' % process_name)
 
-        for modname, source, target, modpath in entries:
-            transpiled_modpaths[modname] = modpath
-            transpiled_targets[modname] = target
-            export_module_names.append(modname)
-            self.transpile_modname_source_target(spec, modname, source, target)
+        for entry in entries:
+            modpaths, targets, export_module_names = process(spec, entry)
+            all_modpaths.update(modpaths)
+            all_targets.update(targets)
+            all_export_module_names.extend(export_module_names)
 
-        return transpiled_modpaths, transpiled_targets, export_module_names
+        return all_modpaths, all_targets, all_export_module_names
+
+    def compile_transpile(self, spec, entries):
+        """
+        The source transpile method for the compile process.
+        """
+
+        return self.base_compile_entries(spec, entries, 'transpile')
+
+    def compile_transpile_entry(self, spec, entry):
+        """
+        Handler for each entry for the transpile method of the compile
+        process.  This invokes the transpiler that was set up to
+        transpile the input files into the build directory.
+        """
+
+        modname, source, target, modpath = entry
+        transpiled_modpath = {modname: modpath}
+        transpiled_target = {modname: target}
+        export_module_name = [modname]
+        self.transpile_modname_source_target(spec, modname, source, target)
+        return transpiled_modpath, transpiled_target, export_module_name
 
     def compile_bundle(self, spec, entries):
         """
-        The transpile method for the bundle process.  This copies the
-        source file or directory into the build directory.
+        The externally supplied source bundling method for the compile
+        process.
         """
 
-        # Contains a mapping of the bundled name to the bundled file's
-        # relative path starting from the base build_dir.
-        bundled_modpaths = {}
-        bundled_targets = {}
-        # List of exported module names, should be equal to all keys of
-        # the compiled and bundled sources.
-        export_module_names = []
+        return self.base_compile_entries(spec, entries, 'bundle')
 
-        for modname, source, target, modpath in entries:
-            bundled_modpaths[modname] = modpath
-            bundled_targets[modname] = target
-            if isfile(source):
-                export_module_names.append(modname)
-                copy_target = join(spec[BUILD_DIR], target)
-                if not exists(dirname(copy_target)):
-                    makedirs(dirname(copy_target))
-                shutil.copy(source, copy_target)
-            elif isdir(source):
-                copy_target = join(spec[BUILD_DIR], modname)
-                shutil.copytree(source, copy_target)
+    def compile_bundle_entry(self, spec, entry):
+        """
+        Handler for each entry for the bundle method of the compile
+        process.  This copies the source file or directory into the
+        build directory.
+        """
 
-        return bundled_modpaths, bundled_targets, export_module_names
+        modname, source, target, modpath = entry
+        bundled_modpath = {modname: modpath}
+        bundled_target = {modname: target}
+        export_module_name = []
+        if isfile(source):
+            export_module_name.append(modname)
+            copy_target = join(spec[BUILD_DIR], target)
+            if not exists(dirname(copy_target)):
+                makedirs(dirname(copy_target))
+            shutil.copy(source, copy_target)
+        elif isdir(source):
+            copy_target = join(spec[BUILD_DIR], modname)
+            shutil.copytree(source, copy_target)
+
+        return bundled_modpath, bundled_target, export_module_name
 
     # The naming methods, which are needed by certain toolchains that
     # need to generate specific names to maintain compatibility.  The
@@ -881,8 +906,9 @@ class Toolchain(BaseDriver):
     # defined name handling ruleset for a given implementation of a
     # toolchain, but for toolchains that have its own custom naming
     # schemes per whatever value combination, further handling can be
-    # done within each of the compile_* methods that are registered for
-    # use for that particular toolchain.
+    # done within each of the compile_* and/or compile_*_entry methods
+    # that are enabled or registered for use for that particular
+    # toolchain implementation.
 
     def modname_source_to_modname(self, spec, modname, source):
         """
