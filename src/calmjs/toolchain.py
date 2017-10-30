@@ -62,6 +62,7 @@ import re
 import shutil
 import sys
 import warnings
+from collections import namedtuple
 from functools import partial
 from inspect import currentframe
 from traceback import format_stack
@@ -99,6 +100,8 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     'AdviceRegistry', 'Spec', 'Toolchain', 'null_transpiler',
+
+    'toolchain_spec_entries_compile', 'ToolchainSpecCompileEntry',
 
     'CALMJS_TOOLCHAIN_ADVICE',
 
@@ -265,6 +268,40 @@ def spec_update_plugins_sourcepath_dict(
         plugins = dict_get(spec, plugins_sourcepath_dict_key)
         plugin = dict_get(plugins, plugin_name)
         plugin[modname] = sourcepath
+
+
+def toolchain_spec_entries_compile(toolchain, spec, entries, process_name):
+    """
+    The standardized Toolchain Spec Entries compile function
+
+    This function accepts a toolchain instance, the spec to be operated
+    with and the entries provided for the process name.  The standard
+    flow is to deferr the actual processing to the toolchain method
+    `compile_{process_name}_entry` for each entry in the entries list.
+
+    The generic compile entries method for the compile process.
+    """
+
+    # Contains a mapping of the module name to the compiled file's
+    # relative path starting from the base build_dir.
+    all_modpaths = {}
+    all_targets = {}
+    # List of exported module names, should be equal to all keys of
+    # the compiled and bundled sources.
+    all_export_module_names = []
+    process = getattr(toolchain, 'compile_%s_entry' % process_name)
+
+    for entry in entries:
+        modpaths, targets, export_module_names = process(spec, entry)
+        all_modpaths.update(modpaths)
+        all_targets.update(targets)
+        all_export_module_names.extend(export_module_names)
+
+    return all_modpaths, all_targets, all_export_module_names
+
+
+ToolchainSpecCompileEntry = namedtuple('ToolchainSpecCompileEntry', [
+    'process_name', 'read_key', 'store_key'])
 
 
 def null_transpiler(spec, reader, writer):
@@ -732,8 +769,8 @@ class Toolchain(BaseDriver):
 
         return (
             # compile_*, *_sourcepath, (*_modpaths, *_targetpaths)
-            ('transpile', 'transpile', 'transpiled'),
-            ('bundle', 'bundle', 'bundled'),
+            ToolchainSpecCompileEntry('transpile', 'transpile', 'transpiled'),
+            ToolchainSpecCompileEntry('bundle', 'bundle', 'bundled'),
         )
 
     # Default built-in methods referenced by build_compile_entries;
@@ -826,35 +863,6 @@ class Toolchain(BaseDriver):
                 _writer.write(source_map_url)
                 _writer.write('\n')
 
-    def base_compile_entries(self, spec, entries, process_name):
-        """
-        The generic compile entries method for the compile process.
-        """
-
-        # Contains a mapping of the module name to the compiled file's
-        # relative path starting from the base build_dir.
-        all_modpaths = {}
-        all_targets = {}
-        # List of exported module names, should be equal to all keys of
-        # the compiled and bundled sources.
-        all_export_module_names = []
-        process = getattr(self, 'compile_%s_entry' % process_name)
-
-        for entry in entries:
-            modpaths, targets, export_module_names = process(spec, entry)
-            all_modpaths.update(modpaths)
-            all_targets.update(targets)
-            all_export_module_names.extend(export_module_names)
-
-        return all_modpaths, all_targets, all_export_module_names
-
-    def compile_transpile(self, spec, entries):
-        """
-        The source transpile method for the compile process.
-        """
-
-        return self.base_compile_entries(spec, entries, 'transpile')
-
     def compile_transpile_entry(self, spec, entry):
         """
         Handler for each entry for the transpile method of the compile
@@ -868,14 +876,6 @@ class Toolchain(BaseDriver):
         export_module_name = [modname]
         self.transpile_modname_source_target(spec, modname, source, target)
         return transpiled_modpath, transpiled_target, export_module_name
-
-    def compile_bundle(self, spec, entries):
-        """
-        The externally supplied source bundling method for the compile
-        process.
-        """
-
-        return self.base_compile_entries(spec, entries, 'bundle')
 
     def compile_bundle_entry(self, spec, entry):
         """
@@ -1067,21 +1067,7 @@ class Toolchain(BaseDriver):
                 "(got %r instead)" % (EXPORT_MODULE_NAMES, export_module_names)
             )
 
-        for entry in self.compile_entries:
-            m, read_key, store_key = entry
-            if callable(m):
-                method_name = m.__name__
-                method = m
-            else:
-                method_name = self.compile_prefix + m
-                method = getattr(self, method_name, None)
-                if not callable(method):
-                    logger.error(
-                        "'%s' not a callable attribute for %r from "
-                        "compile_entries entry %r; skipping", m, self, entry
-                    )
-                    continue
-
+        def compile_entry(method, read_key, store_key):
             spec_read_key = read_key + self.sourcepath_suffix
             spec_modpath_key = store_key + self.modpath_suffix
             spec_target_key = store_key + self.targetpath_suffix
@@ -1090,7 +1076,7 @@ class Toolchain(BaseDriver):
                 logger.error(
                     "aborting compile step %r due to existing key", entry,
                 )
-                continue
+                return
 
             sourcepath_dict = spec.get(spec_read_key, {})
             entries = self._gen_modname_source_target_modpath(
@@ -1108,6 +1094,28 @@ class Toolchain(BaseDriver):
                 len(new_module_names),
             )
             export_module_names.extend(new_module_names)
+
+        for entry in self.compile_entries:
+            if isinstance(entry, ToolchainSpecCompileEntry):
+                compile_entry(partial(
+                    toolchain_spec_entries_compile, self,
+                    process_name=entry.process_name,
+                ), entry.read_key, entry.store_key)
+                continue
+
+            m, read_key, store_key = entry
+            if callable(m):
+                method = m
+            else:
+                method = getattr(self, self.compile_prefix + m, None)
+                if not callable(method):
+                    logger.error(
+                        "'%s' not a callable attribute for %r from "
+                        "compile_entries entry %r; skipping", m, self, entry
+                    )
+                    continue
+
+            compile_entry(method, read_key, store_key)
 
     def assemble(self, spec):
         """

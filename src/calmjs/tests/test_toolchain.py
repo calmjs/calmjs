@@ -3,6 +3,7 @@ import unittest
 import json
 import tempfile
 import warnings
+from functools import partial
 from inspect import currentframe
 from os import makedirs
 from os.path import basename
@@ -30,6 +31,7 @@ from calmjs.toolchain import ES5Toolchain
 from calmjs.toolchain import dict_get
 from calmjs.toolchain import dict_key_update_overwrite_check
 from calmjs.toolchain import spec_update_plugins_sourcepath_dict
+from calmjs.toolchain import toolchain_spec_entries_compile
 
 from calmjs.toolchain import CLEANUP
 from calmjs.toolchain import SUCCESS
@@ -812,10 +814,10 @@ class ToolchainTestCase(unittest.TestCase):
         # compile step error messages
         self.assertIn(
             ("aborting compile step %r due to existing key" % (
-                (u'transpile', u'transpile', u'transpiled'),)), msg)
+                self.toolchain.compile_entries[0],)), msg)
         self.assertIn(
             ("aborting compile step %r due to existing key" % (
-                (u'bundle', u'bundle', u'bundled'),)), msg)
+                self.toolchain.compile_entries[1],)), msg)
 
         # All should be same identity
         self.assertIs(spec['transpiled_modpaths'], transpiled_modpaths)
@@ -894,6 +896,38 @@ class ToolchainTestCase(unittest.TestCase):
         self.assertNotIn('bundled_modpaths', spec)
         self.assertNotIn('transpiled_targetpaths', spec)
         self.assertNotIn('bundled_targetpaths', spec)
+
+    def test_toolchain_standard_compile_alternate_entries_called(self):
+        added = []
+
+        class CustomToolchain(Toolchain):
+            def build_compile_entries(self):
+                return (('here', 'fake', 'faked'),)
+
+            def compile_here(self, spec, entries):
+                added.extend(list(entries))
+                return {'here': 'mod'}, {'here': 'target'}, ['here']
+
+        # Again, this is not the right way, should subclass/define a new
+        # build_compile_entries method.
+        custom_toolchain = CustomToolchain()
+        spec = Spec(fake_sourcepath={'here': 'source'})
+
+        with pretty_logging(stream=StringIO()) as s:
+            custom_toolchain.compile(spec)
+
+        msg = s.getvalue()
+        self.assertNotIn("'here' not a callable attribute for", msg)
+
+        self.assertNotIn('transpiled_modpaths', spec)
+        self.assertNotIn('bundled_modpaths', spec)
+        self.assertNotIn('transpiled_targetpaths', spec)
+        self.assertNotIn('bundled_targetpaths', spec)
+
+        self.assertEqual([('here', 'source', 'here', 'here')], added)
+        self.assertEqual({'here': 'mod'}, spec['faked_modpaths'])
+        self.assertEqual({'here': 'target'}, spec['faked_targetpaths'])
+        self.assertEqual(['here'], spec['export_module_names'])
 
     def test_toolchain_standard_good(self):
         # good, with a mock
@@ -981,10 +1015,10 @@ class ToolchainTestCase(unittest.TestCase):
             s.getvalue(),
         )
 
-    def test_toolchain_compile_bundle(self):
+    def test_toolchain_compile_bundle_entry(self):
         """
-        Test out the compile bundle being actually flexible for variety
-        of cases.
+        Test out the compile_bundle_entry being flexible in handling the
+        different cases of paths.
         """
 
         build_dir = mkdtemp(self)
@@ -1002,7 +1036,11 @@ class ToolchainTestCase(unittest.TestCase):
         target3 = join('nested', 'namespace', 'mod3.js')
         target4 = 'namespace.mod4.js'
 
-        self.toolchain.compile_bundle(spec, [
+        compile_bundle = partial(
+            toolchain_spec_entries_compile, self.toolchain,
+            process_name='bundle')
+
+        compile_bundle(spec, [
             ('mod1', src, target1, 'mod1'),
             ('mod2', src, target2, 'mod2'),
             ('mod3', src, target3, 'mod3'),
