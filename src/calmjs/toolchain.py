@@ -268,7 +268,8 @@ def spec_update_plugins_sourcepath_dict(
         plugin[modname] = sourcepath
 
 
-def toolchain_spec_entries_compile(toolchain, spec, entries, process_name):
+def toolchain_spec_entries_compile(
+        toolchain, spec, entries, process_name, overwrite_log=None):
     """
     The standardized Toolchain Spec Entries compile function
 
@@ -278,6 +279,25 @@ def toolchain_spec_entries_compile(toolchain, spec, entries, process_name):
     `compile_{process_name}_entry` for each entry in the entries list.
 
     The generic compile entries method for the compile process.
+
+    Arguments:
+
+    toolchain
+        The toolchain to be used for the operation.
+    spec
+        The spec to be operated with.
+    entries
+        The entries for the source.
+    process_name
+        The name of the specific compile process of the provided
+        toolchain.
+    overwrite_log
+        A callable that will accept a 4-tuple of suffix, key, original
+        and new value, if monitoring of overwritten values are required.
+        suffix is derived from the modpath_suffix or targetpath_suffix
+        of the toolchain instance, key is the key on any of the keys on
+        either of those mappings, original and new are the original and
+        the replacement value.
     """
 
     # Contains a mapping of the module name to the compiled file's
@@ -291,15 +311,22 @@ def toolchain_spec_entries_compile(toolchain, spec, entries, process_name):
 
     for entry in entries:
         modpaths, targets, export_module_names = process(spec, entry)
-        all_modpaths.update(modpaths)
-        all_targets.update(targets)
+        if callable(overwrite_log):
+            for dupes in dict_update_overwrite_check(all_modpaths, modpaths):
+                overwrite_log(toolchain.modpath_suffix, *dupes)
+            for dupes in dict_update_overwrite_check(all_targets, targets):
+                overwrite_log(toolchain.targetpath_suffix, *dupes)
+        else:
+            all_modpaths.update(modpaths)
+            all_targets.update(targets)
         all_export_module_names.extend(export_module_names)
 
     return all_modpaths, all_targets, all_export_module_names
 
 
 ToolchainSpecCompileEntry = namedtuple('ToolchainSpecCompileEntry', [
-    'process_name', 'read_key', 'store_key'])
+    'process_name', 'read_key', 'store_key', 'logger', 'log_level'])
+ToolchainSpecCompileEntry.__new__.__defaults__ = (None, None)
 
 
 def null_transpiler(spec, reader, writer):
@@ -1095,9 +1122,18 @@ class Toolchain(BaseDriver):
 
         for entry in self.compile_entries:
             if isinstance(entry, ToolchainSpecCompileEntry):
+                log = partial(
+                    logging.getLogger(entry.logger).log,
+                    entry.log_level,
+                    (
+                        entry.store_key + "%s['%s'] is being rewritten from "
+                        "'%s' to '%s'; configuration may now be invalid"
+                    ),
+                ) if entry.logger else None
                 compile_entry(partial(
                     toolchain_spec_entries_compile, self,
                     process_name=entry.process_name,
+                    overwrite_log=log,
                 ), entry.read_key, entry.store_key)
                 continue
 

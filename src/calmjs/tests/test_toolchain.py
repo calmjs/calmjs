@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 import unittest
+import logging
 import json
 import tempfile
 import warnings
+from collections import OrderedDict
 from functools import partial
 from inspect import currentframe
 from os import makedirs
@@ -28,6 +30,7 @@ from calmjs.toolchain import Spec
 from calmjs.toolchain import Toolchain
 from calmjs.toolchain import NullToolchain
 from calmjs.toolchain import ES5Toolchain
+from calmjs.toolchain import ToolchainSpecCompileEntry
 from calmjs.toolchain import dict_get
 from calmjs.toolchain import dict_update_overwrite_check
 from calmjs.toolchain import spec_update_plugins_sourcepath_dict
@@ -913,6 +916,83 @@ class ToolchainTestCase(unittest.TestCase):
         self.assertEqual({'here': 'mod'}, spec['faked_modpaths'])
         self.assertEqual({'here': 'target'}, spec['faked_targetpaths'])
         self.assertEqual(['here'], spec['export_module_names'])
+
+    def test_toolchain_spec_compile_entry_logging(self):
+        # this test constructs a situation where the individual compile
+        # entry methods are capable of generating the paths with
+        # duplicated modnames (keys) - could be unusual, and
+        # implementations may use the extended attributes in the
+        # ToolchainSpecCompileEntry to trigger logging.
+
+        class CustomToolchain(Toolchain):
+            def build_compile_entries(self):
+                return [
+                    ToolchainSpecCompileEntry('silent', 'silent', 'silented'),
+                    ToolchainSpecCompileEntry(
+                        'logged', 'log', 'logged',
+                        'calmjs_testing', logging.WARNING,
+                    ),
+                ]
+
+            def compile_silent_entry(self, spec, entry):
+                modname, source, target, modpath = entry
+                return {'module': modpath}, {'module': source}, ['module']
+
+            def compile_logged_entry(self, spec, entry):
+                modname, source, target, modpath = entry
+                return {'module': modpath}, {'module': source}, ['module']
+
+        custom_toolchain = CustomToolchain()
+        spec = Spec(
+            silent_sourcepath=OrderedDict([
+                ('original', 'original'),
+                ('silent', 'silent'),
+            ]),
+            log_sourcepath=OrderedDict([
+                ('original', 'static'),
+                ('log', 'static'),
+                ('final', 'changed'),
+            ]),
+        )
+
+        with pretty_logging(logger='calmjs_testing', stream=StringIO()) as s:
+            custom_toolchain.compile(spec)
+
+        msg = s.getvalue()
+        self.assertNotIn(
+            "silented_modpaths['module'] is being rewritten from "
+            "'original' to 'silent'", msg
+        )
+        self.assertNotIn(
+            "silented_targetpaths['module'] is being rewritten from "
+            "'original' to 'silent'", msg
+        )
+
+        self.assertIn(
+            "logged_modpaths['module'] is being rewritten from "
+            "'original' to 'log'", msg
+        )
+        self.assertNotIn(
+            "logged_targetpaths['module'] is being rewritten from "
+            "'static' to 'static'", msg
+        )
+        self.assertIn(
+            "logged_targetpaths['module'] is being rewritten from "
+            "'static' to 'changed'", msg
+        )
+
+        self.assertEqual({
+            'module': 'silent',
+        }, spec['silented_modpaths'])
+        self.assertEqual({
+            'module': 'silent',
+        }, spec['silented_targetpaths'])
+        self.assertEqual({
+            'module': 'final',
+        }, spec['logged_modpaths'])
+        self.assertEqual({
+            'module': 'changed',
+        }, spec['logged_targetpaths'])
 
     def test_toolchain_standard_good(self):
         # good, with a mock
