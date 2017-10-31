@@ -88,6 +88,7 @@ from calmjs.parse.sourcemap import encode_sourcemap
 
 from calmjs.base import BaseDriver
 from calmjs.base import BaseRegistry
+from calmjs.registry import get as get_registry
 from calmjs.exc import AdviceAbort
 from calmjs.exc import AdviceCancel
 from calmjs.exc import ValueSkip
@@ -114,7 +115,9 @@ __all__ = [
     'AFTER_PREPARE', 'BEFORE_PREPARE', 'AFTER_TEST', 'BEFORE_TEST',
 
     'ADVICE_PACKAGES', 'ARTIFACT_PATHS', 'BUILD_DIR',
-    'CALMJS_MODULE_REGISTRY_NAMES', 'CALMJS_TEST_REGISTRY_NAMES',
+    'CALMJS_MODULE_REGISTRY_NAMES',
+    'CALMJS_LOADERPLUGIN_REGISTRY_NAMES',
+    'CALMJS_TEST_REGISTRY_NAMES',
     'CONFIG_JS_FILES', 'DEBUG',
     'EXPORT_MODULE_NAMES', 'EXPORT_PACKAGE_NAMES',
     'EXPORT_TARGET', 'EXPORT_TARGET_OVERWRITE',
@@ -154,6 +157,7 @@ ARTIFACT_PATHS = 'artifact_paths'
 BUILD_DIR = 'build_dir'
 # source registries that have been used
 CALMJS_MODULE_REGISTRY_NAMES = 'calmjs_module_registry_names'
+CALMJS_LOADERPLUGIN_REGISTRY_NAMES = 'calmjs_loaderplugin_registry_names'
 CALMJS_TEST_REGISTRY_NAMES = 'calmjs_test_registry_names'
 # configuration file for enabling execution of code in build directory
 CONFIG_JS_FILES = 'config_js_files'
@@ -924,6 +928,35 @@ class Toolchain(BaseDriver):
             shutil.copytree(source, copy_target)
 
         return bundled_modpath, bundled_target, export_module_name
+
+    def compile_loaderplugin_entry(self, spec, entry):
+        """
+        Generic loader plugin entry handler.
+
+        The default implementation assumes that everything up to the
+        first '!' symbol resolves to some known loader plugin within
+        the registry.
+        """
+
+        modname, source, target, modpath = entry
+        plugin_name, arguments = modname.split('!', 1)
+        for name in spec.get(CALMJS_LOADERPLUGIN_REGISTRY_NAMES, []):
+            # TODO consider a filter step that will prune bad registry
+            # names and warn once.
+            registry = get_registry(name)
+            if not registry:
+                logger.warning(
+                    "spec specified '%s' as a loaderplugin registry, but it "
+                    "is invalid", name
+                )
+                continue
+            handler = registry.get_record(plugin_name)
+            if not handler:
+                continue
+            return handler(self, spec, modname, source, target, modpath)
+        logger.warning(
+            "no loaderplugin handler found for plugin entry '%s'", modname)
+        return {}, {}, []
 
     # The naming methods, which are needed by certain toolchains that
     # need to generate specific names to maintain compatibility.  The

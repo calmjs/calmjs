@@ -24,6 +24,9 @@ from calmjs.exc import ToolchainCancel
 from calmjs import toolchain as calmjs_toolchain
 from calmjs.utils import pretty_logging
 from calmjs.registry import get
+from calmjs.loaderplugin import LoaderPluginRegistry
+from calmjs.loaderplugin import BaseLoaderPluginHandler
+
 from calmjs.toolchain import CALMJS_TOOLCHAIN_ADVICE
 from calmjs.toolchain import AdviceRegistry
 from calmjs.toolchain import Spec
@@ -49,6 +52,7 @@ from calmjs.toolchain import BEFORE_COMPILE
 from calmjs.toolchain import AFTER_PREPARE
 from calmjs.toolchain import BEFORE_PREPARE
 
+from calmjs.testing.mocks import WorkingSet
 from calmjs.testing.mocks import StringIO
 from calmjs.testing.spec import create_spec_advise_fault
 from calmjs.testing.utils import mkdtemp
@@ -1116,6 +1120,110 @@ class ToolchainTestCase(unittest.TestCase):
         self.assertTrue(exists(join(build_dir, target2)))
         self.assertTrue(exists(join(build_dir, target3)))
         self.assertTrue(exists(join(build_dir, target4)))
+
+
+class MockLPHandler(BaseLoaderPluginHandler):
+
+    def __call__(self, toolchain, spec, modname, source, target, modpath):
+        return {modname: target}, {modname: modpath}, [modname]
+
+
+class ToolchainLoaderPluginTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.toolchain = Toolchain()
+
+    def test_toolchain_compile_loaderplugin_entry_empty(self):
+        """
+        A rough standalone test for handling of loader plugins.
+        """
+
+        src_dir = mkdtemp(self)
+        src = join(src_dir, 'target.txt')
+        spec = Spec()
+        with pretty_logging(stream=StringIO()) as s:
+            results = self.toolchain.compile_loaderplugin_entry(spec, (
+                'foo!target.txt', src, 'foo!target.txt', 'foo!target.txt'))
+        self.assertIn(
+            "no loaderplugin handler found for plugin entry 'foo!target.txt'",
+            s.getvalue())
+        self.assertEqual(({}, {}, []), results)
+
+    def test_toolchain_compile_loaderplugin_entry_registered(self):
+        """
+        A rough standalone test for handling of loader plugins.
+        """
+
+        entry_points = {
+            'calmjs.loaderplugins_1': [
+                'foo = calmjs.tests.test_toolchain:MockLPHandler'],
+            'calmjs.loaderplugins_2': [
+                'bar = calmjs.tests.test_toolchain:MockLPHandler'],
+        }
+        working_set = WorkingSet(entry_points)
+        registries = {
+            k: LoaderPluginRegistry(k, _working_set=working_set)
+            for k in entry_points
+        }
+        stub_item_attr_value(
+            self, calmjs_toolchain, 'get_registry', registries.get)
+
+        src_dir = mkdtemp(self)
+        src = join(src_dir, 'target.txt')
+
+        spec = Spec(
+            calmjs_loaderplugin_registry_names=['calmjs.loaderplugins_1'],
+        )
+        with pretty_logging(stream=StringIO()) as s:
+            self.toolchain.compile_loaderplugin_entry(spec, (
+                'bar!target.txt', src, 'bar!target.txt', 'bar!target.txt'))
+            foo_results = self.toolchain.compile_loaderplugin_entry(spec, (
+                'foo!target.txt', src, 'foo!target.txt', 'foo!target.txt'))
+
+        self.assertIn(
+            "no loaderplugin handler found for plugin entry 'bar!target.txt'",
+            s.getvalue(),
+        )
+        self.assertNotIn(
+            "no loaderplugin handler found for plugin entry 'foo!target.txt'",
+            s.getvalue(),
+        )
+        self.assertEqual((
+            {'foo!target.txt': 'foo!target.txt'},
+            {'foo!target.txt': 'foo!target.txt'},
+            ['foo!target.txt'],
+        ), foo_results)
+
+        spec = Spec(
+            calmjs_loaderplugin_registry_names=[
+                'calmjs.loaderplugins_2',
+                'calmjs.loaderplugins_3',
+            ],
+        )
+        with pretty_logging(stream=StringIO()) as s:
+            bar_results = self.toolchain.compile_loaderplugin_entry(spec, (
+                'bar!target.txt', src, 'bar!target.txt', 'bar!target.txt'))
+            self.toolchain.compile_loaderplugin_entry(spec, (
+                'foo!target.txt', src, 'foo!target.txt', 'foo!target.txt'))
+
+        self.assertNotIn(
+            "no loaderplugin handler found for plugin entry 'bar!target.txt'",
+            s.getvalue(),
+        )
+        self.assertIn(
+            "no loaderplugin handler found for plugin entry 'foo!target.txt'",
+            s.getvalue(),
+        )
+        self.assertIn(
+            "spec specified 'calmjs.loaderplugins_3' as a loaderplugin "
+            "registry, but it is invalid",
+            s.getvalue(),
+        )
+        self.assertEqual((
+            {'bar!target.txt': 'bar!target.txt'},
+            {'bar!target.txt': 'bar!target.txt'},
+            ['bar!target.txt'],
+        ), bar_results)
 
 
 class NullToolchainTestCase(unittest.TestCase):
