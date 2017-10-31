@@ -101,6 +101,8 @@ logger = logging.getLogger(__name__)
 __all__ = [
     'AdviceRegistry', 'Spec', 'Toolchain', 'null_transpiler',
 
+    'dict_get', 'dict_update_overwrite_check',
+
     'toolchain_spec_entries_compile', 'ToolchainSpecCompileEntry',
 
     'CALMJS_TOOLCHAIN_ADVICE',
@@ -220,25 +222,21 @@ def dict_get(d, key):
     return value
 
 
-def dict_key_update_overwrite_check(d, key, mapping, consequence=None):
+def dict_update_overwrite_check(base, fresh):
     """
-    For updating a dict with another whose keys should not already be
-    present.
+    For updating a base dict with a fresh one, returning a list of
+    3-tuples containing the key, previous value (base[key]) and the
+    fresh value (fresh[key]) for all colliding changes (reassignment of
+    identical values are omitted).
     """
 
-    msg = ("configuration may be in an invalid state."
-           if consequence is None else consequence)
-
-    keys = set(d[key].keys()) & set(mapping.keys())
-    for subkey in keys:
-        if d[key][subkey] != mapping[subkey]:
-            logger.warning(
-                "%s['%s'] is being rewritten from '%s' to '%s'; %s",
-                key, subkey, d[key][subkey], mapping[subkey], msg,
-            )
-
-    # complaints are over, finish the job.
-    d[key].update(mapping)
+    result = [
+        (key, base[key], fresh[key])
+        for key in set(base.keys()) & set(fresh.keys())
+        if base[key] != fresh[key]
+    ]
+    base.update(fresh)
+    return result
 
 
 def spec_update_plugins_sourcepath_dict(

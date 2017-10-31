@@ -29,7 +29,7 @@ from calmjs.toolchain import Toolchain
 from calmjs.toolchain import NullToolchain
 from calmjs.toolchain import ES5Toolchain
 from calmjs.toolchain import dict_get
-from calmjs.toolchain import dict_key_update_overwrite_check
+from calmjs.toolchain import dict_update_overwrite_check
 from calmjs.toolchain import spec_update_plugins_sourcepath_dict
 from calmjs.toolchain import toolchain_spec_entries_compile
 
@@ -87,55 +87,40 @@ class DictGetTestCase(unittest.TestCase):
         self.assertIs(items['a_key'], a_key)
 
 
-class DictKeyGetUpdateTestCase(unittest.TestCase):
+class DictUpdateOverwriteTestCase(unittest.TestCase):
     """
     A function for updating specific dict/spec via a key, and ensure
     that any overwritten values are warned with the specified message.
     """
 
     def test_dict_key_update_overwrite_check_standard(self):
-        a = {}
-        a['base_key'] = {'k1': 'v1'}
-        mapping = {'k2': 'v2'}
-        with pretty_logging(stream=StringIO()) as s:
-            dict_key_update_overwrite_check(a, 'base_key', mapping)
-        self.assertEqual(s.getvalue(), '')
-        self.assertEqual(a['base_key'], {'k1': 'v1', 'k2': 'v2'})
+        a = {'k1': 'v1'}
+        b = {'k2': 'v2'}
+        self.assertEqual([], dict_update_overwrite_check(a, b))
+        self.assertEqual(a, {'k1': 'v1', 'k2': 'v2'})
 
     def test_dict_key_update_overwrite_check_no_update(self):
-        a = {}
-        a['base_key'] = {'k1': 'v1'}
-        mapping = {'k1': 'v1'}
-        with pretty_logging(stream=StringIO()) as s:
-            dict_key_update_overwrite_check(a, 'base_key', mapping)
-        self.assertEqual(s.getvalue(), '')
-        self.assertEqual(a['base_key'], {'k1': 'v1'})
+        a = {'k1': 'v1'}
+        b = {'k1': 'v1'}
+        self.assertEqual([], dict_update_overwrite_check(a, b))
+        self.assertEqual(a, {'k1': 'v1'})
 
     def test_dict_key_update_overwrite_check_overwritten_single(self):
-        a = {}
-        a['base_key'] = {'k1': 'v1'}
-        mapping = {'k1': 'v2'}
-        with pretty_logging(stream=StringIO()) as s:
-            dict_key_update_overwrite_check(a, 'base_key', mapping)
-        self.assertIn(
-            "base_key['k1'] is being rewritten from 'v1' to 'v2'; "
-            "configuration may be in an invalid state.",
-            s.getvalue())
-        self.assertEqual(a['base_key'], {'k1': 'v2'})
+        a = {'k1': 'v1'}
+        b = {'k1': 'v2'}
+        self.assertEqual([
+            ('k1', 'v1', 'v2'),
+        ], dict_update_overwrite_check(a, b))
+        self.assertEqual(a, {'k1': 'v2'})
 
     def test_dict_key_update_overwrite_check_overwritten_multi(self):
-        a = {}
-        a['base_key'] = {'k1': 'v1', 'k2': 'v2'}
-        mapping = {'k1': 'v2', 'k2': 'v4'}
-        with pretty_logging(stream=StringIO()) as s:
-            dict_key_update_overwrite_check(a, 'base_key', mapping, 'oops.')
-        self.assertIn(
-            "base_key['k1'] is being rewritten from 'v1' to 'v2'; oops.",
-            s.getvalue())
-        self.assertIn(
-            "base_key['k2'] is being rewritten from 'v2' to 'v4'; oops.",
-            s.getvalue())
-        self.assertEqual(a['base_key'], {'k1': 'v2', 'k2': 'v4'})
+        a = {'k1': 'v1', 'k2': 'v2'}
+        b = {'k1': 'v2', 'k2': 'v4'}
+        self.assertEqual([
+            ('k1', 'v1', 'v2'),
+            ('k2', 'v2', 'v4'),
+        ], sorted(dict_update_overwrite_check(a, b)))
+        self.assertEqual(a, {'k1': 'v2', 'k2': 'v4'})
 
 
 class SpecUpdatePluginsSourcepathDictTestCase(unittest.TestCase):
