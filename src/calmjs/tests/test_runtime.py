@@ -692,6 +692,32 @@ class SourcePackageToolchainRuntimeTestCase(unittest.TestCase):
         self.assertEqual(
             known.source_package_names, ['example.package'])
 
+    def test_source_package_toolchain_default(self):
+        stub_stdouts(self)
+        parser = ArgumentParser()
+        tc = toolchain.NullToolchain()
+        rt = runtime.SourcePackageToolchainRuntime(tc)
+        rt.init_argparser(parser)
+        known, extras = parser.parse_known_args(['example.package'])
+        self.assertEqual(known.calmjs_module_registry_names, None)
+
+    def test_source_package_toolchain_argparser_default_registry(self):
+        class CustomRuntime(runtime.SourcePackageToolchainRuntime):
+            def init_argparser_source_registry(self, argparser):
+                super(CustomRuntime, self).init_argparser_source_registry(
+                    argparser, default=('default_reg',))
+
+        stub_stdouts(self)
+        parser = ArgumentParser()
+        tc = toolchain.NullToolchain()
+        rt = CustomRuntime(tc)
+        rt.init_argparser(parser)
+        known, extras = parser.parse_known_args(['example.package'])
+        self.assertEqual(
+            known.calmjs_module_registry_names, ('default_reg',))
+        self.assertEqual(
+            known.source_package_names, ['example.package'])
+
 
 class PackageManagerDriverTestCase(unittest.TestCase):
     """

@@ -855,13 +855,13 @@ class SourcePackageToolchainRuntime(ToolchainRuntime):
         """
 
         argparser.add_argument(
-            '--source-registry', default=None,
+            '--source-registry', default=default,
             dest=CALMJS_MODULE_REGISTRY_NAMES, action=StoreDelimitedList,
             help=help,
         )
 
         argparser.add_argument(
-            '--source-registries', default=None,
+            '--source-registries', default=default,
             dest=CALMJS_MODULE_REGISTRY_NAMES, action=StoreDelimitedList,
             help=SUPPRESS,
         )
