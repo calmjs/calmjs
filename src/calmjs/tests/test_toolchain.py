@@ -1142,6 +1142,7 @@ class ToolchainLoaderPluginTestCase(unittest.TestCase):
         src = join(src_dir, 'target.txt')
         spec = Spec()
         with pretty_logging(stream=StringIO()) as s:
+            self.toolchain.prepare_loaderplugin_registries(spec)
             results = self.toolchain.compile_loaderplugin_entry(spec, (
                 'foo!target.txt', src, 'foo!target.txt', 'foo!target.txt'))
         self.assertIn(
@@ -1175,6 +1176,7 @@ class ToolchainLoaderPluginTestCase(unittest.TestCase):
             calmjs_loaderplugin_registry_names=['calmjs.loaderplugins_1'],
         )
         with pretty_logging(stream=StringIO()) as s:
+            self.toolchain.prepare_loaderplugin_registries(spec)
             self.toolchain.compile_loaderplugin_entry(spec, (
                 'bar!target.txt', src, 'bar!target.txt', 'bar!target.txt'))
             foo_results = self.toolchain.compile_loaderplugin_entry(spec, (
@@ -1201,6 +1203,7 @@ class ToolchainLoaderPluginTestCase(unittest.TestCase):
             ],
         )
         with pretty_logging(stream=StringIO()) as s:
+            self.toolchain.prepare_loaderplugin_registries(spec)
             bar_results = self.toolchain.compile_loaderplugin_entry(spec, (
                 'bar!target.txt', src, 'bar!target.txt', 'bar!target.txt'))
             self.toolchain.compile_loaderplugin_entry(spec, (

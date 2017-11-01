@@ -117,6 +117,7 @@ __all__ = [
     'ADVICE_PACKAGES', 'ARTIFACT_PATHS', 'BUILD_DIR',
     'CALMJS_MODULE_REGISTRY_NAMES',
     'CALMJS_LOADERPLUGIN_REGISTRY_NAMES',
+    'CALMJS_LOADERPLUGIN_REGISTRIES',
     'CALMJS_TEST_REGISTRY_NAMES',
     'CONFIG_JS_FILES', 'DEBUG',
     'EXPORT_MODULE_NAMES', 'EXPORT_PACKAGE_NAMES',
@@ -158,6 +159,7 @@ BUILD_DIR = 'build_dir'
 # source registries that have been used
 CALMJS_MODULE_REGISTRY_NAMES = 'calmjs_module_registry_names'
 CALMJS_LOADERPLUGIN_REGISTRY_NAMES = 'calmjs_loaderplugin_registry_names'
+CALMJS_LOADERPLUGIN_REGISTRIES = 'calmjs_loaderplugin_registries'
 CALMJS_TEST_REGISTRY_NAMES = 'calmjs_test_registry_names'
 # configuration file for enabling execution of code in build directory
 CONFIG_JS_FILES = 'config_js_files'
@@ -802,8 +804,29 @@ class Toolchain(BaseDriver):
             ToolchainSpecCompileEntry('bundle', 'bundle', 'bundled'),
         )
 
-    # Default built-in methods referenced by build_compile_entries;
-    # these are for the transpile and bundle processes.
+    # Default built-in methods referenced by methods that will be
+    # executed, as constructed by build_compile_entries.
+
+    # Following are used for prepare.
+
+    def prepare_loaderplugin_registries(self, spec):
+        """
+        Resolve loaderplugin registry names to the actual registry and
+        assign them to the spec.
+        """
+
+        spec[CALMJS_LOADERPLUGIN_REGISTRIES] = registries = []
+        for name in spec.get(CALMJS_LOADERPLUGIN_REGISTRY_NAMES, []):
+            registry = get_registry(name)
+            if not registry:
+                logger.warning(
+                    "spec specified '%s' as a loaderplugin registry, but it "
+                    "is invalid", name
+                )
+                continue
+            registries.append(registry)
+
+    # Following are used for the transpile and bundle compile processes.
 
     def _validate_build_target(self, spec, target):
         """
@@ -940,16 +963,7 @@ class Toolchain(BaseDriver):
 
         modname, source, target, modpath = entry
         plugin_name, arguments = modname.split('!', 1)
-        for name in spec.get(CALMJS_LOADERPLUGIN_REGISTRY_NAMES, []):
-            # TODO consider a filter step that will prune bad registry
-            # names and warn once.
-            registry = get_registry(name)
-            if not registry:
-                logger.warning(
-                    "spec specified '%s' as a loaderplugin registry, but it "
-                    "is invalid", name
-                )
-                continue
+        for registry in spec.get(CALMJS_LOADERPLUGIN_REGISTRIES, []):
             handler = registry.get_record(plugin_name)
             if not handler:
                 continue
