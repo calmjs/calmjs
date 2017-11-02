@@ -102,7 +102,7 @@ logger = logging.getLogger(__name__)
 __all__ = [
     'AdviceRegistry', 'Spec', 'Toolchain', 'null_transpiler',
 
-    'dict_get', 'dict_update_overwrite_check',
+    'dict_setget', 'dict_setget_dict', 'dict_update_overwrite_check',
 
     'toolchain_spec_entries_compile', 'ToolchainSpecCompileEntry',
 
@@ -223,9 +223,13 @@ def _deprecation_warning(msg):
     logger.warning(msg)
 
 
-def dict_get(d, key):
-    value = d[key] = d.get(key, {})
+def dict_setget(d, key, value):
+    value = d[key] = d.get(key, value)
     return value
+
+
+def dict_setget_dict(d, key):
+    return dict_setget(d, key, {})
 
 
 def dict_update_overwrite_check(base, fresh):
@@ -260,7 +264,7 @@ def spec_update_plugins_sourcepath_dict(
     encoded mapping of transpiled file back to its original.
     """
 
-    default = dict_get(spec, sourcepath_dict_key)
+    default = dict_setget_dict(spec, sourcepath_dict_key)
     for modname, sourcepath in sourcepath_dict.items():
         parts = modname.split('!', 1)
         if len(parts) == 1:
@@ -269,8 +273,8 @@ def spec_update_plugins_sourcepath_dict(
             continue
 
         plugin_name, arguments = parts
-        plugins = dict_get(spec, plugins_sourcepath_dict_key)
-        plugin = dict_get(plugins, plugin_name)
+        plugins = dict_setget_dict(spec, plugins_sourcepath_dict_key)
+        plugin = dict_setget_dict(plugins, plugin_name)
         plugin[modname] = sourcepath
 
 

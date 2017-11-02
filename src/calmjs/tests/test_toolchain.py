@@ -34,7 +34,8 @@ from calmjs.toolchain import Toolchain
 from calmjs.toolchain import NullToolchain
 from calmjs.toolchain import ES5Toolchain
 from calmjs.toolchain import ToolchainSpecCompileEntry
-from calmjs.toolchain import dict_get
+from calmjs.toolchain import dict_setget
+from calmjs.toolchain import dict_setget_dict
 from calmjs.toolchain import dict_update_overwrite_check
 from calmjs.toolchain import spec_update_plugins_sourcepath_dict
 from calmjs.toolchain import toolchain_spec_entries_compile
@@ -79,18 +80,27 @@ def dummy(spec, extras):
         spec['extras'] = extras
 
 
-class DictGetTestCase(unittest.TestCase):
+class DictSetGetTestCase(unittest.TestCase):
     """
     A special get that also creates keys.
     """
 
-    def test_dict_get(self):
+    def test_dict_setget(self):
         items = {}
-        dict_get(items, 'a_key')
+        value = []
+        dict_setget(items, 'a_key', value)
+        self.assertIs(value, items['a_key'])
+        other = []
+        dict_setget(items, 'a_key', other)
+        self.assertIsNot(other, items['a_key'])
+
+    def test_dict_setget_dict(self):
+        items = {}
+        dict_setget_dict(items, 'a_key')
         self.assertEqual(items, {'a_key': {}})
 
         a_key = items['a_key']
-        dict_get(items, 'a_key')
+        dict_setget_dict(items, 'a_key')
         self.assertIs(items['a_key'], a_key)
 
 
