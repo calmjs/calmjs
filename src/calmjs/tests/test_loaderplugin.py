@@ -241,3 +241,103 @@ class NPMPluginTestCase(unittest.TestCase):
             )
         self.assertIn("for loader plugin 'base'", stream.getvalue())
         self.assertIn("missing working_dir", stream.getvalue())
+
+    def test_plugin_package_chained_loaders(self):
+        # manually create a registry
+        reg = LoaderPluginRegistry('simloaders', _working_set=WorkingSet({}))
+        base = reg.records['base'] = NPMLoaderPluginHandler(reg, 'base')
+        base.node_module_pkg_name = 'dummy_pkg1'
+        extra = reg.records['extra'] = NPMLoaderPluginHandler(reg, 'extra')
+        extra.node_module_pkg_name = 'dummy_pkg2'
+
+        toolchain = NullToolchain()
+        spec = Spec(working_dir=mkdtemp(self))
+        pkg_dir1 = join(spec['working_dir'], 'node_modules', 'dummy_pkg1')
+        pkg_dir2 = join(spec['working_dir'], 'node_modules', 'dummy_pkg2')
+        makedirs(pkg_dir1)
+        makedirs(pkg_dir2)
+
+        with open(join(pkg_dir1, 'package.json'), 'w') as fd:
+            fd.write('{"main": "base.js"}')
+
+        with open(join(pkg_dir2, 'package.json'), 'w') as fd:
+            fd.write('{"main": "extra.js"}')
+
+        # standard case
+        with pretty_logging(stream=StringIO()) as stream:
+            self.assertEqual(
+                {'base': join(pkg_dir1, 'base.js')},
+                base.locate_bundle_sourcepath(toolchain, spec, {
+                    'base!fun.file': 'base!fun.file',
+                }),
+            )
+        self.assertIn("for loader plugin 'base'", stream.getvalue())
+
+        with pretty_logging(stream=StringIO()) as stream:
+            self.assertEqual({
+                'base': join(pkg_dir1, 'base.js'),
+                'extra': join(pkg_dir2, 'extra.js'),
+            }, base.locate_bundle_sourcepath(toolchain, spec, {
+                    'base!fun.file': 'fun.file',
+                    'base!extra!fun.file': 'fun.file',
+                    'base!missing!fun.file': 'what!fun.file',
+                    'base!extra!missing!fun.file': 'what!fun.file',
+                }),
+            )
+        self.assertIn("for loader plugin 'base'", stream.getvalue())
+        self.assertIn("for loader plugin 'extra'", stream.getvalue())
+        self.assertNotIn("for loader plugin 'missing'", stream.getvalue())
+
+        # for the outer one
+        self.assertIn(
+            "loaderplugin 'base' from registry 'simloaders' cannot find "
+            "sibling loaderplugin handler for 'missing'; processing may fail "
+            "for the following nested/chained sources: "
+            "{'missing!fun.file': 'what!fun.file'}", stream.getvalue()
+        )
+        # for the inner one
+        self.assertIn(
+            "loaderplugin 'extra' from registry 'simloaders' cannot find "
+            "sibling loaderplugin handler for 'missing'; processing may fail "
+            "for the following nested/chained sources: "
+            "{'missing!fun.file': 'what!fun.file'}", stream.getvalue()
+        )
+
+    def test_plugin_package_chained_loaders_initial_simple(self):
+        # manually create a registry
+        reg = LoaderPluginRegistry('simloaders', _working_set=WorkingSet({}))
+        base = reg.records['base'] = BaseLoaderPluginHandler(reg, 'base')
+        base.node_module_pkg_name = 'dummy_pkg1'
+        extra = reg.records['extra'] = NPMLoaderPluginHandler(reg, 'extra')
+        extra.node_module_pkg_name = 'dummy_pkg2'
+
+        toolchain = NullToolchain()
+        spec = Spec(working_dir=mkdtemp(self))
+        pkg_dir1 = join(spec['working_dir'], 'node_modules', 'dummy_pkg1')
+        pkg_dir2 = join(spec['working_dir'], 'node_modules', 'dummy_pkg2')
+        makedirs(pkg_dir1)
+        makedirs(pkg_dir2)
+
+        with open(join(pkg_dir1, 'package.json'), 'w') as fd:
+            fd.write('{"main": "base.js"}')
+
+        with open(join(pkg_dir2, 'package.json'), 'w') as fd:
+            fd.write('{"main": "extra.js"}')
+
+        # standard case
+        with pretty_logging(stream=StringIO()) as stream:
+            self.assertEqual(
+                {},
+                base.locate_bundle_sourcepath(toolchain, spec, {
+                    'base!fun.file': 'base!fun.file',
+                }),
+            )
+
+        with pretty_logging(stream=StringIO()) as stream:
+            self.assertEqual({
+                'extra': join(pkg_dir2, 'extra.js'),
+            }, base.locate_bundle_sourcepath(toolchain, spec, {
+                    'base!extra!fun.file': 'fun.file',
+                }),
+            )
+        self.assertIn("for loader plugin 'extra'", stream.getvalue())

@@ -255,6 +255,15 @@ def dict_update_overwrite_check(base, fresh):
     return result
 
 
+# Spec functions for interfacing with loaderplugins
+#
+# The following functions (named in the format spec_*_loaderplugins_*)
+# are helpers for extracting and filtering the mappings for interfacing
+# with the loaderplugin helpers through the registry system.  These
+# helpers are here as they are part of the toolchain, not as part of the
+# loaderplugin module due to that module being the part that couples
+# tightly with npm.
+
 def spec_update_loaderplugins_sourcepath_dict(
         spec, sourcepath_dict, sourcepath_dict_key,
         loaderplugins_sourcepath_dict_key):

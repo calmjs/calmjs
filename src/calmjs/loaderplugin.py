@@ -16,6 +16,7 @@ from os.path import join
 from calmjs.npm import locate_package_entry_file
 from calmjs.base import BaseRegistry
 from calmjs.toolchain import WORKING_DIR
+from calmjs.toolchain import spec_update_loaderplugins_sourcepath_dict
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +86,9 @@ class BaseLoaderPluginHandler(object):
 
     def locate_bundle_sourcepath(self, toolchain, spec, plugin_sourcepath):
         """
+        The default implementation is a recursive lookup method, which
+        subclasses may make use of.
+
         Subclasses must implement this to return a mapping of modnames
         the the absolute path of the desired sourcefiles.  Example:
 
@@ -107,8 +111,31 @@ class BaseLoaderPluginHandler(object):
         method to generate the mapping required.
         """
 
-        # default return value is an empty dictionary.
-        return {}
+        # since the plugin_sourcepath values is the complete modpath
+        # with the loader plugin, the values must be stripped before
+        # making use of the filtering helper function for grouping
+        # the inner mappings
+        fake_spec = {}
+        spec_update_loaderplugins_sourcepath_dict(fake_spec, {
+            self.strip_plugin(k): v
+            for k, v in plugin_sourcepath.items()
+        }, 'current', 'nested')
+        result = {}
+        for plugin_name, sourcepath in fake_spec['nested'].items():
+            plugin = self.registry.get_record(plugin_name)
+            if not plugin:
+                logger.warning(
+                    "loaderplugin '%s' from registry '%s' cannot find "
+                    "sibling loaderplugin handler for '%s'; processing "
+                    "may fail for the following nested/chained sources: "
+                    "%s",
+                    self.name, self.registry.registry_name, plugin_name,
+                    sourcepath,
+                )
+                continue
+            result.update(plugin.locate_bundle_sourcepath(
+                toolchain, spec, sourcepath))
+        return result
 
     def strip_plugin(self, value):
         """
@@ -193,8 +220,16 @@ class NPMLoaderPluginHandler(BaseLoaderPluginHandler):
             working_dir, self.node_module_pkg_name)
         if target:
             logger.debug('picked %r for loader plugin %r', target, self.name)
-            return {self.name: target}
+            # use the parent recursive lookup.
+            result = super(
+                NPMLoaderPluginHandler, self).locate_bundle_sourcepath(
+                    toolchain, spec, plugin_sourcepath)
+            result.update({self.name: target})
+            return result
 
+        # the expected package file is not found, use the logger to show
+        # why.
+        # Also note that any inner/chained loaders will be dropped.
         if exists(join(
                 working_dir, 'node_modules', self.node_module_pkg_name,
                 'package.json')):

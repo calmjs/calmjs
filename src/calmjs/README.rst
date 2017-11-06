@@ -92,5 +92,14 @@ npm
     done like so for the integrated thing that could inherit from
     anything.
 
+loaderplugin
+    While loader plugin handers of this package can be considered as
+    part of the lower level infrastructure, the actual items being
+    encapsulated is actually JavaScript code that interfaces with the
+    JavaScript/Node.js ecosystem in a rather tightly coupled manner,
+    and that it needs the helpers in the npm module to locate the
+    target source files.  Given that, these objects should only be
+    accessed through the registry system.
+
 As a general rule, a module should not inherit from modules listed below
 their respective position on the above list.
