@@ -276,6 +276,8 @@ def spec_update_loaderplugins_sourcepath_dict(
         'module': 'something',
         'plugin!inner': 'inner',
         'plugin!other': 'other',
+        'plugin?query!question': 'question',
+        'plugin!plugin2!target': 'target',
     }
 
     The following will be stored under the following keys in spec:
@@ -288,11 +290,16 @@ def spec_update_loaderplugins_sourcepath_dict(
         'plugin': {
             'plugin!inner': 'inner',
             'plugin!other': 'other',
+            'plugin?query!question': 'question',
+            'plugin!plugin2!target': 'target',
         },
     }
 
     The goal of this function is to aid in processing each of the plugin
-    types by batch.
+    types by batch, one level at a time.  It is up to the handler itself
+    to trigger further lookups as there are implementations of loader
+    plugins that do not respect the chaining mechanism, thus a generic
+    lookup done at once may not be suitable.
 
     Note that nested loaderplugins are not handled as the internal
     syntax are generally proprietary to the outer plugin.
@@ -314,7 +321,9 @@ def spec_update_loaderplugins_sourcepath_dict(
             default[modname] = sourcepath
             continue
 
-        plugin_name, arguments = parts
+        plugin_raw, arguments = parts
+        plugin_globs = plugin_raw.split('?')
+        plugin_name = plugin_globs[0]
         plugin = dict_setget_dict(plugins, plugin_name)
         plugin[modname] = sourcepath
 

@@ -178,10 +178,13 @@ class SpecUpdatePluginsSourcepathDictTestCase(unittest.TestCase):
             'standard/module': 'standard/module',
         })
 
-    def test_modules(self):
+    def test_various_modules(self):
         sourcepath_dict = {
             'plugin/module!argument': 'some/filesystem/path',
+            'plugin/module!css!argument': 'some/style/file.css',
             'text!argument': 'some/text/file.txt',
+            'css?module!target.css': 'some/stylesheet/target.css',
+            'css!main.css': 'some/stylesheet/main.css',
         }
         spec = {}
 
@@ -191,15 +194,21 @@ class SpecUpdatePluginsSourcepathDictTestCase(unittest.TestCase):
             'plugins_key': {
                 'plugin/module': {
                     'plugin/module!argument': 'some/filesystem/path',
+                    'plugin/module!css!argument': 'some/style/file.css',
                 },
                 'text': {
                     'text!argument': 'some/text/file.txt',
+                },
+                'css': {
+                    'css?module!target.css': 'some/stylesheet/target.css',
+                    'css!main.css': 'some/stylesheet/main.css',
                 },
             },
             'sourcepath_key': {
             },
         })
 
+        # subsequent update will do update, not overwrite.
         spec_update_loaderplugins_sourcepath_dict(spec, {
             'text!argument2': 'some/text/file2.txt',
         }, 'sourcepath_key', 'plugins_key')
