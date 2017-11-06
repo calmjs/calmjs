@@ -106,7 +106,7 @@ __all__ = [
 
     'toolchain_spec_entries_compile', 'ToolchainSpecCompileEntry',
 
-    'spec_update_plugins_sourcepath_dict',
+    'spec_update_loaderplugins_sourcepath_dict',
     'spec_extend_loaderplugin_registries',
     'spec_update_loaderplugins_handlers',
 
@@ -255,7 +255,7 @@ def dict_update_overwrite_check(base, fresh):
     return result
 
 
-def spec_update_plugins_sourcepath_dict(
+def spec_update_loaderplugins_sourcepath_dict(
         spec, sourcepath_dict, sourcepath_dict_key,
         loaderplugins_sourcepath_dict_key):
     """
@@ -348,7 +348,7 @@ def spec_update_loaderplugins_handlers(
     the spec.
 
     The sourcepath mappings are expected to be produced and assigned
-    through the spec_update_plugins_sourcepath_dict function.
+    through the spec_update_loaderplugins_sourcepath_dict function.
     """
 
     # extract required values
