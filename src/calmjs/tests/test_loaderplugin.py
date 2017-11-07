@@ -113,6 +113,59 @@ class LoaderPluginRegistryTestCase(unittest.TestCase):
             isinstance(registry.get('example'), BaseLoaderPluginHandler))
 
 
+class BaseLoaderPluginHandlerTestcase(unittest.TestCase):
+
+    def test_plugin_strip_basic(self):
+        base = NPMLoaderPluginHandler(None, 'base')
+        self.assertEqual(
+            base.strip_plugin('base!some/dir/path.ext'),
+            'some/dir/path.ext',
+        )
+        # unrelated will not be stripped.
+        self.assertEqual(
+            base.strip_plugin('something_else!some/dir/path.ext'),
+            'something_else!some/dir/path.ext',
+        )
+
+    def test_plugin_strip_plugin_extras(self):
+        base = BaseLoaderPluginHandler(None, 'base')
+        self.assertEqual(
+            base.strip_plugin('base?someargument!some/dir/path.ext'),
+            'some/dir/path.ext',
+        )
+        self.assertEqual(
+            base.strip_plugin('base!other!some/dir/path.ext'),
+            'other!some/dir/path.ext',
+        )
+        self.assertEqual(
+            base.strip_plugin('base?arg!other?arg!some/dir/path.ext'),
+            'other?arg!some/dir/path.ext',
+        )
+
+    def test_plugin_strip_edge(self):
+        base = NPMLoaderPluginHandler(None, 'base')
+        self.assertEqual(base.strip_plugin('base!'), '')
+
+    def test_plugin_package_strip_broken_recursion_stop(self):
+        class BadPluginHandler(BaseLoaderPluginHandler):
+            def strip_plugin(self, value):
+                # return the identity
+                return value
+
+        base = BadPluginHandler(None, 'base')
+        toolchain = NullToolchain()
+        spec = Spec(working_dir=mkdtemp(self))
+        with pretty_logging(stream=StringIO()) as stream:
+            self.assertEqual(
+                base.locate_bundle_sourcepath(toolchain, spec, {
+                    'base!bad': 'base!bad',
+                }), {})
+
+        self.assertIn(
+            "loaderplugin 'base' extracted same sourcepath of",
+            stream.getvalue())
+
+
 class NPMPluginTestCase(unittest.TestCase):
 
     def setUp(self):
@@ -128,18 +181,6 @@ class NPMPluginTestCase(unittest.TestCase):
                 toolchain=None, spec=None, modname='', source='', target='',
                 modpath='',
             )
-
-    def test_plugin_strip(self):
-        base = NPMLoaderPluginHandler(None, 'base')
-        self.assertEqual(
-            base.strip_plugin('base!some/dir/path.ext'),
-            'some/dir/path.ext',
-        )
-        # unrelated will not be stripped.
-        self.assertEqual(
-            base.strip_plugin('something_else!some/dir/path.ext'),
-            'something_else!some/dir/path.ext',
-        )
 
     def test_plugin_package_base(self):
         base = NPMLoaderPluginHandler(None, 'base')
@@ -302,6 +343,40 @@ class NPMPluginTestCase(unittest.TestCase):
             "for the following nested/chained sources: "
             "{'missing!fun.file': 'what!fun.file'}", stream.getvalue()
         )
+
+        # for repeat loaders
+        with pretty_logging(stream=StringIO()) as stream:
+            self.assertEqual({
+                'base': join(pkg_dir1, 'base.js'),
+                'extra': join(pkg_dir2, 'extra.js'),
+            }, base.locate_bundle_sourcepath(toolchain, spec, {
+                    'base!extra!base!extra!fun.file': 'fun.file',
+                }),
+            )
+        self.assertIn("for loader plugin 'base'", stream.getvalue())
+        self.assertIn("for loader plugin 'extra'", stream.getvalue())
+
+        # for repeat loaders
+        with pretty_logging(stream=StringIO()) as stream:
+            self.assertEqual({
+                'base': join(pkg_dir1, 'base.js'),
+            }, base.locate_bundle_sourcepath(toolchain, spec, {
+                    'base!base!base!fun.file': 'fun.file',
+                }),
+            )
+        self.assertIn("for loader plugin 'base'", stream.getvalue())
+
+        # for argument loaders
+        with pretty_logging(stream=StringIO()) as stream:
+            self.assertEqual({
+                'base': join(pkg_dir1, 'base.js'),
+                'extra': join(pkg_dir2, 'extra.js'),
+            }, base.locate_bundle_sourcepath(toolchain, spec, {
+                    'base?argument!extra?argument!fun.file': 'fun.file',
+                }),
+            )
+        self.assertIn("for loader plugin 'base'", stream.getvalue())
+        self.assertIn("for loader plugin 'extra'", stream.getvalue())
 
     def test_plugin_package_chained_loaders_initial_simple(self):
         # manually create a registry

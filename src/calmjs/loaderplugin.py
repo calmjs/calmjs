@@ -122,6 +122,13 @@ class BaseLoaderPluginHandler(object):
         }, 'current', 'nested')
         result = {}
         for plugin_name, sourcepath in fake_spec['nested'].items():
+            if sourcepath == plugin_sourcepath:
+                logger.warning(
+                    "loaderplugin '%s' extracted same sourcepath of while "
+                    "locating chain loaders: %s; skipping",
+                    self.name, sourcepath
+                )
+                continue
             plugin = self.registry.get_record(plugin_name)
             if not plugin:
                 logger.warning(
@@ -146,9 +153,9 @@ class BaseLoaderPluginHandler(object):
         everything in one go.
         """
 
-        if value.startswith(self.name + '!'):
-            result = value.split('!', 1)
-            return result[-1]
+        globs = value.split('!', 1)
+        if globs[0].split('?', 1)[0] == self.name:
+            return globs[-1]
         else:
             return value
 
