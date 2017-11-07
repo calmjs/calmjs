@@ -180,6 +180,36 @@ class BaseLoaderPluginHandlerTestcase(unittest.TestCase):
             "loaderplugin 'base' extracted same sourcepath of",
             stream.getvalue())
 
+    def test_plugin_loaders_modname_source_to_target(self):
+        class InterceptHandler(BaseLoaderPluginHandler):
+            def modname_source_to_target(self, *a, **kw):
+                # failed to inspect and call parent
+                return 'intercepted'
+
+        reg = LoaderPluginRegistry('simloaders', _working_set=WorkingSet({}))
+        base = reg.records['base'] = BaseLoaderPluginHandler(reg, 'base')
+        extra = reg.records['extra'] = BaseLoaderPluginHandler(reg, 'extra')
+        reg.records['intercept'] = InterceptHandler(reg, 'intercept')
+        toolchain = NullToolchain()
+        spec = Spec()
+        self.assertEqual('fun.file', base.modname_source_to_target(
+            toolchain, spec, 'base!fun.file', '/some/path/fun.file'))
+        self.assertEqual('fun.file', extra.modname_source_to_target(
+            toolchain, spec, 'extra!fun.file', '/some/path/fun.file'))
+        self.assertEqual('fun.file', base.modname_source_to_target(
+            toolchain, spec, 'extra!base!fun.file', '/some/path/fun.file'))
+        # no plugin was found, so no modification
+        self.assertEqual('noplugin!fun.file', base.modname_source_to_target(
+            toolchain, spec, 'extra!noplugin!fun.file', '/some/path/fun.file'))
+        # chained of the same type
+        self.assertEqual('fun.file', base.modname_source_to_target(
+                toolchain, spec, 'base!base!base!fun.file',
+                '/some/path/fun.file'))
+        # chained but overloaded
+        self.assertEqual('intercepted', base.modname_source_to_target(
+                toolchain, spec, 'base!intercept!base!fun.file',
+                '/some/path/fun.file'))
+
 
 class NPMPluginTestCase(unittest.TestCase):
 
@@ -298,7 +328,7 @@ class NPMPluginTestCase(unittest.TestCase):
         self.assertIn("for loader plugin 'base'", stream.getvalue())
         self.assertIn("missing working_dir", stream.getvalue())
 
-    def test_plugin_package_chained_loaders(self):
+    def create_base_extra_plugins(self, working_dir):
         # manually create a registry
         reg = LoaderPluginRegistry('simloaders', _working_set=WorkingSet({}))
         base = reg.records['base'] = NPMLoaderPluginHandler(reg, 'base')
@@ -306,10 +336,8 @@ class NPMPluginTestCase(unittest.TestCase):
         extra = reg.records['extra'] = NPMLoaderPluginHandler(reg, 'extra')
         extra.node_module_pkg_name = 'dummy_pkg2'
 
-        toolchain = NullToolchain()
-        spec = Spec(working_dir=mkdtemp(self))
-        pkg_dir1 = join(spec['working_dir'], 'node_modules', 'dummy_pkg1')
-        pkg_dir2 = join(spec['working_dir'], 'node_modules', 'dummy_pkg2')
+        pkg_dir1 = join(working_dir, 'node_modules', 'dummy_pkg1')
+        pkg_dir2 = join(working_dir, 'node_modules', 'dummy_pkg2')
         makedirs(pkg_dir1)
         makedirs(pkg_dir2)
 
@@ -318,11 +346,18 @@ class NPMPluginTestCase(unittest.TestCase):
 
         with open(join(pkg_dir2, 'package.json'), 'w') as fd:
             fd.write('{"main": "extra.js"}')
+        return reg, base, extra, pkg_dir1, pkg_dir2
 
+    def test_plugin_package_chained_loaders(self):
+        working_dir = mkdtemp(self)
+        reg, base, extra, base_dir, extra_dir = self.create_base_extra_plugins(
+            working_dir)
         # standard case
+        toolchain = NullToolchain()
+        spec = Spec(working_dir=working_dir)
         with pretty_logging(stream=StringIO()) as stream:
             self.assertEqual(
-                {'base': join(pkg_dir1, 'base.js')},
+                {'base': join(base_dir, 'base.js')},
                 base.locate_bundle_sourcepath(toolchain, spec, {
                     'base!fun.file': 'base!fun.file',
                 }),
@@ -331,13 +366,13 @@ class NPMPluginTestCase(unittest.TestCase):
 
         with pretty_logging(stream=StringIO()) as stream:
             self.assertEqual({
-                'base': join(pkg_dir1, 'base.js'),
-                'extra': join(pkg_dir2, 'extra.js'),
+                'base': join(base_dir, 'base.js'),
+                'extra': join(extra_dir, 'extra.js'),
             }, base.locate_bundle_sourcepath(toolchain, spec, {
                     'base!fun.file': 'fun.file',
                     'base!extra!fun.file': 'fun.file',
-                    'base!missing!fun.file': 'what!fun.file',
-                    'base!extra!missing!fun.file': 'what!fun.file',
+                    'base!missing!fun.file': 'fun.file',
+                    'base!extra!missing!fun.file': 'fun.file',
                 }),
             )
         self.assertIn("for loader plugin 'base'", stream.getvalue())
@@ -349,21 +384,21 @@ class NPMPluginTestCase(unittest.TestCase):
             "loaderplugin 'base' from registry 'simloaders' cannot find "
             "sibling loaderplugin handler for 'missing'; processing may fail "
             "for the following nested/chained sources: "
-            "{'missing!fun.file': 'what!fun.file'}", stream.getvalue()
+            "{'missing!fun.file': 'fun.file'}", stream.getvalue()
         )
         # for the inner one
         self.assertIn(
             "loaderplugin 'extra' from registry 'simloaders' cannot find "
             "sibling loaderplugin handler for 'missing'; processing may fail "
             "for the following nested/chained sources: "
-            "{'missing!fun.file': 'what!fun.file'}", stream.getvalue()
+            "{'missing!fun.file': 'fun.file'}", stream.getvalue()
         )
 
         # for repeat loaders
         with pretty_logging(stream=StringIO()) as stream:
             self.assertEqual({
-                'base': join(pkg_dir1, 'base.js'),
-                'extra': join(pkg_dir2, 'extra.js'),
+                'base': join(base_dir, 'base.js'),
+                'extra': join(extra_dir, 'extra.js'),
             }, base.locate_bundle_sourcepath(toolchain, spec, {
                     'base!extra!base!extra!fun.file': 'fun.file',
                 }),
@@ -374,7 +409,7 @@ class NPMPluginTestCase(unittest.TestCase):
         # for repeat loaders
         with pretty_logging(stream=StringIO()) as stream:
             self.assertEqual({
-                'base': join(pkg_dir1, 'base.js'),
+                'base': join(base_dir, 'base.js'),
             }, base.locate_bundle_sourcepath(toolchain, spec, {
                     'base!base!base!fun.file': 'fun.file',
                 }),
@@ -384,8 +419,8 @@ class NPMPluginTestCase(unittest.TestCase):
         # for argument loaders
         with pretty_logging(stream=StringIO()) as stream:
             self.assertEqual({
-                'base': join(pkg_dir1, 'base.js'),
-                'extra': join(pkg_dir2, 'extra.js'),
+                'base': join(base_dir, 'base.js'),
+                'extra': join(extra_dir, 'extra.js'),
             }, base.locate_bundle_sourcepath(toolchain, spec, {
                     'base?argument!extra?argument!fun.file': 'fun.file',
                 }),
@@ -394,40 +429,46 @@ class NPMPluginTestCase(unittest.TestCase):
         self.assertIn("for loader plugin 'extra'", stream.getvalue())
 
     def test_plugin_package_chained_loaders_initial_simple(self):
-        # manually create a registry
-        reg = LoaderPluginRegistry('simloaders', _working_set=WorkingSet({}))
-        base = reg.records['base'] = BaseLoaderPluginHandler(reg, 'base')
-        base.node_module_pkg_name = 'dummy_pkg1'
-        extra = reg.records['extra'] = NPMLoaderPluginHandler(reg, 'extra')
-        extra.node_module_pkg_name = 'dummy_pkg2'
+        working_dir = mkdtemp(self)
+        reg, base, extra, base_dir, extra_dir = self.create_base_extra_plugins(
+            working_dir)
+        simple = reg.records['simple'] = BaseLoaderPluginHandler(reg, 'simple')
 
         toolchain = NullToolchain()
-        spec = Spec(working_dir=mkdtemp(self))
-        pkg_dir1 = join(spec['working_dir'], 'node_modules', 'dummy_pkg1')
-        pkg_dir2 = join(spec['working_dir'], 'node_modules', 'dummy_pkg2')
-        makedirs(pkg_dir1)
-        makedirs(pkg_dir2)
+        spec = Spec(working_dir=working_dir)
 
-        with open(join(pkg_dir1, 'package.json'), 'w') as fd:
-            fd.write('{"main": "base.js"}')
-
-        with open(join(pkg_dir2, 'package.json'), 'w') as fd:
-            fd.write('{"main": "extra.js"}')
-
-        # standard case
         with pretty_logging(stream=StringIO()) as stream:
             self.assertEqual(
                 {},
-                base.locate_bundle_sourcepath(toolchain, spec, {
-                    'base!fun.file': 'base!fun.file',
+                simple.locate_bundle_sourcepath(toolchain, spec, {
+                    'simple!fun.file': 'fun.file',
                 }),
             )
 
         with pretty_logging(stream=StringIO()) as stream:
             self.assertEqual({
-                'extra': join(pkg_dir2, 'extra.js'),
-            }, base.locate_bundle_sourcepath(toolchain, spec, {
-                    'base!extra!fun.file': 'fun.file',
+                'extra': join(extra_dir, 'extra.js'),
+            }, simple.locate_bundle_sourcepath(toolchain, spec, {
+                    'simple!extra!fun.file': 'fun.file',
                 }),
             )
         self.assertIn("for loader plugin 'extra'", stream.getvalue())
+
+    def test_plugin_loaders_modname_source_to_target(self):
+        working_dir = mkdtemp(self)
+        reg, base, extra, base_dir, extra_dir = self.create_base_extra_plugins(
+            working_dir)
+        toolchain = NullToolchain()
+        spec = Spec(working_dir=working_dir)
+        self.assertEqual('fun.file', base.modname_source_to_target(
+            toolchain, spec, 'base!fun.file', '/some/path/fun.file'))
+        self.assertEqual('fun.file', base.modname_source_to_target(
+            toolchain, spec, 'extra!base!fun.file', '/some/path/fun.file'))
+        # no plugin was found, so no modification
+        self.assertEqual('noplugin!fun.file', base.modname_source_to_target(
+            toolchain, spec, 'extra!noplugin!fun.file', '/some/path/fun.file'))
+        # chained of the same type
+        self.assertEqual('fun.file', base.modname_source_to_target(
+            toolchain, spec, 'base!base!base!fun.file',
+            '/some/path/fun.file'))
+        # a mismatched test

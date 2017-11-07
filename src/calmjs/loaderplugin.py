@@ -91,6 +91,30 @@ class BaseLoaderPluginHandler(object):
         self.registry = registry
         self.name = name
 
+    def modname_source_to_target(
+            self, toolchain, spec, modname, source):
+        """
+        This is called by the Toolchain for modnames that contain a '!'
+        as that signifies a loaderplugin syntax.  This will be used by
+        the toolchain (which will also be supplied as the first argument)
+        to resolve the copy target, which must be a path relative to the
+        spec[WORKING_DIR].
+
+        If the provided modname points contains a chain of loaders, the
+        registry associated with this handler instance will be used to
+        resolve the subsequent handlers until none are found, which that
+        handler will be used to return this result.
+        """
+
+        stripped_modname = self.strip_plugin(modname)
+        chained = self.registry.get_record(stripped_modname)
+        if chained:
+            # ensure the stripped_modname is provided as by default the
+            # handler will only deal with its own kind
+            return chained.modname_source_to_target(
+                toolchain, spec, stripped_modname, source)
+        return stripped_modname
+
     def locate_bundle_sourcepath(self, toolchain, spec, plugin_sourcepath):
         """
         The default implementation is a recursive lookup method, which
