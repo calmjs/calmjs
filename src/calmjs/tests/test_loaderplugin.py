@@ -36,6 +36,14 @@ class DupePlugin(BaseLoaderPluginHandler):
 
 class LoaderPluginRegistryTestCase(unittest.TestCase):
 
+    def test_to_plugin_name(self):
+        registry = LoaderPluginRegistry(
+            'calmjs.loader_plugin', _working_set=WorkingSet({}))
+        self.assertEqual('example', registry.to_plugin_name('example'))
+        self.assertEqual('example', registry.to_plugin_name('example?hi'))
+        self.assertEqual('example', registry.to_plugin_name('example!hi'))
+        self.assertEqual('example', registry.to_plugin_name('example?arg!hi'))
+
     def test_initialize_standard(self):
         # ensure that we have a proper working registry
         working_set = WorkingSet({'calmjs.loader_plugin': [
@@ -111,6 +119,13 @@ class LoaderPluginRegistryTestCase(unittest.TestCase):
         # the second one will be registered
         self.assertTrue(
             isinstance(registry.get('example'), BaseLoaderPluginHandler))
+        # ensure that the handler can be acquired from a full name
+        self.assertEqual('example', registry.get('example!hi').name)
+        self.assertEqual('example', registry.get('example?arg!hi').name)
+        self.assertEqual('example', registry.get('example?arg').name)
+        self.assertIsNone(registry.get('examplearg'))
+        self.assertIsNone(registry.get('ex'))
+        self.assertIsNone(registry.get('ex!ample'))
 
 
 class BaseLoaderPluginHandlerTestcase(unittest.TestCase):

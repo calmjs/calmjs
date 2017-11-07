@@ -61,8 +61,15 @@ class LoaderPluginRegistry(BaseRegistry):
                 )
             self.records[entry_point.name] = inst
 
+    def to_plugin_name(self, value):
+        """
+        Find the plugin name from the provided value
+        """
+
+        return value.split('!', 1)[0].split('?', 1)[0]
+
     def get_record(self, name):
-        return self.records.get(name)
+        return self.records.get(self.to_plugin_name(name))
 
 
 class BaseLoaderPluginHandler(object):
