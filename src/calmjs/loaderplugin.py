@@ -23,43 +23,37 @@ logger = logging.getLogger(__name__)
 
 class LoaderPluginRegistry(BaseRegistry):
 
-    def _init(self):
-        for entry_point in self.raw_entry_points:
-            try:
-                cls = entry_point.load()
-            except ImportError:
-                logger.warning(
-                    "registry '%s' failed to load loader plugin handler for "
-                    "entry point '%s'", self.registry_name, entry_point,
-                )
-                continue
+    def _init(self, *a, **kw):
+        self._init_entry_points(self.raw_entry_points)
 
-            if not issubclass(cls, BaseLoaderPluginHandler):
-                logger.warning(
-                    "entry point '%s' does not lead to a valid loader plugin "
-                    "handler class", entry_point
-                )
-                continue
+    def _init_entry_point(self, entry_point):
+        try:
+            cls = entry_point.load()
+        except ImportError:
+            logger.warning(
+                "registry '%s' failed to load loader plugin handler for "
+                "entry point '%s'", self.registry_name, entry_point,
+            )
+            return
 
-            try:
-                inst = cls(self, entry_point.name)
-            except Exception:
-                logger.exception(
-                    "the loader plugin class registered at '%s' failed "
-                    "to be instantiated with the following exception",
-                    entry_point,
-                )
-                continue
+        if not issubclass(cls, BaseLoaderPluginHandler):
+            logger.warning(
+                "entry point '%s' does not lead to a valid loader plugin "
+                "handler class", entry_point
+            )
+            return
 
-            if entry_point.name in self.records:
-                old = type(self.records[entry_point.name])
-                logger.warning(
-                    "loader plugin handler for '%s' was already registered to "
-                    "an instance of '%s:%s'; '%s' will now override this "
-                    "registration",
-                    entry_point.name, old.__module__, old.__name__, entry_point
-                )
-            self.records[entry_point.name] = inst
+        inst = cls(self, entry_point.name)
+
+        if entry_point.name in self.records:
+            old = type(self.records[entry_point.name])
+            logger.warning(
+                "loader plugin handler for '%s' was already registered to "
+                "an instance of '%s:%s'; '%s' will now override this "
+                "registration",
+                entry_point.name, old.__module__, old.__name__, entry_point
+            )
+        self.records[entry_point.name] = inst
 
     def to_plugin_name(self, value):
         """
@@ -69,6 +63,9 @@ class LoaderPluginRegistry(BaseRegistry):
         return value.split('!', 1)[0].split('?', 1)[0]
 
     def get_record(self, name):
+        # it is possible for subclasses to provide a fallback lookup on
+        # "common" registries through the registry framework, e.g.
+        # calmjs.registry.get('some.plugin.reg').get_record(name)
         return self.records.get(self.to_plugin_name(name))
 
 

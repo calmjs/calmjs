@@ -4,6 +4,7 @@ import unittest
 from os.path import join
 from os import chdir
 from os import makedirs
+from pkg_resources import Distribution
 
 from calmjs.loaderplugin import LoaderPluginRegistry
 from calmjs.loaderplugin import BaseLoaderPluginHandler
@@ -88,16 +89,16 @@ class LoaderPluginRegistryTestCase(unittest.TestCase):
     def test_initialize_failure_bad_plugin(self):
         working_set = WorkingSet({'calmjs.loader_plugin': [
             'bad_plugin = calmjs.tests.test_loaderplugin:BadPlugin',
-        ]})
+        ]}, dist=Distribution(project_name='plugin', version='1.0'))
         # should not trigger import failure
         with pretty_logging(stream=StringIO()) as stream:
             registry = LoaderPluginRegistry(
                 'calmjs.loader_plugin', _working_set=working_set)
         self.assertIsNone(registry.get('bad_plugin'))
         self.assertIn(
-            "the loader plugin class registered at 'bad_plugin = "
-            "calmjs.tests.test_loaderplugin:BadPlugin' failed "
-            "to be instantiated with the following exception",
+            "registration of entry point "
+            "'bad_plugin = calmjs.tests.test_loaderplugin:BadPlugin' from "
+            "'plugin 1.0' to registry 'calmjs.loader_plugin' failed",
             stream.getvalue()
         )
 
