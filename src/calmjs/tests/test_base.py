@@ -61,12 +61,23 @@ class BasePkgRefRegistryTestCase(unittest.TestCase):
         registry = base.BasePkgRefRegistry(__name__, _working_set=working_set)
         self.assertEqual(list(registry.iter_records()), [])
 
-    def test_not_implemented(self):
-        working_set = mocks.WorkingSet({__name__: [
+    def test_no_op_default(self):
+        working_set = mocks.WorkingSet({'regname': [
             'calmjs.testing.module1 = calmjs.testing.module1',
-        ]})
-        with self.assertRaises(NotImplementedError):
-            base.BasePkgRefRegistry(__name__, _working_set=working_set)
+        ]}, dist=Distribution(project_name='some.project', version='1.0'))
+        with pretty_logging(stream=mocks.StringIO()) as s:
+            base.BasePkgRefRegistry('regname', _working_set=working_set)
+        self.assertIn(
+            "registering 1 entry points for registry 'regname'", s.getvalue())
+        self.assertIn(
+            "registering entry point 'calmjs.testing.module1 = "
+            "calmjs.testing.module1' from 'some.project 1.0'", s.getvalue())
+        self.assertIn(
+            "registration of entry point 'calmjs.testing.module1 = "
+            "calmjs.testing.module1' from 'some.project 1.0' to registry "
+            "'regname' failed",
+            s.getvalue())
+        self.assertIn('NotImplemented', s.getvalue())
 
 
 class BaseModuleRegistryTestCase(unittest.TestCase):
@@ -95,12 +106,13 @@ class BaseModuleRegistryTestCase(unittest.TestCase):
         self.assertEqual(registry.get_record('module'), {})
         self.assertEqual(list(registry.iter_records()), [])
 
-    def test_not_implemented(self):
+    def test_no_op_default(self):
         working_set = mocks.WorkingSet({__name__: [
             'calmjs.testing.module1 = calmjs.testing.module1',
         ]})
-        with self.assertRaises(NotImplementedError):
+        with pretty_logging(stream=mocks.StringIO()) as s:
             base.BaseModuleRegistry(__name__, _working_set=working_set)
+        self.assertIn('NotImplemented', s.getvalue())
 
     def test_dummy_implemented(self):
         from calmjs.testing import module1

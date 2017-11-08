@@ -92,7 +92,45 @@ class BaseRegistry(object):
 
     def _init(self, *a, **kw):
         """
-        Subclasses can override this for setting up its single instance.
+        Subclasses can completely override this for its instantiation,
+        or it can override this by having its subclass override
+        _init_entry_point and then have this method call
+
+            self._init_entry_points(self.raw_entry_points)
+
+        to initialize all entry points during instantiation.
+        """
+
+    def _init_entry_points(self, entry_points):
+        """
+        Default initialization loop.
+        """
+
+        logger.debug(
+            "registering %d entry points for registry '%s'",
+            len(entry_points), self.registry_name,
+        )
+        for entry_point in entry_points:
+            try:
+                logger.debug(
+                    "registering entry point '%s' from '%s'",
+                    entry_point, entry_point.dist,
+                )
+                self._init_entry_point(entry_point)
+            except ImportError:
+                logger.warning(
+                    'ImportError: %s not found; skipping registration',
+                    entry_point.module_name)
+            except Exception:
+                logger.exception(
+                    "registration of entry point '%s' from '%s' to registry "
+                    "'%s' failed with the following exception",
+                    entry_point, entry_point.dist, self.registry_name,
+                )
+
+    def _init_entry_point(self, entry_point):
+        """
+        Default does nothing.
         """
 
     def get_record(self, name):
@@ -128,14 +166,10 @@ class BasePkgRefRegistry(BaseRegistry):
             this registry instance.
         """
 
-        for entry_point in entry_points:
-            try:
-                self.register_entry_point(entry_point)
-            except ImportError:
-                logger.warning(
-                    'ImportError: %s not found; skipping registration',
-                    entry_point.module_name)
-                continue
+        return self._init_entry_points(entry_points)
+
+    def _init_entry_point(self, entry_point):
+        return self.register_entry_point(entry_point)
 
     def register_entry_point(self, entry_point):
         raise NotImplementedError
