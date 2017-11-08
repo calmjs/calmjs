@@ -88,6 +88,7 @@ from calmjs.parse.sourcemap import encode_sourcemap
 
 from calmjs.base import BaseDriver
 from calmjs.base import BaseRegistry
+from calmjs.base import BaseLoaderPluginRegistry
 from calmjs.registry import get as get_registry
 from calmjs.exc import AdviceAbort
 from calmjs.exc import AdviceCancel
@@ -107,8 +108,6 @@ __all__ = [
     'toolchain_spec_entries_compile', 'ToolchainSpecCompileEntry',
 
     'spec_update_loaderplugins_sourcepath_dict',
-    'spec_extend_loaderplugin_registries',
-    'spec_update_loaderplugins_handlers',
 
     'CALMJS_TOOLCHAIN_ADVICE',
 
@@ -120,9 +119,8 @@ __all__ = [
 
     'ADVICE_PACKAGES', 'ARTIFACT_PATHS', 'BUILD_DIR',
     'CALMJS_MODULE_REGISTRY_NAMES',
-    'CALMJS_LOADERPLUGIN_REGISTRY_NAMES',
-    'CALMJS_LOADERPLUGIN_REGISTRIES',
-    'CALMJS_LOADERPLUGIN_HANDLERS',
+    'CALMJS_LOADERPLUGIN_REGISTRY_NAME',
+    'CALMJS_LOADERPLUGIN_REGISTRY',
     'CALMJS_TEST_REGISTRY_NAMES',
     'CONFIG_JS_FILES', 'DEBUG',
     'EXPORT_MODULE_NAMES', 'EXPORT_PACKAGE_NAMES',
@@ -163,9 +161,8 @@ ARTIFACT_PATHS = 'artifact_paths'
 BUILD_DIR = 'build_dir'
 # source registries that have been used
 CALMJS_MODULE_REGISTRY_NAMES = 'calmjs_module_registry_names'
-CALMJS_LOADERPLUGIN_REGISTRY_NAMES = 'calmjs_loaderplugin_registry_names'
-CALMJS_LOADERPLUGIN_REGISTRIES = 'calmjs_loaderplugin_registries'
-CALMJS_LOADERPLUGIN_HANDLERS = 'calmjs_loaderplugin_handlers'
+CALMJS_LOADERPLUGIN_REGISTRY_NAME = 'calmjs_loaderplugin_registry_name'
+CALMJS_LOADERPLUGIN_REGISTRY = 'calmjs_loaderplugin_registry'
 CALMJS_TEST_REGISTRY_NAMES = 'calmjs_test_registry_names'
 # configuration file for enabling execution of code in build directory
 CONFIG_JS_FILES = 'config_js_files'
@@ -264,6 +261,35 @@ def dict_update_overwrite_check(base, fresh):
 # loaderplugin module due to that module being the part that couples
 # tightly with npm.
 
+def spec_update_loaderplugin_registry(spec):
+    """
+    Resolve a BasePluginLoaderRegistry instance from spec, and update
+    spec[CALMJS_LOADERPLUGIN_REGISTRY] with that value before returning
+    it.
+    """
+
+    registry = spec.get(CALMJS_LOADERPLUGIN_REGISTRY, get_registry(
+        spec.get(CALMJS_LOADERPLUGIN_REGISTRY_NAME, '')))
+    if isinstance(registry, BaseLoaderPluginRegistry):
+        logger.info("using loaderplugin registry '%s'", registry.registry_name)
+        spec[CALMJS_LOADERPLUGIN_REGISTRY] = registry
+        return registry
+
+    # TODO determine the best way to optionally warn about this for
+    # toolchains that require this.
+    if registry:
+        logger.info(
+            "object referenced in spec is not a valid loaderplugin registry; "
+            "using default fallback")
+    else:
+        logger.info(
+            'no loaderplugin registry found in spec; using default fallback')
+    spec[CALMJS_LOADERPLUGIN_REGISTRY] = registry = BaseLoaderPluginRegistry(
+        '<default_loaderplugins>')
+
+    return registry
+
+
 def spec_update_loaderplugins_sourcepath_dict(
         spec, sourcepath_dict, sourcepath_dict_key,
         loaderplugins_sourcepath_dict_key):
@@ -278,6 +304,11 @@ def spec_update_loaderplugins_sourcepath_dict(
     mapping under its own mapping identified by the plugin_name.  The
     mapping under loaderplugins_sourcepath_dict_key will contain all
     mappings of this type.
+
+    The resolution for the handlers will be done through the loader
+    plugin registry provided via spec[CALMJS_LOADERPLUGIN_REGISTRY] if
+    available, otherwise the registry instance will be acquired through
+    the main registry using spec[CALMJS_LOADERPLUGIN_REGISTRY_NAME].
 
     For the example sourcepath_dict input:
 
@@ -310,8 +341,11 @@ def spec_update_loaderplugins_sourcepath_dict(
     plugins that do not respect the chaining mechanism, thus a generic
     lookup done at once may not be suitable.
 
-    Note that nested loaderplugins are not handled as the internal
-    syntax are generally proprietary to the outer plugin.
+    Note that nested/chained loaderplugins are not immediately grouped
+    as they must be individually handled given that the internal syntax
+    are generally proprietary to the outer plugin.  The handling will be
+    dealt with at the Toolchain.compile_loaderplugin_entry method
+    through the associated handler call method.
 
     Toolchain implementations may either invoke this directly as part
     of the prepare step on the required sourcepaths values stored in the
@@ -320,6 +354,8 @@ def spec_update_loaderplugins_sourcepath_dict(
     """
 
     default = dict_setget_dict(spec, sourcepath_dict_key)
+    registry = spec_update_loaderplugin_registry(spec)
+
     # it is more loaderplugins_sourcepath_maps
     plugins = dict_setget_dict(spec, loaderplugins_sourcepath_dict_key)
 
@@ -330,79 +366,10 @@ def spec_update_loaderplugins_sourcepath_dict(
             default[modname] = sourcepath
             continue
 
-        plugin_raw, arguments = parts
-        plugin_globs = plugin_raw.split('?')
-        plugin_name = plugin_globs[0]
+        # don't actually do any processing yet.
+        plugin_name = registry.to_plugin_name(modname)
         plugin = dict_setget_dict(plugins, plugin_name)
         plugin[modname] = sourcepath
-
-
-def spec_extend_loaderplugin_registries(spec):
-    """
-    Resolve loaderplugin registry names provided by the spec in the
-    CALMJS_LOADERPLUGIN_REGISTRY_NAMES list into the actual registries,
-    with the result assigned to CALMJS_LOADERPLUGIN_REGISTRIES.
-    """
-
-    registries = dict_setget(spec, CALMJS_LOADERPLUGIN_REGISTRIES, [])
-    for name in spec.get(CALMJS_LOADERPLUGIN_REGISTRY_NAMES, []):
-        registry = get_registry(name)
-        if not registry:
-            logger.warning(
-                "spec specified '%s' as a loaderplugin registry, but it "
-                "is invalid", name
-            )
-            continue
-        registries.append(registry)
-
-
-def spec_update_loaderplugins_handlers(
-        spec, loaderplugins_sourcepath_dict_key):
-    """
-    Using the registries mapping provided by the spec under the
-    CALMJS_LOADERPLUGIN_REGISTRIES, and the sourcepath mappings under
-    the loaderplugins_sourcepath_dict_key, resolve the required loader
-    plugins and assign them to CALMJS_LOADERPLUGIN_HANDLERS mapping in
-    the spec.
-
-    The sourcepath mappings are expected to be produced and assigned
-    through the spec_update_loaderplugins_sourcepath_dict function.
-    """
-
-    # extract required values
-    registries = spec.get(CALMJS_LOADERPLUGIN_REGISTRIES, [])
-    # it is more loaderplugins_sourcepath_maps
-    plugins = spec.get(loaderplugins_sourcepath_dict_key, {})
-
-    # assign this to spec
-    handlers = dict_setget_dict(spec, CALMJS_LOADERPLUGIN_HANDLERS)
-
-    logger.info(
-        "processing keys at spec['%s'] mapping for loaderplugin handlers, "
-        "using registries stored at spec['%s'] for assignment to handler "
-        "mapping at spec['%s']",
-        loaderplugins_sourcepath_dict_key,
-        CALMJS_LOADERPLUGIN_REGISTRIES,
-        CALMJS_LOADERPLUGIN_HANDLERS,
-    )
-
-    for plugin_name in plugins:
-        if handlers.get(plugin_name):
-            logger.info(
-                "not reassigning loaderplugin handler for '%s'", plugin_name)
-            continue
-
-        for registry in registries:
-            handler = registry.get(plugin_name)
-            if handler:
-                handlers[plugin_name] = handler
-                logger.info(
-                    "picked loaderplugin handler from registry '%s' for '%s'",
-                    registry.registry_name, plugin_name
-                )
-                break
-        else:
-            logger.info("no loaderplugin handler found for '%s'", plugin_name)
 
 
 def toolchain_spec_entries_compile(
@@ -1072,14 +1039,13 @@ class Toolchain(BaseDriver):
         first '!' symbol resolves to some known loader plugin within
         the registry.
 
-        This also requires that all plugin instances be available under
-        the CALMJS_LOADERPLUGIN_HANDLERS key as a mapping from the name
-        to the handler.
+        The registry instance responsible for the resolution of the
+        loader plugin handlers must be available in the spec under
+        CALMJS_LOADERPLUGIN_REGISTRY
         """
 
         modname, source, target, modpath = entry
-        plugin_name, arguments = modname.split('!', 1)
-        handler = spec.get(CALMJS_LOADERPLUGIN_HANDLERS, {}).get(plugin_name)
+        handler = spec[CALMJS_LOADERPLUGIN_REGISTRY].get(modname)
         if handler:
             return handler(self, spec, modname, source, target, modpath)
         logger.warning(

@@ -748,7 +748,7 @@ class RuntimeLoaderPluginRegistryOptionTestCase(unittest.TestCase):
         known, extras = parser.parse_known_args(
             ['--loaderplugin-registry', 'reg1,reg2', 'example.package'])
         self.assertEqual(
-            known.calmjs_loaderplugin_registry_names, ['reg1', 'reg2'])
+            known.calmjs_loaderplugin_registry_name, 'reg1,reg2')
         self.assertEqual(
             known.source_package_names, ['example.package'])
 

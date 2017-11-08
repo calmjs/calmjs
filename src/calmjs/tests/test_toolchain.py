@@ -25,6 +25,7 @@ from calmjs import toolchain as calmjs_toolchain
 from calmjs.utils import pretty_logging
 from calmjs.registry import get
 from calmjs.loaderplugin import LoaderPluginRegistry
+from calmjs.loaderplugin import BaseLoaderPluginRegistry
 from calmjs.loaderplugin import BaseLoaderPluginHandler
 
 from calmjs.toolchain import CALMJS_TOOLCHAIN_ADVICE
@@ -38,9 +39,8 @@ from calmjs.toolchain import dict_setget
 from calmjs.toolchain import dict_setget_dict
 from calmjs.toolchain import dict_update_overwrite_check
 from calmjs.toolchain import spec_update_loaderplugins_sourcepath_dict
+from calmjs.toolchain import spec_update_loaderplugin_registry
 from calmjs.toolchain import toolchain_spec_entries_compile
-from calmjs.toolchain import spec_extend_loaderplugin_registries
-from calmjs.toolchain import spec_update_loaderplugins_handlers
 
 from calmjs.toolchain import CLEANUP
 from calmjs.toolchain import SUCCESS
@@ -142,6 +142,55 @@ class DictUpdateOverwriteTestCase(unittest.TestCase):
         self.assertEqual(a, {'k1': 'v2', 'k2': 'v4'})
 
 
+class SpecResolveRegistryTestCase(unittest.TestCase):
+
+    def test_basic(self):
+        spec = {}
+        with pretty_logging(stream=StringIO()) as s:
+            registry = spec_update_loaderplugin_registry(spec)
+        self.assertTrue(isinstance(registry, BaseLoaderPluginRegistry))
+        self.assertIn('no loaderplugin registry found in spec', s.getvalue())
+
+    def test_wrong(self):
+        spec = {'calmjs_loaderplugin_registry': object()}
+        with pretty_logging(stream=StringIO()) as s:
+            registry = spec_update_loaderplugin_registry(spec)
+        self.assertIn(
+            "object referenced in spec is not a valid", s.getvalue())
+        # still got the base instance instead.
+        self.assertTrue(isinstance(registry, BaseLoaderPluginRegistry))
+
+    def test_provided(self):
+        spec = {'calmjs_loaderplugin_registry': LoaderPluginRegistry(
+            'some.registry', _working_set=WorkingSet({})
+        )}
+        with pretty_logging(stream=StringIO()) as s:
+            registry = spec_update_loaderplugin_registry(spec)
+        self.assertIn(
+            "using loaderplugin registry 'some.registry'", s.getvalue())
+        self.assertTrue(isinstance(registry, LoaderPluginRegistry))
+
+    def test_resolve_and_order(self):
+        fake = LoaderPluginRegistry('fake_registry', _working_set=WorkingSet({
+            'fake_registry': [
+                'foo = calmjs.tests.test_toolchain:MockLPHandler']}))
+        registries = {'fake_registry': fake}
+        stub_item_attr_value(
+            self, calmjs_toolchain, 'get_registry', registries.get)
+
+        spec = {'calmjs_loaderplugin_registry_name': 'fake_registry'}
+        with pretty_logging(stream=StringIO()) as s:
+            registry = spec_update_loaderplugin_registry(spec)
+        self.assertIn(
+            "using loaderplugin registry 'fake_registry'", s.getvalue())
+        self.assertIs(registry, fake)
+
+        spec = {
+            'calmjs_loaderplugin_registry_name': 'fake_registry',
+            'calmjs_loaderplugin_registry': BaseLoaderPluginRegistry('raw'),
+        }
+
+
 class SpecUpdatePluginsSourcepathDictTestCase(unittest.TestCase):
     """
     A function for updating the spec with a sourcepath dict for target
@@ -156,6 +205,8 @@ class SpecUpdatePluginsSourcepathDictTestCase(unittest.TestCase):
         spec = {}
         spec_update_loaderplugins_sourcepath_dict(
             spec, sourcepath_dict, 'sourcepath_key', 'plugins_key')
+        self.assertTrue(isinstance(spec.pop(
+            'calmjs_loaderplugin_registry'), BaseLoaderPluginRegistry))
         self.assertEqual(spec, {
             'plugins_key': {},
             'sourcepath_key': {
@@ -173,6 +224,8 @@ class SpecUpdatePluginsSourcepathDictTestCase(unittest.TestCase):
 
         spec_update_loaderplugins_sourcepath_dict(
             spec, sourcepath_dict, 'sourcepath_key', 'plugins_key')
+        self.assertTrue(isinstance(spec.pop(
+            'calmjs_loaderplugin_registry'), BaseLoaderPluginRegistry))
         self.assertIs(spec['sourcepath_key'], base_map)
         self.assertEqual(base_map, {
             'standard/module': 'standard/module',
@@ -190,6 +243,8 @@ class SpecUpdatePluginsSourcepathDictTestCase(unittest.TestCase):
 
         spec_update_loaderplugins_sourcepath_dict(
             spec, sourcepath_dict, 'sourcepath_key', 'plugins_key')
+        self.assertTrue(isinstance(spec.pop(
+            'calmjs_loaderplugin_registry'), BaseLoaderPluginRegistry))
         self.assertEqual(spec, {
             'plugins_key': {
                 'plugin/module': {
@@ -1154,47 +1209,25 @@ class ToolchainLoaderPluginTestCase(unittest.TestCase):
     def setUp(self):
         self.toolchain = Toolchain()
 
-    def test_toolchain_loaderplugin_setup_abnormal_logging(self):
-        spec = Spec(
-            calmjs_loaderplugin_registry_names=['no_such_registry'],
-            calmjs_loaderplugin_handlers={
-                'stored': object(),
-            },
-            plugins_sourcepath_maps={
-                'stored': {
-                    '!something': 'somewhere',
-                },
-                'nosuchplugin': {
-                    'nosuchplugin!some/path': 'some/path',
-                },
-            },
-        )
-
-        with pretty_logging(stream=StringIO()) as s:
-            spec_extend_loaderplugin_registries(spec)
-            spec_update_loaderplugins_handlers(spec, 'plugins_sourcepath_maps')
-
-        self.assertIn(
-            "spec specified 'no_such_registry' as a loaderplugin registry, "
-            "but it is invalid", s.getvalue())
-        self.assertIn(
-            "processing keys at spec['plugins_sourcepath_maps'] mapping for "
-            "loaderplugin handlers, using registries stored at "
-            "spec['calmjs_loaderplugin_registries'] for assignment to handler "
-            "mapping at spec['calmjs_loaderplugin_handlers']", s.getvalue())
-        self.assertIn(
-            "not reassigning loaderplugin handler for 'stored'", s.getvalue())
-        self.assertIn(
-            "no loaderplugin handler found for 'nosuchplugin'", s.getvalue())
-
     def test_toolchain_compile_loaderplugin_entry_empty(self):
+        """
+        A rough standalone test for handling of loader plugins.
+        """
+
+        spec = Spec()
+        with self.assertRaises(KeyError):
+            # as the registry is not in the spec
+            self.toolchain.compile_loaderplugin_entry(spec, (
+                'foo!target.txt', 'foo', 'foo!target.txt', 'foo!target.txt'))
+
+    def test_toolchain_compile_loaderplugin_entry_not_found(self):
         """
         A rough standalone test for handling of loader plugins.
         """
 
         src_dir = mkdtemp(self)
         src = join(src_dir, 'target.txt')
-        spec = Spec()
+        spec = Spec(calmjs_loaderplugin_registry={})
         with pretty_logging(stream=StringIO()) as s:
             results = self.toolchain.compile_loaderplugin_entry(spec, (
                 'foo!target.txt', src, 'foo!target.txt', 'foo!target.txt'))
@@ -1208,99 +1241,39 @@ class ToolchainLoaderPluginTestCase(unittest.TestCase):
         A rough standalone test for handling of loader plugins.
         """
 
-        entry_points = {
-            'calmjs.loaderplugins_1': [
-                'foo = calmjs.tests.test_toolchain:MockLPHandler'],
-            'calmjs.loaderplugins_2': [
-                'bar = calmjs.tests.test_toolchain:MockLPHandler'],
-        }
-        working_set = WorkingSet(entry_points)
-        registries = {
-            k: LoaderPluginRegistry(k, _working_set=working_set)
-            for k in entry_points
-        }
-        stub_item_attr_value(
-            self, calmjs_toolchain, 'get_registry', registries.get)
+        reg = LoaderPluginRegistry('simple', _working_set=WorkingSet({
+            'simple': [
+                'foo = calmjs.tests.test_toolchain:MockLPHandler',
+                'bar = calmjs.tests.test_toolchain:MockLPHandler',
+            ],
+        }))
 
         src_dir = mkdtemp(self)
         src = join(src_dir, 'target.txt')
 
-        spec = Spec(
-            calmjs_loaderplugin_registry_names=['calmjs.loaderplugins_1'],
-            plugin_sourcepath_maps={
-                'foo': {},
-                'bar': {},
-            },
-        )
+        spec = Spec(calmjs_loaderplugin_registry=reg)
         with pretty_logging(stream=StringIO()) as s:
-            spec_extend_loaderplugin_registries(spec)
-            spec_update_loaderplugins_handlers(spec, 'plugin_sourcepath_maps')
-            self.toolchain.compile_loaderplugin_entry(spec, (
+            bar_results = self.toolchain.compile_loaderplugin_entry(spec, (
                 'bar!target.txt', src, 'bar!target.txt', 'bar!target.txt'))
             foo_results = self.toolchain.compile_loaderplugin_entry(spec, (
                 'foo!target.txt', src, 'foo!target.txt', 'foo!target.txt'))
 
-        self.assertIn(
-            "picked loaderplugin handler from registry "
-            "'calmjs.loaderplugins_1' for 'foo'",
-            s.getvalue(),
-        )
-        self.assertNotIn(
-            "picked loaderplugin handler from registry "
-            "'calmjs.loaderplugins_2' for 'bar'",
-            s.getvalue(),
-        )
+        self.assertEqual('', s.getvalue())
 
-        self.assertIn(
-            "no loaderplugin handler found for plugin entry 'bar!target.txt'",
-            s.getvalue(),
-        )
-        self.assertNotIn(
-            "no loaderplugin handler found for plugin entry 'foo!target.txt'",
-            s.getvalue(),
-        )
         self.assertEqual((
             {'foo!target.txt': 'foo!target.txt'},
             {'foo!target.txt': 'foo!target.txt'},
             ['foo!target.txt'],
         ), foo_results)
 
-        spec = Spec(
-            calmjs_loaderplugin_registry_names=[
-                'calmjs.loaderplugins_2',
-                'calmjs.loaderplugins_3',
-            ],
-            plugin_sourcepath_maps={
-                'foo': {},
-                'bar': {},
-            },
-        )
-        with pretty_logging(stream=StringIO()) as s:
-            spec_extend_loaderplugin_registries(spec)
-            spec_update_loaderplugins_handlers(spec, 'plugin_sourcepath_maps')
-            bar_results = self.toolchain.compile_loaderplugin_entry(spec, (
-                'bar!target.txt', src, 'bar!target.txt', 'bar!target.txt'))
-            self.toolchain.compile_loaderplugin_entry(spec, (
-                'foo!target.txt', src, 'foo!target.txt', 'foo!target.txt'))
-
-        self.assertNotIn(
-            "no loaderplugin handler found for plugin entry 'bar!target.txt'",
-            s.getvalue(),
-        )
-        self.assertIn(
-            "no loaderplugin handler found for plugin entry 'foo!target.txt'",
-            s.getvalue(),
-        )
-        self.assertIn(
-            "spec specified 'calmjs.loaderplugins_3' as a loaderplugin "
-            "registry, but it is invalid",
-            s.getvalue(),
-        )
         self.assertEqual((
             {'bar!target.txt': 'bar!target.txt'},
             {'bar!target.txt': 'bar!target.txt'},
             ['bar!target.txt'],
         ), bar_results)
+
+        # recursive lookups are generally not needed, if the target
+        # supplied _is_ the target.
 
 
 class NullToolchainTestCase(unittest.TestCase):

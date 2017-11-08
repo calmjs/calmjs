@@ -31,7 +31,7 @@ from calmjs.toolchain import ADVICE_PACKAGES
 from calmjs.toolchain import AFTER_PREPARE
 from calmjs.toolchain import BUILD_DIR
 from calmjs.toolchain import CALMJS_MODULE_REGISTRY_NAMES
-from calmjs.toolchain import CALMJS_LOADERPLUGIN_REGISTRY_NAMES
+from calmjs.toolchain import CALMJS_LOADERPLUGIN_REGISTRY_NAME
 from calmjs.toolchain import CALMJS_TOOLCHAIN_ADVICE
 from calmjs.toolchain import DEBUG
 from calmjs.toolchain import EXPORT_TARGET
@@ -875,9 +875,8 @@ class SourcePackageToolchainRuntime(ToolchainRuntime):
 
     def init_argparser_loaderplugin_registry(
             self, argparser, default=None, help=(
-                'comma separated list of registries to use for the handling '
-                'of loader plugins that may be loaded from the given Python '
-                'packages'
+                'the name of the registry to use for the handling of loader '
+                'plugins that may be loaded from the given Python packages'
             )):
         """
         Default helper for setting up the loaderplugin registries flags.
@@ -890,15 +889,9 @@ class SourcePackageToolchainRuntime(ToolchainRuntime):
 
         argparser.add_argument(
             '--loaderplugin-registry', default=default,
-            dest=CALMJS_LOADERPLUGIN_REGISTRY_NAMES, action=StoreDelimitedList,
-            metavar='registry_name[,registry_name[...]]',
+            dest=CALMJS_LOADERPLUGIN_REGISTRY_NAME, action='store',
+            metavar='registry_name',
             help=help,
-        )
-
-        argparser.add_argument(
-            '--loaderplugin-registries', default=default,
-            dest=CALMJS_LOADERPLUGIN_REGISTRY_NAMES, action=StoreDelimitedList,
-            help=SUPPRESS,
         )
 
     def init_argparser_package_names(
