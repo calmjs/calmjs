@@ -1362,6 +1362,31 @@ class NullToolchainTestCase(unittest.TestCase):
             'template.tmpl',
         )
 
+    def test_toolchain_naming_modname_source_to_target_loaderplugin(self):
+        s = Spec(calmjs_loaderplugin_registry=LoaderPluginRegistry(
+            'simloaders', _working_set=WorkingSet({'simloaders': [
+                'foo = calmjs.loaderplugin:LoaderPluginHandler',
+                'bar = calmjs.loaderplugin:LoaderPluginHandler',
+            ]})
+        ))
+        self.assertEqual(self.toolchain.modname_source_to_target(
+            s, 'example/module', '/tmp/example.module/src/example/module.js'),
+            'example/module.js',
+        )
+        self.assertEqual(self.toolchain.modname_source_to_target(
+            s, 'foo!example/module.txt', '/tmp/example.module/src/example'),
+            'example/module.txt',
+        )
+        self.assertEqual(self.toolchain.modname_source_to_target(
+            s, 'foo!bar!module.txt', '/tmp/example.module/src/example'),
+            'module.txt',
+        )
+        # baz not handled.
+        self.assertEqual(self.toolchain.modname_source_to_target(
+            s, 'foo!baz!bar!module.txt', '/tmp/example.module/src/example'),
+            'baz!bar!module.txt',
+        )
+
     def test_toolchain_gen_modname_source_target_modpath(self):
         spec = Spec()
         toolchain = self.toolchain

@@ -1095,6 +1095,13 @@ class Toolchain(BaseDriver):
         Called by generator method `_gen_modname_source_target_modpath`.
         """
 
+        loaderplugin_registry = spec.get(CALMJS_LOADERPLUGIN_REGISTRY)
+        if loaderplugin_registry:
+            handler = loaderplugin_registry.get(modname)
+            if handler:
+                return handler.modname_source_to_target(
+                    self, spec, modname, source)
+
         if (source.endswith(self.filename_suffix) and
                 not modname.endswith(self.filename_suffix)):
             return modname + self.filename_suffix
