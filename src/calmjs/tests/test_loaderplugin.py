@@ -6,8 +6,9 @@ from os import chdir
 from os import makedirs
 from pkg_resources import Distribution
 
+from calmjs.base import BaseLoaderPluginHandler
 from calmjs.loaderplugin import LoaderPluginRegistry
-from calmjs.loaderplugin import BaseLoaderPluginHandler
+from calmjs.loaderplugin import LoaderPluginHandler
 from calmjs.loaderplugin import NPMLoaderPluginHandler
 from calmjs.toolchain import NullToolchain
 from calmjs.toolchain import Spec
@@ -23,13 +24,13 @@ class NotPlugin(LoaderPluginRegistry):
     """yeanah"""
 
 
-class BadPlugin(BaseLoaderPluginHandler):
+class BadPlugin(LoaderPluginHandler):
 
     def __init__(self):
         """this will not be called; missing argument"""
 
 
-class DupePlugin(BaseLoaderPluginHandler):
+class DupePlugin(LoaderPluginHandler):
     """
     Dummy duplicate plugin
     """
@@ -48,12 +49,12 @@ class LoaderPluginRegistryTestCase(unittest.TestCase):
     def test_initialize_standard(self):
         # ensure that we have a proper working registry
         working_set = WorkingSet({'calmjs.loader_plugin': [
-            'example = calmjs.loaderplugin:BaseLoaderPluginHandler',
+            'example = calmjs.loaderplugin:LoaderPluginHandler',
         ]})
         registry = LoaderPluginRegistry(
             'calmjs.loader_plugin', _working_set=working_set)
         plugin = registry.get('example')
-        self.assertTrue(isinstance(plugin, BaseLoaderPluginHandler))
+        self.assertTrue(isinstance(plugin, LoaderPluginHandler))
         self.assertEqual(
             {}, plugin.locate_bundle_sourcepath(NullToolchain(), Spec(), {}))
 
@@ -119,7 +120,7 @@ class LoaderPluginRegistryTestCase(unittest.TestCase):
         )
         # the second one will be registered
         self.assertTrue(
-            isinstance(registry.get('example'), BaseLoaderPluginHandler))
+            isinstance(registry.get('example'), LoaderPluginHandler))
         # ensure that the handler can be acquired from a full name
         self.assertEqual('example', registry.get('example!hi').name)
         self.assertEqual('example', registry.get('example?arg!hi').name)
@@ -129,7 +130,7 @@ class LoaderPluginRegistryTestCase(unittest.TestCase):
         self.assertIsNone(registry.get('ex!ample'))
 
 
-class BaseLoaderPluginHandlerTestcase(unittest.TestCase):
+class LoaderPluginHandlerTestcase(unittest.TestCase):
 
     def test_plugin_strip_basic(self):
         base = NPMLoaderPluginHandler(None, 'base')
@@ -144,7 +145,7 @@ class BaseLoaderPluginHandlerTestcase(unittest.TestCase):
         )
 
     def test_plugin_strip_plugin_extras(self):
-        base = BaseLoaderPluginHandler(None, 'base')
+        base = LoaderPluginHandler(None, 'base')
         self.assertEqual(
             base.strip_plugin('base?someargument!some/dir/path.ext'),
             'some/dir/path.ext',
@@ -162,8 +163,17 @@ class BaseLoaderPluginHandlerTestcase(unittest.TestCase):
         base = NPMLoaderPluginHandler(None, 'base')
         self.assertEqual(base.strip_plugin('base!'), '')
 
+    def test_base_plugin_locate_bundle_sourcepath(self):
+        base = BaseLoaderPluginHandler(None, 'base')
+        toolchain = NullToolchain()
+        spec = Spec(working_dir=mkdtemp(self))
+        self.assertEqual(
+            base.locate_bundle_sourcepath(toolchain, spec, {
+                'base!bad': 'base!bad',
+            }), {})
+
     def test_plugin_package_strip_broken_recursion_stop(self):
-        class BadPluginHandler(BaseLoaderPluginHandler):
+        class BadPluginHandler(LoaderPluginHandler):
             def strip_plugin(self, value):
                 # return the identity
                 return value
@@ -182,14 +192,14 @@ class BaseLoaderPluginHandlerTestcase(unittest.TestCase):
             stream.getvalue())
 
     def test_plugin_loaders_modname_source_to_target(self):
-        class InterceptHandler(BaseLoaderPluginHandler):
+        class InterceptHandler(LoaderPluginHandler):
             def modname_source_to_target(self, *a, **kw):
                 # failed to inspect and call parent
                 return 'intercepted'
 
         reg = LoaderPluginRegistry('simloaders', _working_set=WorkingSet({}))
-        base = reg.records['base'] = BaseLoaderPluginHandler(reg, 'base')
-        extra = reg.records['extra'] = BaseLoaderPluginHandler(reg, 'extra')
+        base = reg.records['base'] = LoaderPluginHandler(reg, 'base')
+        extra = reg.records['extra'] = LoaderPluginHandler(reg, 'extra')
         reg.records['intercept'] = InterceptHandler(reg, 'intercept')
         toolchain = NullToolchain()
         spec = Spec()
@@ -204,12 +214,12 @@ class BaseLoaderPluginHandlerTestcase(unittest.TestCase):
             toolchain, spec, 'extra!noplugin!fun.file', '/some/path/fun.file'))
         # chained of the same type
         self.assertEqual('fun.file', base.modname_source_to_target(
-                toolchain, spec, 'base!base!base!fun.file',
-                '/some/path/fun.file'))
+            toolchain, spec, 'base!base!base!fun.file',
+            '/some/path/fun.file'))
         # chained but overloaded
         self.assertEqual('intercepted', base.modname_source_to_target(
-                toolchain, spec, 'base!intercept!base!fun.file',
-                '/some/path/fun.file'))
+            toolchain, spec, 'base!intercept!base!fun.file',
+            '/some/path/fun.file'))
 
 
 class NPMPluginTestCase(unittest.TestCase):
@@ -433,7 +443,7 @@ class NPMPluginTestCase(unittest.TestCase):
         working_dir = mkdtemp(self)
         reg, base, extra, base_dir, extra_dir = self.create_base_extra_plugins(
             working_dir)
-        simple = reg.records['simple'] = BaseLoaderPluginHandler(reg, 'simple')
+        simple = reg.records['simple'] = LoaderPluginHandler(reg, 'simple')
 
         toolchain = NullToolchain()
         spec = Spec(working_dir=working_dir)
