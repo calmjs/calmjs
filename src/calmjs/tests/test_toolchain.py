@@ -149,15 +149,27 @@ class SpecResolveRegistryTestCase(unittest.TestCase):
         with pretty_logging(stream=StringIO()) as s:
             registry = spec_update_loaderplugin_registry(spec)
         self.assertTrue(isinstance(registry, BaseLoaderPluginRegistry))
-        self.assertIn('no loaderplugin registry found in spec', s.getvalue())
+        self.assertIn(
+            'no loaderplugin registry referenced in spec', s.getvalue())
+        self.assertIn('<default_loaderplugins>', s.getvalue())
 
     def test_default(self):
         spec = {}
-        default = BaseLoaderPluginRegistry('some.registry')
+        default = BaseLoaderPluginRegistry('my.default')
         with pretty_logging(stream=StringIO()) as s:
             registry = spec_update_loaderplugin_registry(spec, default=default)
         self.assertIs(registry, default)
-        self.assertIn('no loaderplugin registry found in spec', s.getvalue())
+        self.assertIn(
+            'no loaderplugin registry referenced in spec', s.getvalue())
+        self.assertIn('my.default', s.getvalue())
+
+        registries = {'my.default': default}
+        stub_item_attr_value(
+            self, calmjs_toolchain, 'get_registry', registries.get)
+        spec = {}
+        with pretty_logging(stream=StringIO()) as s:
+            self.assertEqual('my.default', spec_update_loaderplugin_registry(
+                spec, default='my.default').registry_name)
 
     def test_wrong(self):
         spec = {'calmjs_loaderplugin_registry': object()}
@@ -168,6 +180,29 @@ class SpecResolveRegistryTestCase(unittest.TestCase):
         # still got the base instance instead.
         self.assertTrue(isinstance(registry, BaseLoaderPluginRegistry))
 
+    def test_wrong_registry_type(self):
+        advice = AdviceRegistry('adv', _working_set=WorkingSet({}))
+        registries = {'adv': advice}
+        stub_item_attr_value(
+            self, calmjs_toolchain, 'get_registry', registries.get)
+
+        spec = {'calmjs_loaderplugin_registry_name': 'adv'}
+        with pretty_logging(stream=StringIO()) as s:
+            registry = spec_update_loaderplugin_registry(spec)
+        self.assertIn(
+            "object referenced in spec is not a valid", s.getvalue())
+        self.assertIsNot(registry, advice)
+        self.assertTrue(isinstance(registry, BaseLoaderPluginRegistry))
+
+        spec = {}
+        with pretty_logging(stream=StringIO()) as s:
+            registry = spec_update_loaderplugin_registry(spec, default='adv')
+        self.assertIn(
+            "provided default is not a valid loaderplugin registry",
+            s.getvalue())
+        self.assertIsNot(registry, advice)
+        self.assertTrue(isinstance(registry, BaseLoaderPluginRegistry))
+
     def test_provided(self):
         spec = {'calmjs_loaderplugin_registry': LoaderPluginRegistry(
             'some.registry', _working_set=WorkingSet({})
@@ -175,7 +210,8 @@ class SpecResolveRegistryTestCase(unittest.TestCase):
         with pretty_logging(stream=StringIO()) as s:
             registry = spec_update_loaderplugin_registry(spec)
         self.assertIn(
-            "using loaderplugin registry 'some.registry'", s.getvalue())
+            "loaderplugin registry 'some.registry' already assigned to spec",
+            s.getvalue())
         self.assertTrue(isinstance(registry, LoaderPluginRegistry))
 
     def test_resolve_and_order(self):

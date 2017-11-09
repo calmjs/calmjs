@@ -172,6 +172,32 @@ class LoaderPluginHandlerTestcase(unittest.TestCase):
                 'base!bad': 'base!bad',
             }), {})
 
+    def test_plugin_locate_bundle_sourcepath_default_registry(self):
+        base = LoaderPluginHandler(None, 'base')
+        toolchain = NullToolchain()
+        spec = Spec(working_dir=mkdtemp(self))
+        with pretty_logging(stream=StringIO()) as stream:
+            self.assertEqual(
+                base.locate_bundle_sourcepath(toolchain, spec, {
+                    'base!bad': 'base!bad',
+                }), {})
+        self.assertIn("using default loaderplugin registry", stream.getvalue())
+
+    def test_plugin_locate_bundle_sourcepath_resolved_registry(self):
+        base = LoaderPluginHandler(None, 'base')
+        reg = LoaderPluginRegistry('loaders', _working_set=WorkingSet({}))
+        toolchain = NullToolchain()
+        spec = Spec(
+            working_dir=mkdtemp(self), calmjs_loaderplugin_registry=reg)
+        with pretty_logging(stream=StringIO()) as stream:
+            self.assertEqual(
+                base.locate_bundle_sourcepath(toolchain, spec, {
+                    'base!bad': 'base!bad',
+                }), {})
+        self.assertIn(
+            "loaderplugin registry 'loaders' already assigned to spec",
+            stream.getvalue())
+
     def test_plugin_package_strip_broken_recursion_stop(self):
         class BadPluginHandler(LoaderPluginHandler):
             def strip_plugin(self, value):

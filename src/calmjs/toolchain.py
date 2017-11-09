@@ -262,30 +262,49 @@ def dict_update_overwrite_check(base, fresh):
 # loaderplugin module due to that module being the part that couples
 # tightly with npm.
 
-def spec_update_loaderplugin_registry(spec, default=BaseLoaderPluginRegistry(
-        '<default_loaderplugins>')):
+def spec_update_loaderplugin_registry(spec, default=None):
     """
     Resolve a BasePluginLoaderRegistry instance from spec, and update
     spec[CALMJS_LOADERPLUGIN_REGISTRY] with that value before returning
     it.
     """
 
-    registry = spec.get(CALMJS_LOADERPLUGIN_REGISTRY, get_registry(
-        spec.get(CALMJS_LOADERPLUGIN_REGISTRY_NAME, '')))
+    registry = spec.get(CALMJS_LOADERPLUGIN_REGISTRY)
     if isinstance(registry, BaseLoaderPluginRegistry):
-        logger.info("using loaderplugin registry '%s'", registry.registry_name)
-        spec[CALMJS_LOADERPLUGIN_REGISTRY] = registry
+        logger.debug(
+            "loaderplugin registry '%s' already assigned to spec",
+            registry.registry_name)
         return registry
+    elif not registry:
+        # resolving registry
+        registry = get_registry(spec.get(CALMJS_LOADERPLUGIN_REGISTRY_NAME))
+        if isinstance(registry, BaseLoaderPluginRegistry):
+            logger.info(
+                "using loaderplugin registry '%s'", registry.registry_name)
+            spec[CALMJS_LOADERPLUGIN_REGISTRY] = registry
+            return registry
+
+    # acquire the real default instance, if possible.
+    if not isinstance(default, BaseLoaderPluginRegistry):
+        default = get_registry(default)
+        if not isinstance(default, BaseLoaderPluginRegistry):
+            logger.info(
+                "provided default is not a valid loaderplugin registry")
+            default = None
+
+    if default is None:
+        default = BaseLoaderPluginRegistry('<default_loaderplugins>')
 
     # TODO determine the best way to optionally warn about this for
     # toolchains that require this.
     if registry:
         logger.info(
             "object referenced in spec is not a valid loaderplugin registry; "
-            "using default fallback")
+            "using default loaderplugin registry '%s'", default.registry_name)
     else:
         logger.info(
-            'no loaderplugin registry found in spec; using default fallback')
+            "no loaderplugin registry referenced in spec; "
+            "using default loaderplugin registry '%s'", default.registry_name)
     spec[CALMJS_LOADERPLUGIN_REGISTRY] = registry = default
 
     return registry
