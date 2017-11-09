@@ -151,6 +151,14 @@ class SpecResolveRegistryTestCase(unittest.TestCase):
         self.assertTrue(isinstance(registry, BaseLoaderPluginRegistry))
         self.assertIn('no loaderplugin registry found in spec', s.getvalue())
 
+    def test_default(self):
+        spec = {}
+        default = BaseLoaderPluginRegistry('some.registry')
+        with pretty_logging(stream=StringIO()) as s:
+            registry = spec_update_loaderplugin_registry(spec, default=default)
+        self.assertIs(registry, default)
+        self.assertIn('no loaderplugin registry found in spec', s.getvalue())
+
     def test_wrong(self):
         spec = {'calmjs_loaderplugin_registry': object()}
         with pretty_logging(stream=StringIO()) as s:

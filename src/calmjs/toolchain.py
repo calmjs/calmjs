@@ -261,7 +261,8 @@ def dict_update_overwrite_check(base, fresh):
 # loaderplugin module due to that module being the part that couples
 # tightly with npm.
 
-def spec_update_loaderplugin_registry(spec):
+def spec_update_loaderplugin_registry(spec, default=BaseLoaderPluginRegistry(
+        '<default_loaderplugins>')):
     """
     Resolve a BasePluginLoaderRegistry instance from spec, and update
     spec[CALMJS_LOADERPLUGIN_REGISTRY] with that value before returning
@@ -284,8 +285,7 @@ def spec_update_loaderplugin_registry(spec):
     else:
         logger.info(
             'no loaderplugin registry found in spec; using default fallback')
-    spec[CALMJS_LOADERPLUGIN_REGISTRY] = registry = BaseLoaderPluginRegistry(
-        '<default_loaderplugins>')
+    spec[CALMJS_LOADERPLUGIN_REGISTRY] = registry = default
 
     return registry
 
