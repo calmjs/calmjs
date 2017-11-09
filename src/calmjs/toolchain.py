@@ -107,7 +107,8 @@ __all__ = [
 
     'toolchain_spec_entries_compile', 'ToolchainSpecCompileEntry',
 
-    'spec_update_loaderplugins_sourcepath_dict',
+    'spec_update_loaderplugin_sourcepath_dict',
+    'spec_update_loaderplugin_registry',
 
     'CALMJS_TOOLCHAIN_ADVICE',
 
@@ -254,7 +255,7 @@ def dict_update_overwrite_check(base, fresh):
 
 # Spec functions for interfacing with loaderplugins
 #
-# The following functions (named in the format spec_*_loaderplugins_*)
+# The following functions (named in the format spec_*_loaderplugin_*)
 # are helpers for extracting and filtering the mappings for interfacing
 # with the loaderplugin helpers through the registry system.  These
 # helpers are here as they are part of the toolchain, not as part of the
@@ -290,9 +291,9 @@ def spec_update_loaderplugin_registry(spec, default=BaseLoaderPluginRegistry(
     return registry
 
 
-def spec_update_loaderplugins_sourcepath_dict(
+def spec_update_loaderplugin_sourcepath_dict(
         spec, sourcepath_dict, sourcepath_dict_key,
-        loaderplugins_sourcepath_dict_key):
+        loaderplugin_sourcepath_dict_key):
     """
     Take an existing spec and a sourcepath mapping (that could be
     produced via calmjs.dist.*_module_registry_dependencies functions)
@@ -302,7 +303,7 @@ def spec_update_loaderplugins_sourcepath_dict(
     For the parts with loader plugin syntax (i.e. modnames (keys) that
     contain a '!' character), they are instead stored under a different
     mapping under its own mapping identified by the plugin_name.  The
-    mapping under loaderplugins_sourcepath_dict_key will contain all
+    mapping under loaderplugin_sourcepath_dict_key will contain all
     mappings of this type.
 
     The resolution for the handlers will be done through the loader
@@ -326,7 +327,7 @@ def spec_update_loaderplugins_sourcepath_dict(
         'module': 'something',
     }
 
-    spec[loaderplugins_sourcepath_dict_key] = {
+    spec[loaderplugin_sourcepath_dict_key] = {
         'plugin': {
             'plugin!inner': 'inner',
             'plugin!other': 'other',
@@ -356,8 +357,8 @@ def spec_update_loaderplugins_sourcepath_dict(
     default = dict_setget_dict(spec, sourcepath_dict_key)
     registry = spec_update_loaderplugin_registry(spec)
 
-    # it is more loaderplugins_sourcepath_maps
-    plugins = dict_setget_dict(spec, loaderplugins_sourcepath_dict_key)
+    # it is more loaderplugin_sourcepath_maps
+    plugins = dict_setget_dict(spec, loaderplugin_sourcepath_dict_key)
 
     for modname, sourcepath in sourcepath_dict.items():
         parts = modname.split('!', 1)

@@ -38,7 +38,7 @@ from calmjs.toolchain import ToolchainSpecCompileEntry
 from calmjs.toolchain import dict_setget
 from calmjs.toolchain import dict_setget_dict
 from calmjs.toolchain import dict_update_overwrite_check
-from calmjs.toolchain import spec_update_loaderplugins_sourcepath_dict
+from calmjs.toolchain import spec_update_loaderplugin_sourcepath_dict
 from calmjs.toolchain import spec_update_loaderplugin_registry
 from calmjs.toolchain import toolchain_spec_entries_compile
 
@@ -211,7 +211,7 @@ class SpecUpdatePluginsSourcepathDictTestCase(unittest.TestCase):
             'standard.module': 'standard.module',
         }
         spec = {}
-        spec_update_loaderplugins_sourcepath_dict(
+        spec_update_loaderplugin_sourcepath_dict(
             spec, sourcepath_dict, 'sourcepath_key', 'plugins_key')
         self.assertTrue(isinstance(spec.pop(
             'calmjs_loaderplugin_registry'), BaseLoaderPluginRegistry))
@@ -230,7 +230,7 @@ class SpecUpdatePluginsSourcepathDictTestCase(unittest.TestCase):
         base_map = {}
         spec = {'sourcepath_key': base_map}
 
-        spec_update_loaderplugins_sourcepath_dict(
+        spec_update_loaderplugin_sourcepath_dict(
             spec, sourcepath_dict, 'sourcepath_key', 'plugins_key')
         self.assertTrue(isinstance(spec.pop(
             'calmjs_loaderplugin_registry'), BaseLoaderPluginRegistry))
@@ -249,7 +249,7 @@ class SpecUpdatePluginsSourcepathDictTestCase(unittest.TestCase):
         }
         spec = {}
 
-        spec_update_loaderplugins_sourcepath_dict(
+        spec_update_loaderplugin_sourcepath_dict(
             spec, sourcepath_dict, 'sourcepath_key', 'plugins_key')
         self.assertTrue(isinstance(spec.pop(
             'calmjs_loaderplugin_registry'), BaseLoaderPluginRegistry))
@@ -272,7 +272,7 @@ class SpecUpdatePluginsSourcepathDictTestCase(unittest.TestCase):
         })
 
         # subsequent update will do update, not overwrite.
-        spec_update_loaderplugins_sourcepath_dict(spec, {
+        spec_update_loaderplugin_sourcepath_dict(spec, {
             'text!argument2': 'some/text/file2.txt',
         }, 'sourcepath_key', 'plugins_key')
 
