@@ -720,7 +720,9 @@ class BaseLoaderPluginHandler(object):
         """
 
         stripped_modname = self.strip_plugin(modname)
-        chained = self.registry.get_record(stripped_modname)
+        chained = (
+            self.registry.get_record(stripped_modname)
+            if '!' in stripped_modname else None)
         if chained:
             # ensure the stripped_modname is provided as by default the
             # handler will only deal with its own kind

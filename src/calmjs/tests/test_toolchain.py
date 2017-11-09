@@ -241,6 +241,7 @@ class SpecUpdatePluginsSourcepathDictTestCase(unittest.TestCase):
 
     def test_various_modules(self):
         sourcepath_dict = {
+            'plugin/module': 'path/to/plugin/module',
             'plugin/module!argument': 'some/filesystem/path',
             'plugin/module!css!argument': 'some/style/file.css',
             'text!argument': 'some/text/file.txt',
@@ -268,6 +269,7 @@ class SpecUpdatePluginsSourcepathDictTestCase(unittest.TestCase):
                 },
             },
             'sourcepath_key': {
+                'plugin/module': 'path/to/plugin/module',
             },
         })
 
@@ -1375,6 +1377,7 @@ class NullToolchainTestCase(unittest.TestCase):
             'simloaders', _working_set=WorkingSet({'simloaders': [
                 'foo = calmjs.loaderplugin:LoaderPluginHandler',
                 'bar = calmjs.loaderplugin:LoaderPluginHandler',
+                'py/loader = calmjs.loaderplugin:LoaderPluginHandler',
             ]})
         ))
         self.assertEqual(self.toolchain.modname_source_to_target(
@@ -1393,6 +1396,15 @@ class NullToolchainTestCase(unittest.TestCase):
         self.assertEqual(self.toolchain.modname_source_to_target(
             s, 'foo!baz!bar!module.txt', '/tmp/example.module/src/example'),
             'baz!bar!module.txt',
+        )
+        # python provided loaders
+        self.assertEqual(self.toolchain.modname_source_to_target(
+            s, 'py/module', '/tmp/py.module/py/module.js'),
+            'py/module.js',
+        )
+        self.assertEqual(self.toolchain.modname_source_to_target(
+            s, 'py/loader', '/tmp/py.module/py/loader.js'),
+            'py/loader.js',
         )
 
     def test_toolchain_gen_modname_source_target_modpath(self):

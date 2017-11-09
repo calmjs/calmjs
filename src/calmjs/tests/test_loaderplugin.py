@@ -221,6 +221,21 @@ class LoaderPluginHandlerTestcase(unittest.TestCase):
             toolchain, spec, 'base!intercept!base!fun.file',
             '/some/path/fun.file'))
 
+    def test_plugin_loaders_modname_source_to_target_identity(self):
+        # manually create a registry
+        reg = LoaderPluginRegistry('simloaders', _working_set=WorkingSet({}))
+        base = reg.records['local/dev'] = LoaderPluginHandler(reg, 'local/dev')
+        toolchain = NullToolchain()
+        spec = Spec()
+
+        self.assertEqual('fun.file', base.modname_source_to_target(
+            toolchain, spec, 'local/dev!fun.file',
+            '/some/path/fun.file'))
+        # a redundant usage test
+        self.assertEqual('local/dev', base.modname_source_to_target(
+            toolchain, spec, 'local/dev',
+            '/some/path/to/the/plugin'))
+
 
 class NPMPluginTestCase(unittest.TestCase):
 

@@ -1097,7 +1097,7 @@ class Toolchain(BaseDriver):
         """
 
         loaderplugin_registry = spec.get(CALMJS_LOADERPLUGIN_REGISTRY)
-        if loaderplugin_registry:
+        if '!' in modname and loaderplugin_registry:
             handler = loaderplugin_registry.get(modname)
             if handler:
                 return handler.modname_source_to_target(
