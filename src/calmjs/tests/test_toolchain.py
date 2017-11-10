@@ -40,7 +40,7 @@ from calmjs.toolchain import dict_setget_dict
 from calmjs.toolchain import dict_update_overwrite_check
 from calmjs.toolchain import spec_update_loaderplugin_sourcepath_dict
 from calmjs.toolchain import spec_update_loaderplugin_registry
-from calmjs.toolchain import toolchain_spec_entries_compile
+from calmjs.toolchain import toolchain_spec_compile_entries
 
 from calmjs.toolchain import CLEANUP
 from calmjs.toolchain import SUCCESS
@@ -1228,7 +1228,7 @@ class ToolchainTestCase(unittest.TestCase):
         target4 = 'namespace.mod4.js'
 
         compile_bundle = partial(
-            toolchain_spec_entries_compile, self.toolchain,
+            toolchain_spec_compile_entries, self.toolchain,
             process_name='bundle')
 
         compile_bundle(spec, [

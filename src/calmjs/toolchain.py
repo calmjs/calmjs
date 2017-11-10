@@ -25,21 +25,22 @@ modname
     have.  The Python analogue is the name of a given import module.
     Using the default mapper, one might map a Python module with the
     name ``calmjs.toolchain`` to ``calmjs/toolchain``.  While relative
-    modpaths are supported by most JavaScript/Node.js based import
-    systems, its usage from within calmjs framework is discouraged.
+    modpaths (i.e. identifiers beginning with './') are supported by
+    most JavaScript/Node.js based import systems, its usage from within
+    calmjs framework is discouraged.
 
 sourcepath
     An absolute path on the local filesystem to the source file for a
     given modpath.  These two values (modpath and sourcepath) serves as
     the foundational mapping from a JavaScript module name to its
     corresponding source file.  Previously, this was simply named
-    'source'.
+    'source', so certain arguments remain named like so.
 
 targetpath
-    A relative path to a build_dir.  The relative path MUST not contain
-    relative references.  A mapping from modpath to targetpath is
-    generated from a modpath to sourcepath mapping, where the source
-    file has been somehow transformed into the target at targetpath.
+    A relative path to a build directory (build_dir) serving as the
+    write target for whatever proccessing done by the toolchain
+    implementation to the file provided at the associated sourcepath.
+
     The relative path version (again, from build_dir) is typically
     recorded by instances of ``Spec`` objects that have undergone a
     ``Toolchain`` run.  Previously, this was simply named 'target'.
@@ -49,7 +50,8 @@ modpath
     that this is the transformed value that is to be better understood
     by the underlying tools.  Think of this as the post compiled value,
     or an alternative import location that is only applicable in the
-    post-compiled context.
+    post-compiled context, specific to the toolchain class that it
+    intends to encapsulate.
 """
 
 from __future__ import absolute_import
@@ -105,7 +107,7 @@ __all__ = [
 
     'dict_setget', 'dict_setget_dict', 'dict_update_overwrite_check',
 
-    'toolchain_spec_entries_compile', 'ToolchainSpecCompileEntry',
+    'toolchain_spec_compile_entries', 'ToolchainSpecCompileEntry',
 
     'spec_update_loaderplugin_sourcepath_dict',
     'spec_update_loaderplugin_registry',
@@ -162,9 +164,10 @@ ARTIFACT_PATHS = 'artifact_paths'
 BUILD_DIR = 'build_dir'
 # source registries that have been used
 CALMJS_MODULE_REGISTRY_NAMES = 'calmjs_module_registry_names'
+CALMJS_TEST_REGISTRY_NAMES = 'calmjs_test_registry_names'
+# loaderplugin registry related.
 CALMJS_LOADERPLUGIN_REGISTRY_NAME = 'calmjs_loaderplugin_registry_name'
 CALMJS_LOADERPLUGIN_REGISTRY = 'calmjs_loaderplugin_registry'
-CALMJS_TEST_REGISTRY_NAMES = 'calmjs_test_registry_names'
 # configuration file for enabling execution of code in build directory
 CONFIG_JS_FILES = 'config_js_files'
 # for debug level
@@ -392,7 +395,7 @@ def spec_update_loaderplugin_sourcepath_dict(
         plugin[modname] = sourcepath
 
 
-def toolchain_spec_entries_compile(
+def toolchain_spec_compile_entries(
         toolchain, spec, entries, process_name, overwrite_log=None):
     """
     The standardized Toolchain Spec Entries compile function
@@ -1082,6 +1085,9 @@ class Toolchain(BaseDriver):
     # that are enabled or registered for use for that particular
     # toolchain implementation.
 
+    # Also note that 'source' and 'target' refer to 'sourcepath' and
+    # 'targetpath' respectively in argument and method names.
+
     def modname_source_to_modname(self, spec, modname, source):
         """
         Method to get a modname.  Should really return the modname, but
@@ -1112,6 +1118,12 @@ class Toolchain(BaseDriver):
         assigned to this instance (setup by setup_filename_suffix), iff
         the provided source also end with this filename suffix.
 
+        However, certain tools have issues dealing with loader plugin
+        syntaxes showing up on the filesystem (and certain filesystems
+        definitely do not like some of the characters), so the usage of
+        the loaderplugin registry assigned to the spec may be used for
+        lookup if available.
+
         Called by generator method `_gen_modname_source_target_modpath`.
         """
 
@@ -1141,6 +1153,8 @@ class Toolchain(BaseDriver):
         The modname and source argument provided to aid pedantic tools,
         but really though this provides more consistency to method
         signatures.
+
+        Called by generator method `_gen_modname_source_target_modpath`.
         """
 
         return modname
@@ -1175,17 +1189,24 @@ class Toolchain(BaseDriver):
         Private generator that will consume those above functions.  This
         should NOT be overridden.
 
-        Produces the following 4-tuple on iteration with the input dict
+        Produces the following 4-tuple on iteration with the input dict;
+        the definition is written at the module level documention for
+        calmjs.toolchain, but in brief:
 
         modname
-            CommonJS require/import module name.
+            The JavaScript module name.
         source
-            path to JavaScript source file from a Python package.
+            Stands for sourcepath - path to some JavaScript source file.
         target
-            the target write path relative to build_dir
+            Stands for targetpath - the target path relative to
+            spec[BUILD_DIR] where the source file will be written to
+            using the method that genearted this entry.
         modpath
-            the module path that is compatible with tool referencing
-            the target
+            The module path that is compatible with tool referencing
+            the target.  While this is typically identical with modname,
+            some tools require certain modifications or markers in
+            additional to what is presented (e.g. such as the addition
+            of a '?' symbol to ensure absolute lookup).
         """
 
         for modname_source in d.items():
@@ -1285,7 +1306,7 @@ class Toolchain(BaseDriver):
                     ),
                 ) if entry.logger else None
                 compile_entry(partial(
-                    toolchain_spec_entries_compile, self,
+                    toolchain_spec_compile_entries, self,
                     process_name=entry.process_name,
                     overwrite_log=log,
                 ), entry.read_key, entry.store_key)
