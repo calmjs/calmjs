@@ -42,7 +42,8 @@ class LoaderPluginHandler(BaseLoaderPluginHandler):
     to be supported by subclasses.
     """
 
-    def locate_bundle_sourcepath(self, toolchain, spec, plugin_sourcepath):
+    def generate_handler_sourcepath(
+            self, toolchain, spec, loaderplugin_sourcepath):
         """
         The default implementation is a recursive lookup method, which
         subclasses may make use of.
@@ -51,39 +52,32 @@ class LoaderPluginHandler(BaseLoaderPluginHandler):
         the the absolute path of the desired sourcefiles.  Example:
 
         return {
-            'text': '/tmp/src/example_module/text/index.js'
-            'json': '/tmp/src/example_module/json/index.js'
+            'text': '/tmp/src/example_module/text/index.js',
+            'json': '/tmp/src/example_module/json/index.js',
         }
 
-        Implementation must also accept both the toolchain and the spec
-        argument, along with the plugin_sourcepath argument which will
-        be a mapping of {modname: sourcepath} that are relevant to this
-        specific plugin handler.  Instances of subclasses may then
-        derive the the bundle_sourcepath required for a successful build
-        for the given toolchain and spec.
-
-        For nested/chained plugins, the recommended handling method is
-        to also make use of the registry instance assigned to this
-        handler instance to lookup specific handler(s) that may also
-        be registered here, and use their locate_bundle_sourcepath
-        method to generate the mapping required.
+        Subclasses of this implementation must accept the same
+        arguments, and they should invoke this implementation via super
+        and merge its results (e.g. using dict.update) with one provided
+        by this one.  Also, this implementation depends on a correct
+        unwrap implementation for the loaderplugin at hand, if required.
         """
 
-        # since the plugin_sourcepath values is the complete modpath
-        # with the loader plugin, the values must be stripped before
-        # making use of the filtering helper function for grouping
-        # the inner mappings
+        # since the loaderplugin_sourcepath values is the complete
+        # modpath with the loader plugin, the values must be stripped
+        # before making use of the filtering helper function for
+        # grouping the inner mappings
         fake_spec = {}
         registry = spec.get(CALMJS_LOADERPLUGIN_REGISTRY)
         if registry:
             fake_spec[CALMJS_LOADERPLUGIN_REGISTRY] = registry
         spec_update_loaderplugin_sourcepath_dict(fake_spec, {
-            self.strip_plugin(k): v
-            for k, v in plugin_sourcepath.items()
+            self.unwrap(k): v
+            for k, v in loaderplugin_sourcepath.items()
         }, 'current', 'nested')
         result = {}
         for plugin_name, sourcepath in fake_spec['nested'].items():
-            if sourcepath == plugin_sourcepath:
+            if sourcepath == loaderplugin_sourcepath:
                 logger.warning(
                     "loaderplugin '%s' extracted same sourcepath of while "
                     "locating chain loaders: %s; skipping",
@@ -101,7 +95,7 @@ class LoaderPluginHandler(BaseLoaderPluginHandler):
                     sourcepath,
                 )
                 continue
-            result.update(plugin.locate_bundle_sourcepath(
+            result.update(plugin.generate_handler_sourcepath(
                 toolchain, spec, sourcepath))
         return result
 
@@ -122,7 +116,8 @@ class NPMLoaderPluginHandler(LoaderPluginHandler):
 
     node_module_pkg_name = None
 
-    def locate_bundle_sourcepath(self, toolchain, spec, plugin_sourcepath):
+    def generate_handler_sourcepath(
+            self, toolchain, spec, loaderplugin_sourcepath):
         """
         Attempt to locate the plugin source; returns a mapping of
         modnames to the absolute path of the located sources.
@@ -147,8 +142,8 @@ class NPMLoaderPluginHandler(LoaderPluginHandler):
             logger.debug('picked %r for loader plugin %r', target, self.name)
             # use the parent recursive lookup.
             result = super(
-                NPMLoaderPluginHandler, self).locate_bundle_sourcepath(
-                    toolchain, spec, plugin_sourcepath)
+                NPMLoaderPluginHandler, self).generate_handler_sourcepath(
+                    toolchain, spec, loaderplugin_sourcepath)
             result.update({self.name: target})
             return result
 

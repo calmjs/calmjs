@@ -719,7 +719,7 @@ class BaseLoaderPluginHandler(object):
         handler will be used to return this result.
         """
 
-        stripped_modname = self.strip_plugin(modname)
+        stripped_modname = self.unwrap(modname)
         chained = (
             self.registry.get_record(stripped_modname)
             if '!' in stripped_modname else None)
@@ -730,41 +730,47 @@ class BaseLoaderPluginHandler(object):
                 toolchain, spec, stripped_modname, source)
         return stripped_modname
 
-    def locate_bundle_sourcepath(self, toolchain, spec, plugin_sourcepath):
+    def generate_handler_sourcepath(
+            self, toolchain, spec, loaderplugin_sourcepath):
         """
-        The default implementation is a recursive lookup method, which
-        subclasses may make use of.
+        This returns the sourcepath (mapping) that may be added to the
+        appropriate mapping within the spec for a successful toolchain
+        execution.  The value generated is specific to the current
+        spec that is being passed through the toolchain.
+
+        The return value must be a modname: sourcepath mapping, e.g:
+
+        return {
+            'text': '/tmp/src/example_module/text/index.js',
+            'json': '/tmp/src/example_module/json/index.js',
+        }
 
         Subclasses must implement this to return a mapping of modnames
         the the absolute path of the desired sourcefiles.  Example:
 
-        return {
-            'text': '/tmp/src/example_module/text/index.js'
-            'json': '/tmp/src/example_module/json/index.js'
-        }
-
         Implementation must also accept both the toolchain and the spec
-        argument, along with the plugin_sourcepath argument which will
-        be a mapping of {modname: sourcepath} that are relevant to this
-        specific plugin handler.  Instances of subclasses may then
-        derive the the bundle_sourcepath required for a successful build
-        for the given toolchain and spec.
+        argument, along with the loaderplugin_sourcepath argument which
+        will be a mapping of {modname: sourcepath} that are relevant to
+        the current spec being processed through the toolchain.
 
         For nested/chained plugins, the recommended handling method is
-        to also make use of the registry instance assigned to this
-        handler instance to lookup specific handler(s) that may also
-        be registered here, and use their locate_bundle_sourcepath
-        method to generate the mapping required.
+        to make use of the assigned registry instance to lookup relevant
+        loaderplugin handler(s) instances, and make use of their
+        ``generate_handler_sourcepath`` method to generate the mapping
+        required.  The immediate subclass in the loaderplugin module
+        has a generic implementation done in this manner.
         """
 
         return {}
 
-    def strip_plugin(self, value):
+    def unwrap(self, value):
         """
-        Strip the first plugin fragment and return just the value.  This
-        is a simple helper.  Note that the filter chaining can be very
-        implementation specific to each and every loader plugin, so the
-        default implementation is not going to attempt to consume
+        A helper method for unwrapping the loaderplugin fragment out of
+        the provided value (typically a modname) and return it.
+
+        Note that the filter chaining is very implementation specific to
+        each and every loader plugin and their specific toolchain, so
+        this default implementation is not going to attempt to consume
         everything in one go.
         """
 

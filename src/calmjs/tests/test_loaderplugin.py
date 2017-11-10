@@ -55,8 +55,8 @@ class LoaderPluginRegistryTestCase(unittest.TestCase):
             'calmjs.loader_plugin', _working_set=working_set)
         plugin = registry.get('example')
         self.assertTrue(isinstance(plugin, LoaderPluginHandler))
-        self.assertEqual(
-            {}, plugin.locate_bundle_sourcepath(NullToolchain(), Spec(), {}))
+        self.assertEqual({}, plugin.generate_handler_sourcepath(
+            NullToolchain(), Spec(), {}))
 
     def test_initialize_failure_missing(self):
         working_set = WorkingSet({'calmjs.loader_plugin': [
@@ -135,55 +135,55 @@ class LoaderPluginHandlerTestcase(unittest.TestCase):
     def test_plugin_strip_basic(self):
         base = NPMLoaderPluginHandler(None, 'base')
         self.assertEqual(
-            base.strip_plugin('base!some/dir/path.ext'),
+            base.unwrap('base!some/dir/path.ext'),
             'some/dir/path.ext',
         )
         # unrelated will not be stripped.
         self.assertEqual(
-            base.strip_plugin('something_else!some/dir/path.ext'),
+            base.unwrap('something_else!some/dir/path.ext'),
             'something_else!some/dir/path.ext',
         )
 
-    def test_plugin_strip_plugin_extras(self):
+    def test_plugin_unwrap_extras(self):
         base = LoaderPluginHandler(None, 'base')
         self.assertEqual(
-            base.strip_plugin('base?someargument!some/dir/path.ext'),
+            base.unwrap('base?someargument!some/dir/path.ext'),
             'some/dir/path.ext',
         )
         self.assertEqual(
-            base.strip_plugin('base!other!some/dir/path.ext'),
+            base.unwrap('base!other!some/dir/path.ext'),
             'other!some/dir/path.ext',
         )
         self.assertEqual(
-            base.strip_plugin('base?arg!other?arg!some/dir/path.ext'),
+            base.unwrap('base?arg!other?arg!some/dir/path.ext'),
             'other?arg!some/dir/path.ext',
         )
 
     def test_plugin_strip_edge(self):
         base = NPMLoaderPluginHandler(None, 'base')
-        self.assertEqual(base.strip_plugin('base!'), '')
+        self.assertEqual(base.unwrap('base!'), '')
 
-    def test_base_plugin_locate_bundle_sourcepath(self):
+    def test_base_plugin_generate_handler_sourcepath(self):
         base = BaseLoaderPluginHandler(None, 'base')
         toolchain = NullToolchain()
         spec = Spec(working_dir=mkdtemp(self))
         self.assertEqual(
-            base.locate_bundle_sourcepath(toolchain, spec, {
+            base.generate_handler_sourcepath(toolchain, spec, {
                 'base!bad': 'base!bad',
             }), {})
 
-    def test_plugin_locate_bundle_sourcepath_default_registry(self):
+    def test_plugin_generate_handler_sourcepath_default_registry(self):
         base = LoaderPluginHandler(None, 'base')
         toolchain = NullToolchain()
         spec = Spec(working_dir=mkdtemp(self))
         with pretty_logging(stream=StringIO()) as stream:
             self.assertEqual(
-                base.locate_bundle_sourcepath(toolchain, spec, {
+                base.generate_handler_sourcepath(toolchain, spec, {
                     'base!bad': 'base!bad',
                 }), {})
         self.assertIn("using default loaderplugin registry", stream.getvalue())
 
-    def test_plugin_locate_bundle_sourcepath_resolved_registry(self):
+    def test_plugin_generate_handler_sourcepath_resolved_registry(self):
         base = LoaderPluginHandler(None, 'base')
         reg = LoaderPluginRegistry('loaders', _working_set=WorkingSet({}))
         toolchain = NullToolchain()
@@ -191,7 +191,7 @@ class LoaderPluginHandlerTestcase(unittest.TestCase):
             working_dir=mkdtemp(self), calmjs_loaderplugin_registry=reg)
         with pretty_logging(stream=StringIO()) as stream:
             self.assertEqual(
-                base.locate_bundle_sourcepath(toolchain, spec, {
+                base.generate_handler_sourcepath(toolchain, spec, {
                     'base!bad': 'base!bad',
                 }), {})
         self.assertIn(
@@ -200,7 +200,7 @@ class LoaderPluginHandlerTestcase(unittest.TestCase):
 
     def test_plugin_package_strip_broken_recursion_stop(self):
         class BadPluginHandler(LoaderPluginHandler):
-            def strip_plugin(self, value):
+            def unwrap(self, value):
                 # return the identity
                 return value
 
@@ -209,7 +209,7 @@ class LoaderPluginHandlerTestcase(unittest.TestCase):
         spec = Spec(working_dir=mkdtemp(self))
         with pretty_logging(stream=StringIO()) as stream:
             self.assertEqual(
-                base.locate_bundle_sourcepath(toolchain, spec, {
+                base.generate_handler_sourcepath(toolchain, spec, {
                     'base!bad': 'base!bad',
                 }), {})
 
@@ -284,7 +284,7 @@ class NPMPluginTestCase(unittest.TestCase):
         toolchain = NullToolchain()
         spec = Spec(working_dir=mkdtemp(self))
         self.assertEqual(
-            base.locate_bundle_sourcepath(toolchain, spec, {}), {})
+            base.generate_handler_sourcepath(toolchain, spec, {}), {})
 
     def test_plugin_package_missing_dir(self):
         base = NPMLoaderPluginHandler(None, 'base')
@@ -293,7 +293,7 @@ class NPMPluginTestCase(unittest.TestCase):
         spec = Spec(working_dir=mkdtemp(self))
         with pretty_logging(stream=StringIO()) as stream:
             self.assertEqual(
-                base.locate_bundle_sourcepath(toolchain, spec, {}), {})
+                base.generate_handler_sourcepath(toolchain, spec, {}), {})
         self.assertIn(
             "could not locate 'package.json' for the npm package 'dummy_pkg' "
             "which was specified to contain the loader plugin 'base' in the "
@@ -313,7 +313,7 @@ class NPMPluginTestCase(unittest.TestCase):
 
         with pretty_logging(stream=StringIO()) as stream:
             self.assertEqual(
-                base.locate_bundle_sourcepath(toolchain, spec, {}), {})
+                base.generate_handler_sourcepath(toolchain, spec, {}), {})
 
         self.assertIn(
             "calmjs.loaderplugin 'package.json' for the npm package "
@@ -336,7 +336,7 @@ class NPMPluginTestCase(unittest.TestCase):
         with pretty_logging(stream=StringIO()) as stream:
             self.assertEqual(
                 join(pkg_dir, 'base.js'),
-                base.locate_bundle_sourcepath(toolchain, spec, {})['base'],
+                base.generate_handler_sourcepath(toolchain, spec, {})['base'],
             )
         self.assertIn("for loader plugin 'base'", stream.getvalue())
 
@@ -353,7 +353,7 @@ class NPMPluginTestCase(unittest.TestCase):
         with pretty_logging(stream=StringIO()) as stream:
             self.assertEqual(
                 join(pkg_dir, 'browser', 'base.js'),
-                base.locate_bundle_sourcepath(toolchain, spec, {})['base'],
+                base.generate_handler_sourcepath(toolchain, spec, {})['base'],
             )
         self.assertIn("for loader plugin 'base'", stream.getvalue())
         self.assertNotIn("missing working_dir", stream.getvalue())
@@ -375,7 +375,7 @@ class NPMPluginTestCase(unittest.TestCase):
         with pretty_logging(stream=StringIO()) as stream:
             self.assertEqual(
                 join(pkg_dir, 'browser', 'base.js'),
-                base.locate_bundle_sourcepath(toolchain, spec, {})['base'],
+                base.generate_handler_sourcepath(toolchain, spec, {})['base'],
             )
         self.assertIn("for loader plugin 'base'", stream.getvalue())
         self.assertIn("missing working_dir", stream.getvalue())
@@ -410,7 +410,7 @@ class NPMPluginTestCase(unittest.TestCase):
         with pretty_logging(stream=StringIO()) as stream:
             self.assertEqual(
                 {'base': join(base_dir, 'base.js')},
-                base.locate_bundle_sourcepath(toolchain, spec, {
+                base.generate_handler_sourcepath(toolchain, spec, {
                     'base!fun.file': 'base!fun.file',
                 }),
             )
@@ -420,7 +420,7 @@ class NPMPluginTestCase(unittest.TestCase):
             self.assertEqual({
                 'base': join(base_dir, 'base.js'),
                 'extra': join(extra_dir, 'extra.js'),
-            }, base.locate_bundle_sourcepath(toolchain, spec, {
+            }, base.generate_handler_sourcepath(toolchain, spec, {
                     'base!fun.file': 'fun.file',
                     'base!extra!fun.file': 'fun.file',
                     'base!missing!fun.file': 'fun.file',
@@ -451,7 +451,7 @@ class NPMPluginTestCase(unittest.TestCase):
             self.assertEqual({
                 'base': join(base_dir, 'base.js'),
                 'extra': join(extra_dir, 'extra.js'),
-            }, base.locate_bundle_sourcepath(toolchain, spec, {
+            }, base.generate_handler_sourcepath(toolchain, spec, {
                     'base!extra!base!extra!fun.file': 'fun.file',
                 }),
             )
@@ -462,7 +462,7 @@ class NPMPluginTestCase(unittest.TestCase):
         with pretty_logging(stream=StringIO()) as stream:
             self.assertEqual({
                 'base': join(base_dir, 'base.js'),
-            }, base.locate_bundle_sourcepath(toolchain, spec, {
+            }, base.generate_handler_sourcepath(toolchain, spec, {
                     'base!base!base!fun.file': 'fun.file',
                 }),
             )
@@ -473,7 +473,7 @@ class NPMPluginTestCase(unittest.TestCase):
             self.assertEqual({
                 'base': join(base_dir, 'base.js'),
                 'extra': join(extra_dir, 'extra.js'),
-            }, base.locate_bundle_sourcepath(toolchain, spec, {
+            }, base.generate_handler_sourcepath(toolchain, spec, {
                     'base?argument!extra?argument!fun.file': 'fun.file',
                 }),
             )
@@ -492,7 +492,7 @@ class NPMPluginTestCase(unittest.TestCase):
         with pretty_logging(stream=StringIO()) as stream:
             self.assertEqual(
                 {},
-                simple.locate_bundle_sourcepath(toolchain, spec, {
+                simple.generate_handler_sourcepath(toolchain, spec, {
                     'simple!fun.file': 'fun.file',
                 }),
             )
@@ -500,7 +500,7 @@ class NPMPluginTestCase(unittest.TestCase):
         with pretty_logging(stream=StringIO()) as stream:
             self.assertEqual({
                 'extra': join(extra_dir, 'extra.js'),
-            }, simple.locate_bundle_sourcepath(toolchain, spec, {
+            }, simple.generate_handler_sourcepath(toolchain, spec, {
                     'simple!extra!fun.file': 'fun.file',
                 }),
             )
