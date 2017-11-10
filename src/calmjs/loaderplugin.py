@@ -18,7 +18,7 @@ from calmjs.base import BaseLoaderPluginRegistry
 from calmjs.base import BaseLoaderPluginHandler
 from calmjs.toolchain import WORKING_DIR
 from calmjs.toolchain import CALMJS_LOADERPLUGIN_REGISTRY
-from calmjs.toolchain import spec_update_loaderplugin_sourcepath_dict
+from calmjs.toolchain import spec_update_sourcepath_filter_loaderplugins
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ class LoaderPluginHandler(BaseLoaderPluginHandler):
         registry = spec.get(CALMJS_LOADERPLUGIN_REGISTRY)
         if registry:
             fake_spec[CALMJS_LOADERPLUGIN_REGISTRY] = registry
-        spec_update_loaderplugin_sourcepath_dict(fake_spec, {
+        spec_update_sourcepath_filter_loaderplugins(fake_spec, {
             self.unwrap(k): v
             for k, v in loaderplugin_sourcepath.items()
         }, 'current', 'nested')

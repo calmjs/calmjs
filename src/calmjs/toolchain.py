@@ -107,10 +107,12 @@ __all__ = [
 
     'dict_setget', 'dict_setget_dict', 'dict_update_overwrite_check',
 
-    'toolchain_spec_compile_entries', 'ToolchainSpecCompileEntry',
-
-    'spec_update_loaderplugin_sourcepath_dict',
     'spec_update_loaderplugin_registry',
+    'spec_update_sourcepath_filter_loaderplugins',
+
+    'toolchain_spec_prepare_loaderplugins',
+
+    'toolchain_spec_compile_entries', 'ToolchainSpecCompileEntry',
 
     'CALMJS_TOOLCHAIN_ADVICE',
 
@@ -182,6 +184,10 @@ EXPORT_PACKAGE_NAMES = 'export_package_names'
 EXPORT_TARGET = 'export_target'
 # specify that export target is safe to be overwritten.
 EXPORT_TARGET_OVERWRITE = 'export_target_overwrite'
+# for loaderplugin sourcepath dicts, where the maps are grouped by the
+# name of the plugin; an intermediate step for processing of loader
+# plugins
+LOADERPLUGIN_SOURCEPATH_MAPS = 'loaderplugin_sourcepath_maps'
 # if true, generate source map
 GENERATE_SOURCE_MAP = 'generate_source_map'
 # source module names; currently not supported by any part of the
@@ -194,7 +200,7 @@ SOURCE_PACKAGE_NAMES = 'source_package_names'
 # for testing
 # name of test modules
 TEST_MODULE_NAMES = 'test_module_names'
-# mapping of test module to their paths; i.e. sourcepath_dict, but not
+# mapping of test module to their paths; i.e. sourcepath_map, but not
 # labled as one to prevent naming conflicts (and they ARE to be
 # standalone modules to be used directly by the toolchain and testing
 # integration layer.
@@ -313,19 +319,19 @@ def spec_update_loaderplugin_registry(spec, default=None):
     return registry
 
 
-def spec_update_loaderplugin_sourcepath_dict(
-        spec, sourcepath_dict, sourcepath_dict_key,
-        loaderplugin_sourcepath_dict_key):
+def spec_update_sourcepath_filter_loaderplugins(
+        spec, sourcepath_map, sourcepath_map_key,
+        loaderplugin_sourcepath_map_key=LOADERPLUGIN_SOURCEPATH_MAPS):
     """
     Take an existing spec and a sourcepath mapping (that could be
     produced via calmjs.dist.*_module_registry_dependencies functions)
     and split out the keys that does not contain loaderplugin syntax and
-    assign it to the spec under sourcepath_dict_key.
+    assign it to the spec under sourcepath_key.
 
     For the parts with loader plugin syntax (i.e. modnames (keys) that
     contain a '!' character), they are instead stored under a different
     mapping under its own mapping identified by the plugin_name.  The
-    mapping under loaderplugin_sourcepath_dict_key will contain all
+    mapping under loaderplugin_sourcepath_map_key will contain all
     mappings of this type.
 
     The resolution for the handlers will be done through the loader
@@ -333,9 +339,9 @@ def spec_update_loaderplugin_sourcepath_dict(
     available, otherwise the registry instance will be acquired through
     the main registry using spec[CALMJS_LOADERPLUGIN_REGISTRY_NAME].
 
-    For the example sourcepath_dict input:
+    For the example sourcepath_map input:
 
-    sourcepath_dict = {
+    sourcepath = {
         'module': 'something',
         'plugin!inner': 'inner',
         'plugin!other': 'other',
@@ -345,11 +351,11 @@ def spec_update_loaderplugin_sourcepath_dict(
 
     The following will be stored under the following keys in spec:
 
-    spec[sourcepath_dict_key] = {
+    spec[sourcepath_key] = {
         'module': 'something',
     }
 
-    spec[loaderplugin_sourcepath_dict_key] = {
+    spec[loaderplugin_sourcepath_map_key] = {
         'plugin': {
             'plugin!inner': 'inner',
             'plugin!other': 'other',
@@ -376,13 +382,13 @@ def spec_update_loaderplugin_sourcepath_dict(
     toolchain instance with the spec.
     """
 
-    default = dict_setget_dict(spec, sourcepath_dict_key)
+    default = dict_setget_dict(spec, sourcepath_map_key)
     registry = spec_update_loaderplugin_registry(spec)
 
     # it is more loaderplugin_sourcepath_maps
-    plugins = dict_setget_dict(spec, loaderplugin_sourcepath_dict_key)
+    plugins = dict_setget_dict(spec, loaderplugin_sourcepath_map_key)
 
-    for modname, sourcepath in sourcepath_dict.items():
+    for modname, sourcepath in sourcepath_map.items():
         parts = modname.split('!', 1)
         if len(parts) == 1:
             # default
@@ -393,6 +399,80 @@ def spec_update_loaderplugin_sourcepath_dict(
         plugin_name = registry.to_plugin_name(modname)
         plugin = dict_setget_dict(plugins, plugin_name)
         plugin[modname] = sourcepath
+
+
+def toolchain_spec_prepare_loaderplugins(
+        toolchain, spec,
+        loaderplugin_read_key,
+        handler_sourcepath_key,
+        loaderplugin_sourcepath_map_key=LOADERPLUGIN_SOURCEPATH_MAPS):
+    """
+    A standard helper function for combining the filtered (e.g. using
+    ``spec_update_sourcepath_filter_loaderplugins``) loaderplugin
+    sourcepath mappings back into one that is usable with the standard
+    ``toolchain_spec_compile_entries`` function.
+
+    Arguments:
+
+    toolchain
+        The toolchain
+    spec
+        The spec
+
+    loaderplugin_read_key
+        The read_key associated with the loaderplugin process as set up
+        for the Toolchain that implemented this.  If the toolchain has
+        this in its compile_entries:
+
+            ToolchainSpecCompileEntry('loaderplugin', 'plugsrc', 'plugsink')
+
+        The loaderplugin_read_key it must use will be 'plugsrc'.
+
+    handler_sourcepath_key
+        All found handlers will have their handler_sourcepath method be
+        invoked, and the combined results will be a dict stored in the
+        spec under that key.
+
+    loaderplugin_sourcepath_map_key
+        It must be the same key to the value produced by
+        ``spec_update_sourcepath_filter_loaderplugins``
+    """
+
+    # ensure the registry is applied to the spec
+    registry = spec_update_loaderplugin_registry(
+        spec, default=toolchain.loaderplugin_registry)
+
+    # this one is named like so for the compile entry method
+    plugin_sourcepath = dict_setget_dict(
+        spec, loaderplugin_read_key + '_sourcepath')
+    # the key is supplied by the toolchain that might make use of this
+    if handler_sourcepath_key:
+        handler_sourcepath = dict_setget_dict(spec, handler_sourcepath_key)
+    else:
+        # provide a null value for this.
+        handler_sourcepath = {}
+
+    for key, value in spec.get(loaderplugin_sourcepath_map_key, {}).items():
+        handler = registry.get(key)
+        if handler:
+            # assume handler will do the job.
+            logger.debug("found handler for '%s' loader plugin", key)
+            plugin_sourcepath.update(value)
+            logger.debug(
+                "plugin_sourcepath updated with %d keys", len(value))
+            # TODO figure out how to address the case where the actual
+            # JavaScript module for the handling wasn't found.
+            handler_sourcepath.update(
+                handler.generate_handler_sourcepath(toolchain, spec, value))
+        else:
+            logger.warning(
+                "loaderplugin handler for '%s' not found in loaderplugin "
+                "registry '%s'; as arguments associated with loader plugins "
+                "are specific, processing is disabled for this group; the "
+                "sources referenced by the following names will not be "
+                "compiled into the build target: %s",
+                key, registry.registry_name, sorted(value.keys()),
+            )
 
 
 def toolchain_spec_compile_entries(
@@ -801,6 +881,10 @@ class Toolchain(BaseDriver):
         The working directory where the relative paths will be based
         from.
     """
+
+    # subclasses may assign an identifier or instance of a compatible
+    # loaderplugin registry for use with the encapsulated framework.
+    loaderplugin_registry = None
 
     def __init__(self, *a, **kw):
         """

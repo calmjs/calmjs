@@ -38,9 +38,10 @@ from calmjs.toolchain import ToolchainSpecCompileEntry
 from calmjs.toolchain import dict_setget
 from calmjs.toolchain import dict_setget_dict
 from calmjs.toolchain import dict_update_overwrite_check
-from calmjs.toolchain import spec_update_loaderplugin_sourcepath_dict
+from calmjs.toolchain import spec_update_sourcepath_filter_loaderplugins
 from calmjs.toolchain import spec_update_loaderplugin_registry
 from calmjs.toolchain import toolchain_spec_compile_entries
+from calmjs.toolchain import toolchain_spec_prepare_loaderplugins
 
 from calmjs.toolchain import CLEANUP
 from calmjs.toolchain import SUCCESS
@@ -247,7 +248,7 @@ class SpecUpdatePluginsSourcepathDictTestCase(unittest.TestCase):
             'standard.module': 'standard.module',
         }
         spec = {}
-        spec_update_loaderplugin_sourcepath_dict(
+        spec_update_sourcepath_filter_loaderplugins(
             spec, sourcepath_dict, 'sourcepath_key', 'plugins_key')
         self.assertTrue(isinstance(spec.pop(
             'calmjs_loaderplugin_registry'), BaseLoaderPluginRegistry))
@@ -266,7 +267,7 @@ class SpecUpdatePluginsSourcepathDictTestCase(unittest.TestCase):
         base_map = {}
         spec = {'sourcepath_key': base_map}
 
-        spec_update_loaderplugin_sourcepath_dict(
+        spec_update_sourcepath_filter_loaderplugins(
             spec, sourcepath_dict, 'sourcepath_key', 'plugins_key')
         self.assertTrue(isinstance(spec.pop(
             'calmjs_loaderplugin_registry'), BaseLoaderPluginRegistry))
@@ -286,7 +287,7 @@ class SpecUpdatePluginsSourcepathDictTestCase(unittest.TestCase):
         }
         spec = {}
 
-        spec_update_loaderplugin_sourcepath_dict(
+        spec_update_sourcepath_filter_loaderplugins(
             spec, sourcepath_dict, 'sourcepath_key', 'plugins_key')
         self.assertTrue(isinstance(spec.pop(
             'calmjs_loaderplugin_registry'), BaseLoaderPluginRegistry))
@@ -310,7 +311,7 @@ class SpecUpdatePluginsSourcepathDictTestCase(unittest.TestCase):
         })
 
         # subsequent update will do update, not overwrite.
-        spec_update_loaderplugin_sourcepath_dict(spec, {
+        spec_update_sourcepath_filter_loaderplugins(spec, {
             'text!argument2': 'some/text/file2.txt',
         }, 'sourcepath_key', 'plugins_key')
 
@@ -1249,6 +1250,9 @@ class MockLPHandler(BaseLoaderPluginHandler):
     def __call__(self, toolchain, spec, modname, source, target, modpath):
         return {modname: target}, {modname: modpath}, [modname]
 
+    def generate_handler_sourcepath(self, toolchain, spec, value):
+        return {self.name: self.name}
+
 
 class ToolchainLoaderPluginTestCase(unittest.TestCase):
 
@@ -1320,6 +1324,73 @@ class ToolchainLoaderPluginTestCase(unittest.TestCase):
 
         # recursive lookups are generally not needed, if the target
         # supplied _is_ the target.
+
+    def test_toolchain_spec_prepare_loaderplugins_unsupported(self):
+        spec = Spec()
+        # really though, providing None shouldn't be supported, but
+        # leaving this in for now until it is formalized.
+        toolchain_spec_prepare_loaderplugins(
+            self.toolchain, spec, 'plugin', None)
+        self.assertIn('plugin_sourcepath', spec)
+
+    def test_toolchain_spec_prepare_loaderplugins_standard(self):
+        reg = LoaderPluginRegistry('simple', _working_set=WorkingSet({
+            'simple': [
+                'foo = calmjs.tests.test_toolchain:MockLPHandler',
+                'bar = calmjs.tests.test_toolchain:MockLPHandler',
+            ],
+        }))
+        spec = Spec(
+            calmjs_loaderplugin_registry=reg,
+            loaderplugin_sourcepath_maps={
+                'foo': {'foo!thing': 'thing'},
+                'bar': {'bar!thing': 'thing'},
+            },
+        )
+        toolchain_spec_prepare_loaderplugins(
+            self.toolchain, spec, 'loaderplugin', 'loaders')
+        self.assertEqual({
+            'foo!thing': 'thing',
+            'bar!thing': 'thing',
+        }, spec['loaderplugin_sourcepath'])
+        self.assertEqual({
+            'foo': 'foo',
+            'bar': 'bar',
+        }, spec['loaders'])
+
+    def test_toolchain_spec_prepare_loaderplugins_missing(self):
+        reg = LoaderPluginRegistry('simple', _working_set=WorkingSet({
+            'simple': [
+                'foo = calmjs.tests.test_toolchain:MockLPHandler',
+                'bar = calmjs.tests.test_toolchain:MockLPHandler',
+            ],
+        }))
+        spec = Spec(
+            calmjs_loaderplugin_registry=reg,
+            loaderplugin_sourcepath_maps={
+                'foo': {'foo!thing': 'thing'},
+                'missing': {'missing!thing': 'thing'},
+                'bar': {'bar!thing': 'thing'},
+            },
+        )
+        with pretty_logging(stream=StringIO()) as s:
+            toolchain_spec_prepare_loaderplugins(
+                self.toolchain, spec, 'loaderplugin', 'loaders')
+        self.assertEqual({
+            'foo!thing': 'thing',
+            'bar!thing': 'thing',
+        }, spec['loaderplugin_sourcepath'])
+        self.assertEqual({
+            'foo': 'foo',
+            'bar': 'bar',
+        }, spec['loaders'])
+
+        self.assertIn(
+            "loaderplugin handler for 'missing' not found in loaderplugin "
+            "registry 'simple'", s.getvalue())
+        self.assertIn(
+            "will not be compiled into the build target: ['missing!thing']",
+            s.getvalue())
 
 
 class NullToolchainTestCase(unittest.TestCase):
