@@ -76,6 +76,7 @@ def _reset_global_runtime_attrs():
     _global_runtime_attrs.update({
         'debug': 0,
         'log_level': 0,
+        'bootstrap_log_level': -1,
         'verbosity': 0,
     })
 
@@ -87,9 +88,11 @@ def _initialize_global_runtime_attrs(**kwargs):
     debug = kwargs.pop('debug')
     verbosity = min(max(kwargs.pop('verbose') - kwargs.pop('quiet'), -2), 2)
     log_level = levels.get(verbosity)
+    bootstrap_log_level = levels.get(max(-2, verbosity - 1))
     _global_runtime_attrs.update({
         'debug': debug,
         'log_level': log_level,
+        'bootstrap_log_level': bootstrap_log_level,
         'verbosity': verbosity,
     })
 
@@ -154,6 +157,10 @@ class BootstrapRuntime(object):
     @property
     def log_level(self):
         return _global_runtime_attrs_get('log_level')
+
+    @property
+    def bootstrap_log_level(self):
+        return _global_runtime_attrs_get('bootstrap_log_level')
 
     @property
     def verbosity(self):
@@ -1078,7 +1085,8 @@ def main(args=None, runtime_cls=CalmJSRuntime):
         warnings.simplefilter('ignore')
         # log down the construction of the bootstrap class.
         with pretty_logging(
-                logger='', level=bootstrap.log_level, stream=sys.stderr):
+                logger='', level=bootstrap.bootstrap_log_level,
+                stream=sys.stderr):
             runtime = runtime_cls()
             # access the argparser property to trigger its construction
             # inside this logger context, so that any messages passed to

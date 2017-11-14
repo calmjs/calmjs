@@ -30,6 +30,7 @@ from calmjs.testing.utils import stub_item_attr_value
 from calmjs.testing.utils import stub_base_which
 from calmjs.testing.utils import stub_check_interactive
 from calmjs.testing.utils import stub_mod_call
+from calmjs.testing.utils import stub_os_environ
 from calmjs.testing.utils import stub_stdin
 from calmjs.testing.utils import stub_stdouts
 
@@ -845,6 +846,50 @@ class RuntimeGoingWrongTestCase(unittest.TestCase):
         self.assertNotIn('badname:likethis', out)
         # command listing naturally not available.
         self.assertNotIn('npm', out)
+
+    def test_root_runtime_bootstrap_logging(self):
+        sys.modules.pop('calmjs.npm', None)
+        self.addCleanup(sys.modules.pop, 'calmjs.npm', None)
+        stub_stdouts(self)
+        stub_os_environ(self)
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.runtime]\n'
+            'npm = calmjs.npm:npm.runtime',
+        ),), 'example.package', '1.0')
+
+        os.environ['PATH'] = ''
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+
+        sys.modules.pop('calmjs.npm', None)
+        with self.assertRaises(SystemExit):
+            runtime.main(
+                [],
+                runtime_cls=lambda: runtime.Runtime(working_set=working_set)
+            )
+
+        self.assertNotIn(
+            "Unable to locate the 'npm' binary", sys.stderr.getvalue())
+
+        sys.modules.pop('calmjs.npm', None)
+        with self.assertRaises(SystemExit):
+            runtime.main(
+                ['-qqqq'],
+                runtime_cls=lambda: runtime.Runtime(working_set=working_set)
+            )
+
+        self.assertNotIn(
+            "Unable to locate the 'npm' binary", sys.stderr.getvalue())
+
+        sys.modules.pop('calmjs.npm', None)
+        with self.assertRaises(SystemExit):
+            runtime.main(
+                ['-v'],
+                runtime_cls=lambda: runtime.Runtime(working_set=working_set)
+            )
+
+        self.assertIn(
+            "Unable to locate the 'npm' binary", sys.stderr.getvalue())
 
     def test_runtime_group_not_runtime_reported(self):
         stub_stdouts(self)

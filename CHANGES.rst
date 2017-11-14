@@ -5,6 +5,10 @@ Changelog
 ------------------
 
 - The ``yarn`` subcommand is now provided as an alternative to ``npm``.
+- Also decreased the log verbosity during the bootstrap runtime stage,
+  so that for systems that don't have the required binaries available,
+  the default ``calmjs`` command won't show those pile of warnings for
+  that (increasing verbosity with ``-v`` will restore those warnings).
 - Some confusing internal (but public) identifiers which are used in the
   Toolchain and Spec system have been renamed to better reflect their
   intended use and purpose.  Deprecation code is applied to aid
