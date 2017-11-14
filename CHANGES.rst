@@ -36,6 +36,11 @@ Changelog
 - Removed most of the ``vlqsm`` module as the functionality is now
   provided by ``calmjs.parse.vlq`` and ``calmjs.parse.sourcemap``.  Only
   the legacy ``SourceWriter`` class remain, which is deprecated.
+- Provide generic first class support for loader plugins, such that
+  downstream packages should no longer need to explicitly declare
+  ``extras_calmjs`` to specify the location of loaders for all the
+  different toolchains (which inevitably collide and cause conflicts).
+  Toolchains downstream will need to implement support for this.
 
 2.1.0 (2016-11-29)
 ------------------
