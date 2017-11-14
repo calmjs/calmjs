@@ -25,21 +25,22 @@ modname
     have.  The Python analogue is the name of a given import module.
     Using the default mapper, one might map a Python module with the
     name ``calmjs.toolchain`` to ``calmjs/toolchain``.  While relative
-    modpaths are supported by most JavaScript/Node.js based import
-    systems, its usage from within calmjs framework is discouraged.
+    modpaths (i.e. identifiers beginning with './') are supported by
+    most JavaScript/Node.js based import systems, its usage from within
+    calmjs framework is discouraged.
 
 sourcepath
     An absolute path on the local filesystem to the source file for a
     given modpath.  These two values (modpath and sourcepath) serves as
     the foundational mapping from a JavaScript module name to its
     corresponding source file.  Previously, this was simply named
-    'source'.
+    'source', so certain arguments remain named like so.
 
 targetpath
-    A relative path to a build_dir.  The relative path MUST not contain
-    relative references.  A mapping from modpath to targetpath is
-    generated from a modpath to sourcepath mapping, where the source
-    file has been somehow transformed into the target at targetpath.
+    A relative path to a build directory (build_dir) serving as the
+    write target for whatever proccessing done by the toolchain
+    implementation to the file provided at the associated sourcepath.
+
     The relative path version (again, from build_dir) is typically
     recorded by instances of ``Spec`` objects that have undergone a
     ``Toolchain`` run.  Previously, this was simply named 'target'.
@@ -49,7 +50,8 @@ modpath
     that this is the transformed value that is to be better understood
     by the underlying tools.  Think of this as the post compiled value,
     or an alternative import location that is only applicable in the
-    post-compiled context.
+    post-compiled context, specific to the toolchain class that it
+    intends to encapsulate.
 """
 
 from __future__ import absolute_import
@@ -62,6 +64,7 @@ import re
 import shutil
 import sys
 import warnings
+from collections import namedtuple
 from functools import partial
 from inspect import currentframe
 from traceback import format_stack
@@ -87,6 +90,8 @@ from calmjs.parse.sourcemap import encode_sourcemap
 
 from calmjs.base import BaseDriver
 from calmjs.base import BaseRegistry
+from calmjs.base import BaseLoaderPluginRegistry
+from calmjs.registry import get as get_registry
 from calmjs.exc import AdviceAbort
 from calmjs.exc import AdviceCancel
 from calmjs.exc import ValueSkip
@@ -100,6 +105,15 @@ logger = logging.getLogger(__name__)
 __all__ = [
     'AdviceRegistry', 'Spec', 'Toolchain', 'null_transpiler',
 
+    'dict_setget', 'dict_setget_dict', 'dict_update_overwrite_check',
+
+    'spec_update_loaderplugin_registry',
+    'spec_update_sourcepath_filter_loaderplugins',
+
+    'toolchain_spec_prepare_loaderplugins',
+
+    'toolchain_spec_compile_entries', 'ToolchainSpecCompileEntry',
+
     'CALMJS_TOOLCHAIN_ADVICE',
 
     'SETUP', 'CLEANUP', 'SUCCESS',
@@ -109,7 +123,10 @@ __all__ = [
     'AFTER_PREPARE', 'BEFORE_PREPARE', 'AFTER_TEST', 'BEFORE_TEST',
 
     'ADVICE_PACKAGES', 'ARTIFACT_PATHS', 'BUILD_DIR',
-    'CALMJS_MODULE_REGISTRY_NAMES', 'CALMJS_TEST_REGISTRY_NAMES',
+    'CALMJS_MODULE_REGISTRY_NAMES',
+    'CALMJS_LOADERPLUGIN_REGISTRY_NAME',
+    'CALMJS_LOADERPLUGIN_REGISTRY',
+    'CALMJS_TEST_REGISTRY_NAMES',
     'CONFIG_JS_FILES', 'DEBUG',
     'EXPORT_MODULE_NAMES', 'EXPORT_PACKAGE_NAMES',
     'EXPORT_TARGET', 'EXPORT_TARGET_OVERWRITE',
@@ -150,6 +167,9 @@ BUILD_DIR = 'build_dir'
 # source registries that have been used
 CALMJS_MODULE_REGISTRY_NAMES = 'calmjs_module_registry_names'
 CALMJS_TEST_REGISTRY_NAMES = 'calmjs_test_registry_names'
+# loaderplugin registry related.
+CALMJS_LOADERPLUGIN_REGISTRY_NAME = 'calmjs_loaderplugin_registry_name'
+CALMJS_LOADERPLUGIN_REGISTRY = 'calmjs_loaderplugin_registry'
 # configuration file for enabling execution of code in build directory
 CONFIG_JS_FILES = 'config_js_files'
 # for debug level
@@ -164,6 +184,10 @@ EXPORT_PACKAGE_NAMES = 'export_package_names'
 EXPORT_TARGET = 'export_target'
 # specify that export target is safe to be overwritten.
 EXPORT_TARGET_OVERWRITE = 'export_target_overwrite'
+# for loaderplugin sourcepath dicts, where the maps are grouped by the
+# name of the plugin; an intermediate step for processing of loader
+# plugins
+LOADERPLUGIN_SOURCEPATH_MAPS = 'loaderplugin_sourcepath_maps'
 # if true, generate source map
 GENERATE_SOURCE_MAP = 'generate_source_map'
 # source module names; currently not supported by any part of the
@@ -176,7 +200,7 @@ SOURCE_PACKAGE_NAMES = 'source_package_names'
 # for testing
 # name of test modules
 TEST_MODULE_NAMES = 'test_module_names'
-# mapping of test module to their paths; i.e. sourcepath_dict, but not
+# mapping of test module to their paths; i.e. sourcepath_map, but not
 # labled as one to prevent naming conflicts (and they ARE to be
 # standalone modules to be used directly by the toolchain and testing
 # integration layer.
@@ -212,59 +236,304 @@ def _deprecation_warning(msg):
     logger.warning(msg)
 
 
-def dict_get(d, key):
-    value = d[key] = d.get(key, {})
+def dict_setget(d, key, value):
+    value = d[key] = d.get(key, value)
     return value
 
 
-def dict_key_update_overwrite_check(d, key, mapping, consequence=None):
+def dict_setget_dict(d, key):
+    return dict_setget(d, key, {})
+
+
+def dict_update_overwrite_check(base, fresh):
     """
-    For updating a dict with another whose keys should not already be
-    present.
+    For updating a base dict with a fresh one, returning a list of
+    3-tuples containing the key, previous value (base[key]) and the
+    fresh value (fresh[key]) for all colliding changes (reassignment of
+    identical values are omitted).
     """
 
-    msg = ("configuration may be in an invalid state."
-           if consequence is None else consequence)
-
-    keys = set(d[key].keys()) & set(mapping.keys())
-    for subkey in keys:
-        if d[key][subkey] != mapping[subkey]:
-            logger.warning(
-                "%s['%s'] is being rewritten from '%s' to '%s'; %s",
-                key, subkey, d[key][subkey], mapping[subkey], msg,
-            )
-
-    # complaints are over, finish the job.
-    d[key].update(mapping)
+    result = [
+        (key, base[key], fresh[key])
+        for key in set(base.keys()) & set(fresh.keys())
+        if base[key] != fresh[key]
+    ]
+    base.update(fresh)
+    return result
 
 
-def spec_update_plugins_sourcepath_dict(
-        spec, sourcepath_dict, sourcepath_dict_key,
-        plugins_sourcepath_dict_key):
+# Spec functions for interfacing with loaderplugins
+#
+# The following functions (named in the format spec_*_loaderplugin_*)
+# are helpers for extracting and filtering the mappings for interfacing
+# with the loaderplugin helpers through the registry system.  These
+# helpers are here as they are part of the toolchain, not as part of the
+# loaderplugin module due to that module being the part that couples
+# tightly with npm.
+
+def spec_update_loaderplugin_registry(spec, default=None):
+    """
+    Resolve a BasePluginLoaderRegistry instance from spec, and update
+    spec[CALMJS_LOADERPLUGIN_REGISTRY] with that value before returning
+    it.
+    """
+
+    registry = spec.get(CALMJS_LOADERPLUGIN_REGISTRY)
+    if isinstance(registry, BaseLoaderPluginRegistry):
+        logger.debug(
+            "loaderplugin registry '%s' already assigned to spec",
+            registry.registry_name)
+        return registry
+    elif not registry:
+        # resolving registry
+        registry = get_registry(spec.get(CALMJS_LOADERPLUGIN_REGISTRY_NAME))
+        if isinstance(registry, BaseLoaderPluginRegistry):
+            logger.info(
+                "using loaderplugin registry '%s'", registry.registry_name)
+            spec[CALMJS_LOADERPLUGIN_REGISTRY] = registry
+            return registry
+
+    # acquire the real default instance, if possible.
+    if not isinstance(default, BaseLoaderPluginRegistry):
+        default = get_registry(default)
+        if not isinstance(default, BaseLoaderPluginRegistry):
+            logger.info(
+                "provided default is not a valid loaderplugin registry")
+            default = None
+
+    if default is None:
+        default = BaseLoaderPluginRegistry('<default_loaderplugins>')
+
+    # TODO determine the best way to optionally warn about this for
+    # toolchains that require this.
+    if registry:
+        logger.info(
+            "object referenced in spec is not a valid loaderplugin registry; "
+            "using default loaderplugin registry '%s'", default.registry_name)
+    else:
+        logger.info(
+            "no loaderplugin registry referenced in spec; "
+            "using default loaderplugin registry '%s'", default.registry_name)
+    spec[CALMJS_LOADERPLUGIN_REGISTRY] = registry = default
+
+    return registry
+
+
+def spec_update_sourcepath_filter_loaderplugins(
+        spec, sourcepath_map, sourcepath_map_key,
+        loaderplugin_sourcepath_map_key=LOADERPLUGIN_SOURCEPATH_MAPS):
     """
     Take an existing spec and a sourcepath mapping (that could be
     produced via calmjs.dist.*_module_registry_dependencies functions)
-    and apply it to a dict in the spec under the key sourcepath_dict_key
-    in the spec, with any chunks that define a loader plugin be split
-    off to the one under the plugins_sourcepath_dict_key.
+    and split out the keys that does not contain loaderplugin syntax and
+    assign it to the spec under sourcepath_key.
 
-    Note that sourcepath was formerly typicaly written as source_map,
-    which is rather confusing when it is also the name for the VLQ
-    encoded mapping of transpiled file back to its original.
+    For the parts with loader plugin syntax (i.e. modnames (keys) that
+    contain a '!' character), they are instead stored under a different
+    mapping under its own mapping identified by the plugin_name.  The
+    mapping under loaderplugin_sourcepath_map_key will contain all
+    mappings of this type.
+
+    The resolution for the handlers will be done through the loader
+    plugin registry provided via spec[CALMJS_LOADERPLUGIN_REGISTRY] if
+    available, otherwise the registry instance will be acquired through
+    the main registry using spec[CALMJS_LOADERPLUGIN_REGISTRY_NAME].
+
+    For the example sourcepath_map input:
+
+    sourcepath = {
+        'module': 'something',
+        'plugin!inner': 'inner',
+        'plugin!other': 'other',
+        'plugin?query!question': 'question',
+        'plugin!plugin2!target': 'target',
+    }
+
+    The following will be stored under the following keys in spec:
+
+    spec[sourcepath_key] = {
+        'module': 'something',
+    }
+
+    spec[loaderplugin_sourcepath_map_key] = {
+        'plugin': {
+            'plugin!inner': 'inner',
+            'plugin!other': 'other',
+            'plugin?query!question': 'question',
+            'plugin!plugin2!target': 'target',
+        },
+    }
+
+    The goal of this function is to aid in processing each of the plugin
+    types by batch, one level at a time.  It is up to the handler itself
+    to trigger further lookups as there are implementations of loader
+    plugins that do not respect the chaining mechanism, thus a generic
+    lookup done at once may not be suitable.
+
+    Note that nested/chained loaderplugins are not immediately grouped
+    as they must be individually handled given that the internal syntax
+    are generally proprietary to the outer plugin.  The handling will be
+    dealt with at the Toolchain.compile_loaderplugin_entry method
+    through the associated handler call method.
+
+    Toolchain implementations may either invoke this directly as part
+    of the prepare step on the required sourcepaths values stored in the
+    spec, or implement this at a higher level before invocating the
+    toolchain instance with the spec.
     """
 
-    default = dict_get(spec, sourcepath_dict_key)
-    for modname, sourcepath in sourcepath_dict.items():
+    default = dict_setget_dict(spec, sourcepath_map_key)
+    registry = spec_update_loaderplugin_registry(spec)
+
+    # it is more loaderplugin_sourcepath_maps
+    plugins = dict_setget_dict(spec, loaderplugin_sourcepath_map_key)
+
+    for modname, sourcepath in sourcepath_map.items():
         parts = modname.split('!', 1)
         if len(parts) == 1:
             # default
             default[modname] = sourcepath
             continue
 
-        plugin_name, arguments = parts
-        plugins = dict_get(spec, plugins_sourcepath_dict_key)
-        plugin = dict_get(plugins, plugin_name)
+        # don't actually do any processing yet.
+        plugin_name = registry.to_plugin_name(modname)
+        plugin = dict_setget_dict(plugins, plugin_name)
         plugin[modname] = sourcepath
+
+
+def toolchain_spec_prepare_loaderplugins(
+        toolchain, spec,
+        loaderplugin_read_key,
+        handler_sourcepath_key,
+        loaderplugin_sourcepath_map_key=LOADERPLUGIN_SOURCEPATH_MAPS):
+    """
+    A standard helper function for combining the filtered (e.g. using
+    ``spec_update_sourcepath_filter_loaderplugins``) loaderplugin
+    sourcepath mappings back into one that is usable with the standard
+    ``toolchain_spec_compile_entries`` function.
+
+    Arguments:
+
+    toolchain
+        The toolchain
+    spec
+        The spec
+
+    loaderplugin_read_key
+        The read_key associated with the loaderplugin process as set up
+        for the Toolchain that implemented this.  If the toolchain has
+        this in its compile_entries:
+
+            ToolchainSpecCompileEntry('loaderplugin', 'plugsrc', 'plugsink')
+
+        The loaderplugin_read_key it must use will be 'plugsrc'.
+
+    handler_sourcepath_key
+        All found handlers will have their handler_sourcepath method be
+        invoked, and the combined results will be a dict stored in the
+        spec under that key.
+
+    loaderplugin_sourcepath_map_key
+        It must be the same key to the value produced by
+        ``spec_update_sourcepath_filter_loaderplugins``
+    """
+
+    # ensure the registry is applied to the spec
+    registry = spec_update_loaderplugin_registry(
+        spec, default=toolchain.loaderplugin_registry)
+
+    # this one is named like so for the compile entry method
+    plugin_sourcepath = dict_setget_dict(
+        spec, loaderplugin_read_key + '_sourcepath')
+    # the key is supplied by the toolchain that might make use of this
+    if handler_sourcepath_key:
+        handler_sourcepath = dict_setget_dict(spec, handler_sourcepath_key)
+    else:
+        # provide a null value for this.
+        handler_sourcepath = {}
+
+    for key, value in spec.get(loaderplugin_sourcepath_map_key, {}).items():
+        handler = registry.get(key)
+        if handler:
+            # assume handler will do the job.
+            logger.debug("found handler for '%s' loader plugin", key)
+            plugin_sourcepath.update(value)
+            logger.debug(
+                "plugin_sourcepath updated with %d keys", len(value))
+            # TODO figure out how to address the case where the actual
+            # JavaScript module for the handling wasn't found.
+            handler_sourcepath.update(
+                handler.generate_handler_sourcepath(toolchain, spec, value))
+        else:
+            logger.warning(
+                "loaderplugin handler for '%s' not found in loaderplugin "
+                "registry '%s'; as arguments associated with loader plugins "
+                "are specific, processing is disabled for this group; the "
+                "sources referenced by the following names will not be "
+                "compiled into the build target: %s",
+                key, registry.registry_name, sorted(value.keys()),
+            )
+
+
+def toolchain_spec_compile_entries(
+        toolchain, spec, entries, process_name, overwrite_log=None):
+    """
+    The standardized Toolchain Spec Entries compile function
+
+    This function accepts a toolchain instance, the spec to be operated
+    with and the entries provided for the process name.  The standard
+    flow is to deferr the actual processing to the toolchain method
+    `compile_{process_name}_entry` for each entry in the entries list.
+
+    The generic compile entries method for the compile process.
+
+    Arguments:
+
+    toolchain
+        The toolchain to be used for the operation.
+    spec
+        The spec to be operated with.
+    entries
+        The entries for the source.
+    process_name
+        The name of the specific compile process of the provided
+        toolchain.
+    overwrite_log
+        A callable that will accept a 4-tuple of suffix, key, original
+        and new value, if monitoring of overwritten values are required.
+        suffix is derived from the modpath_suffix or targetpath_suffix
+        of the toolchain instance, key is the key on any of the keys on
+        either of those mappings, original and new are the original and
+        the replacement value.
+    """
+
+    # Contains a mapping of the module name to the compiled file's
+    # relative path starting from the base build_dir.
+    all_modpaths = {}
+    all_targets = {}
+    # List of exported module names, should be equal to all keys of
+    # the compiled and bundled sources.
+    all_export_module_names = []
+    process = getattr(toolchain, 'compile_%s_entry' % process_name)
+
+    for entry in entries:
+        modpaths, targets, export_module_names = process(spec, entry)
+        if callable(overwrite_log):
+            for dupes in dict_update_overwrite_check(all_modpaths, modpaths):
+                overwrite_log(toolchain.modpath_suffix, *dupes)
+            for dupes in dict_update_overwrite_check(all_targets, targets):
+                overwrite_log(toolchain.targetpath_suffix, *dupes)
+        else:
+            all_modpaths.update(modpaths)
+            all_targets.update(targets)
+        all_export_module_names.extend(export_module_names)
+
+    return all_modpaths, all_targets, all_export_module_names
+
+
+ToolchainSpecCompileEntry = namedtuple('ToolchainSpecCompileEntry', [
+    'process_name', 'read_key', 'store_key', 'logger', 'log_level'])
+ToolchainSpecCompileEntry.__new__.__defaults__ = (None, None)
 
 
 def null_transpiler(spec, reader, writer):
@@ -613,6 +882,10 @@ class Toolchain(BaseDriver):
         from.
     """
 
+    # subclasses may assign an identifier or instance of a compatible
+    # loaderplugin registry for use with the encapsulated framework.
+    loaderplugin_registry = None
+
     def __init__(self, *a, **kw):
         """
         Refer to parent for exact arguments.
@@ -732,12 +1005,14 @@ class Toolchain(BaseDriver):
 
         return (
             # compile_*, *_sourcepath, (*_modpaths, *_targetpaths)
-            ('transpile', 'transpile', 'transpiled'),
-            ('bundle', 'bundle', 'bundled'),
+            ToolchainSpecCompileEntry('transpile', 'transpile', 'transpiled'),
+            ToolchainSpecCompileEntry('bundle', 'bundle', 'bundled'),
         )
 
-    # Default built-in methods referenced by build_compile_entries;
-    # these are for the transpile and bundle processes.
+    # Default built-in methods referenced by methods that will be
+    # executed, as constructed by build_compile_entries.
+
+    # Following are used for the transpile and bundle compile processes.
 
     def _validate_build_target(self, spec, target):
         """
@@ -747,8 +1022,9 @@ class Toolchain(BaseDriver):
         if not realpath(target).startswith(spec[BUILD_DIR]):
             raise ValueError('build_target %s is outside build_dir' % target)
 
-    # note that nearly instances of source means sourcepath, and that
-    # target means targetpath
+    # note that in the following methods, a shorthand notation is used
+    # for some of the arguments: nearly all occurrences of source means
+    # sourcepath, and target means targetpath.
 
     def _generate_transpile_target(self, spec, target):
         bd_target = join(spec[BUILD_DIR], target)
@@ -761,7 +1037,9 @@ class Toolchain(BaseDriver):
 
     def transpile_modname_source_target(self, spec, modname, source, target):
         """
-        The function that gets called by
+        The function that gets called by compile_transpile_entry for
+        processing the provided JavaScript source file provided by some
+        Python package through the transpiler instance.
         """
 
         if not isinstance(self.transpiler, BaseUnparser):
@@ -823,57 +1101,63 @@ class Toolchain(BaseDriver):
                 _writer.write(source_map_url)
                 _writer.write('\n')
 
-    def compile_transpile(self, spec, entries):
+    def compile_transpile_entry(self, spec, entry):
         """
-        The transpile method for the compile process.  This invokes the
-        transpiler that was set up to transpile the input files into the
+        Handler for each entry for the transpile method of the compile
+        process.  This invokes the transpiler that was set up to
+        transpile the input files into the build directory.
+        """
+
+        modname, source, target, modpath = entry
+        transpiled_modpath = {modname: modpath}
+        transpiled_target = {modname: target}
+        export_module_name = [modname]
+        self.transpile_modname_source_target(spec, modname, source, target)
+        return transpiled_modpath, transpiled_target, export_module_name
+
+    def compile_bundle_entry(self, spec, entry):
+        """
+        Handler for each entry for the bundle method of the compile
+        process.  This copies the source file or directory into the
         build directory.
         """
 
-        # Contains a mapping of the module name to the compiled file's
-        # relative path starting from the base build_dir.
-        transpiled_modpaths = {}
-        transpiled_targets = {}
-        # List of exported module names, should be equal to all keys of
-        # the compiled and bundled sources.
-        export_module_names = []
+        modname, source, target, modpath = entry
+        bundled_modpath = {modname: modpath}
+        bundled_target = {modname: target}
+        export_module_name = []
+        if isfile(source):
+            export_module_name.append(modname)
+            copy_target = join(spec[BUILD_DIR], target)
+            if not exists(dirname(copy_target)):
+                makedirs(dirname(copy_target))
+            shutil.copy(source, copy_target)
+        elif isdir(source):
+            copy_target = join(spec[BUILD_DIR], modname)
+            shutil.copytree(source, copy_target)
 
-        for modname, source, target, modpath in entries:
-            transpiled_modpaths[modname] = modpath
-            transpiled_targets[modname] = target
-            export_module_names.append(modname)
-            self.transpile_modname_source_target(spec, modname, source, target)
+        return bundled_modpath, bundled_target, export_module_name
 
-        return transpiled_modpaths, transpiled_targets, export_module_names
-
-    def compile_bundle(self, spec, entries):
+    def compile_loaderplugin_entry(self, spec, entry):
         """
-        The transpile method for the bundle process.  This copies the
-        source file or directory into the build directory.
+        Generic loader plugin entry handler.
+
+        The default implementation assumes that everything up to the
+        first '!' symbol resolves to some known loader plugin within
+        the registry.
+
+        The registry instance responsible for the resolution of the
+        loader plugin handlers must be available in the spec under
+        CALMJS_LOADERPLUGIN_REGISTRY
         """
 
-        # Contains a mapping of the bundled name to the bundled file's
-        # relative path starting from the base build_dir.
-        bundled_modpaths = {}
-        bundled_targets = {}
-        # List of exported module names, should be equal to all keys of
-        # the compiled and bundled sources.
-        export_module_names = []
-
-        for modname, source, target, modpath in entries:
-            bundled_modpaths[modname] = modpath
-            bundled_targets[modname] = target
-            if isfile(source):
-                export_module_names.append(modname)
-                copy_target = join(spec[BUILD_DIR], target)
-                if not exists(dirname(copy_target)):
-                    makedirs(dirname(copy_target))
-                shutil.copy(source, copy_target)
-            elif isdir(source):
-                copy_target = join(spec[BUILD_DIR], modname)
-                shutil.copytree(source, copy_target)
-
-        return bundled_modpaths, bundled_targets, export_module_names
+        modname, source, target, modpath = entry
+        handler = spec[CALMJS_LOADERPLUGIN_REGISTRY].get(modname)
+        if handler:
+            return handler(self, spec, modname, source, target, modpath)
+        logger.warning(
+            "no loaderplugin handler found for plugin entry '%s'", modname)
+        return {}, {}, []
 
     # The naming methods, which are needed by certain toolchains that
     # need to generate specific names to maintain compatibility.  The
@@ -881,8 +1165,12 @@ class Toolchain(BaseDriver):
     # defined name handling ruleset for a given implementation of a
     # toolchain, but for toolchains that have its own custom naming
     # schemes per whatever value combination, further handling can be
-    # done within each of the compile_* methods that are registered for
-    # use for that particular toolchain.
+    # done within each of the compile_* and/or compile_*_entry methods
+    # that are enabled or registered for use for that particular
+    # toolchain implementation.
+
+    # Also note that 'source' and 'target' refer to 'sourcepath' and
+    # 'targetpath' respectively in argument and method names.
 
     def modname_source_to_modname(self, spec, modname, source):
         """
@@ -914,8 +1202,21 @@ class Toolchain(BaseDriver):
         assigned to this instance (setup by setup_filename_suffix), iff
         the provided source also end with this filename suffix.
 
+        However, certain tools have issues dealing with loader plugin
+        syntaxes showing up on the filesystem (and certain filesystems
+        definitely do not like some of the characters), so the usage of
+        the loaderplugin registry assigned to the spec may be used for
+        lookup if available.
+
         Called by generator method `_gen_modname_source_target_modpath`.
         """
+
+        loaderplugin_registry = spec.get(CALMJS_LOADERPLUGIN_REGISTRY)
+        if '!' in modname and loaderplugin_registry:
+            handler = loaderplugin_registry.get(modname)
+            if handler:
+                return handler.modname_source_to_target(
+                    self, spec, modname, source)
 
         if (source.endswith(self.filename_suffix) and
                 not modname.endswith(self.filename_suffix)):
@@ -936,6 +1237,8 @@ class Toolchain(BaseDriver):
         The modname and source argument provided to aid pedantic tools,
         but really though this provides more consistency to method
         signatures.
+
+        Called by generator method `_gen_modname_source_target_modpath`.
         """
 
         return modname
@@ -970,17 +1273,24 @@ class Toolchain(BaseDriver):
         Private generator that will consume those above functions.  This
         should NOT be overridden.
 
-        Produces the following 4-tuple on iteration with the input dict
+        Produces the following 4-tuple on iteration with the input dict;
+        the definition is written at the module level documention for
+        calmjs.toolchain, but in brief:
 
         modname
-            CommonJS require/import module name.
+            The JavaScript module name.
         source
-            path to JavaScript source file from a Python package.
+            Stands for sourcepath - path to some JavaScript source file.
         target
-            the target write path relative to build_dir
+            Stands for targetpath - the target path relative to
+            spec[BUILD_DIR] where the source file will be written to
+            using the method that genearted this entry.
         modpath
-            the module path that is compatible with tool referencing
-            the target
+            The module path that is compatible with tool referencing
+            the target.  While this is typically identical with modname,
+            some tools require certain modifications or markers in
+            additional to what is presented (e.g. such as the addition
+            of a '?' symbol to ensure absolute lookup).
         """
 
         for modname_source in d.items():
@@ -1041,21 +1351,7 @@ class Toolchain(BaseDriver):
                 "(got %r instead)" % (EXPORT_MODULE_NAMES, export_module_names)
             )
 
-        for entry in self.compile_entries:
-            m, read_key, store_key = entry
-            if callable(m):
-                method_name = m.__name__
-                method = m
-            else:
-                method_name = self.compile_prefix + m
-                method = getattr(self, method_name, None)
-                if not callable(method):
-                    logger.error(
-                        "'%s' not a callable attribute for %r from "
-                        "compile_entries entry %r; skipping", m, self, entry
-                    )
-                    continue
-
+        def compile_entry(method, read_key, store_key):
             spec_read_key = read_key + self.sourcepath_suffix
             spec_modpath_key = store_key + self.modpath_suffix
             spec_target_key = store_key + self.targetpath_suffix
@@ -1064,7 +1360,7 @@ class Toolchain(BaseDriver):
                 logger.error(
                     "aborting compile step %r due to existing key", entry,
                 )
-                continue
+                return
 
             sourcepath_dict = spec.get(spec_read_key, {})
             entries = self._gen_modname_source_target_modpath(
@@ -1082,6 +1378,37 @@ class Toolchain(BaseDriver):
                 len(new_module_names),
             )
             export_module_names.extend(new_module_names)
+
+        for entry in self.compile_entries:
+            if isinstance(entry, ToolchainSpecCompileEntry):
+                log = partial(
+                    logging.getLogger(entry.logger).log,
+                    entry.log_level,
+                    (
+                        entry.store_key + "%s['%s'] is being rewritten from "
+                        "'%s' to '%s'; configuration may now be invalid"
+                    ),
+                ) if entry.logger else None
+                compile_entry(partial(
+                    toolchain_spec_compile_entries, self,
+                    process_name=entry.process_name,
+                    overwrite_log=log,
+                ), entry.read_key, entry.store_key)
+                continue
+
+            m, read_key, store_key = entry
+            if callable(m):
+                method = m
+            else:
+                method = getattr(self, self.compile_prefix + m, None)
+                if not callable(method):
+                    logger.error(
+                        "'%s' not a callable attribute for %r from "
+                        "compile_entries entry %r; skipping", m, self, entry
+                    )
+                    continue
+
+            compile_entry(method, read_key, store_key)
 
     def assemble(self, spec):
         """
@@ -1231,8 +1558,8 @@ class ES5Toolchain(Toolchain):
     around, using the es5 Unparser, pretty printer version.
     """
 
-    def __init__(self):
-        super(ES5Toolchain, self).__init__()
+    def __init__(self, *a, **kw):
+        super(ES5Toolchain, self).__init__(*a, **kw)
 
     def setup_transpiler(self):
         self.transpiler = pretty_printer()

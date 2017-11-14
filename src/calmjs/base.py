@@ -92,7 +92,45 @@ class BaseRegistry(object):
 
     def _init(self, *a, **kw):
         """
-        Subclasses can override this for setting up its single instance.
+        Subclasses can completely override this for its instantiation,
+        or it can override this by having its subclass override
+        _init_entry_point and then have this method call
+
+            self._init_entry_points(self.raw_entry_points)
+
+        to initialize all entry points during instantiation.
+        """
+
+    def _init_entry_points(self, entry_points):
+        """
+        Default initialization loop.
+        """
+
+        logger.debug(
+            "registering %d entry points for registry '%s'",
+            len(entry_points), self.registry_name,
+        )
+        for entry_point in entry_points:
+            try:
+                logger.debug(
+                    "registering entry point '%s' from '%s'",
+                    entry_point, entry_point.dist,
+                )
+                self._init_entry_point(entry_point)
+            except ImportError:
+                logger.warning(
+                    'ImportError: %s not found; skipping registration',
+                    entry_point.module_name)
+            except Exception:
+                logger.exception(
+                    "registration of entry point '%s' from '%s' to registry "
+                    "'%s' failed with the following exception",
+                    entry_point, entry_point.dist, self.registry_name,
+                )
+
+    def _init_entry_point(self, entry_point):
+        """
+        Default does nothing.
         """
 
     def get_record(self, name):
@@ -128,14 +166,10 @@ class BasePkgRefRegistry(BaseRegistry):
             this registry instance.
         """
 
-        for entry_point in entry_points:
-            try:
-                self.register_entry_point(entry_point)
-            except ImportError:
-                logger.warning(
-                    'ImportError: %s not found; skipping registration',
-                    entry_point.module_name)
-                continue
+        return self._init_entry_points(entry_points)
+
+    def _init_entry_point(self, entry_point):
+        return self.register_entry_point(entry_point)
 
     def register_entry_point(self, entry_point):
         raise NotImplementedError
@@ -605,3 +639,171 @@ class BaseDriver(object):
         if path:
             return join(cwd, path)
         return cwd
+
+
+class BaseLoaderPluginRegistry(BaseRegistry):
+
+    def _init_entry_point(self, entry_point):
+        try:
+            cls = entry_point.load()
+        except ImportError:
+            logger.warning(
+                "registry '%s' failed to load loader plugin handler for "
+                "entry point '%s'", self.registry_name, entry_point,
+            )
+            return
+
+        if not issubclass(cls, BaseLoaderPluginHandler):
+            logger.warning(
+                "entry point '%s' does not lead to a valid loader plugin "
+                "handler class", entry_point
+            )
+            return
+
+        inst = cls(self, entry_point.name)
+
+        if entry_point.name in self.records:
+            old = type(self.records[entry_point.name])
+            logger.warning(
+                "loader plugin handler for '%s' was already registered to "
+                "an instance of '%s:%s'; '%s' will now override this "
+                "registration",
+                entry_point.name, old.__module__, old.__name__, entry_point
+            )
+        self.records[entry_point.name] = inst
+
+    def to_plugin_name(self, value):
+        """
+        Find the plugin name from the provided value
+        """
+
+        return value.split('!', 1)[0].split('?', 1)[0]
+
+    def get_record(self, name):
+        # it is possible for subclasses to provide a fallback lookup on
+        # "common" registries through the registry framework, e.g.
+        # calmjs.registry.get('some.plugin.reg').get_record(name)
+        return self.records.get(self.to_plugin_name(name))
+
+
+class BaseLoaderPluginHandler(object):
+    """
+    The base loaderplugin handler class provides only the stub methods;
+    for a more concrete implementation, refer to the loaderplugin module
+    for the subclass.
+    """
+
+    def __init__(self, registry, name=None):
+        """
+        The LoaderPluginRegistry will try to construct the instance and
+        pass itself into the constructor; leaving this as the default
+        will enable specific plugins to load further plugins should the
+        input modname has more loader plugin strings.
+        """
+
+        self.registry = registry
+        self.name = name
+
+    def modname_source_to_target(
+            self, toolchain, spec, modname, source):
+        """
+        This is called by the Toolchain for modnames that contain a '!'
+        as that signifies a loaderplugin syntax.  This will be used by
+        the toolchain (which will also be supplied as the first argument)
+        to resolve the copy target, which must be a path relative to the
+        spec[WORKING_DIR].
+
+        If the provided modname points contains a chain of loaders, the
+        registry associated with this handler instance will be used to
+        resolve the subsequent handlers until none are found, which that
+        handler will be used to return this result.
+        """
+
+        stripped_modname = self.unwrap(modname)
+        chained = (
+            self.registry.get_record(stripped_modname)
+            if '!' in stripped_modname else None)
+        if chained:
+            # ensure the stripped_modname is provided as by default the
+            # handler will only deal with its own kind
+            return chained.modname_source_to_target(
+                toolchain, spec, stripped_modname, source)
+        return stripped_modname
+
+    def generate_handler_sourcepath(
+            self, toolchain, spec, loaderplugin_sourcepath):
+        """
+        This returns the sourcepath (mapping) that may be added to the
+        appropriate mapping within the spec for a successful toolchain
+        execution.  The value generated is specific to the current
+        spec that is being passed through the toolchain.
+
+        The return value must be a modname: sourcepath mapping, e.g:
+
+        return {
+            'text': '/tmp/src/example_module/text/index.js',
+            'json': '/tmp/src/example_module/json/index.js',
+        }
+
+        Subclasses must implement this to return a mapping of modnames
+        the the absolute path of the desired sourcefiles.  Example:
+
+        Implementation must also accept both the toolchain and the spec
+        argument, along with the loaderplugin_sourcepath argument which
+        will be a mapping of {modname: sourcepath} that are relevant to
+        the current spec being processed through the toolchain.
+
+        For nested/chained plugins, the recommended handling method is
+        to make use of the assigned registry instance to lookup relevant
+        loaderplugin handler(s) instances, and make use of their
+        ``generate_handler_sourcepath`` method to generate the mapping
+        required.  The immediate subclass in the loaderplugin module
+        has a generic implementation done in this manner.
+        """
+
+        return {}
+
+    def unwrap(self, value):
+        """
+        A helper method for unwrapping the loaderplugin fragment out of
+        the provided value (typically a modname) and return it.
+
+        Note that the filter chaining is very implementation specific to
+        each and every loader plugin and their specific toolchain, so
+        this default implementation is not going to attempt to consume
+        everything in one go.
+        """
+
+        globs = value.split('!', 1)
+        if globs[0].split('?', 1)[0] == self.name:
+            return globs[-1]
+        else:
+            return value
+
+    def __call__(self, toolchain, spec, modname, source, target, modpath):
+        """
+        These need to provide the actual implementation required for the
+        production of the final artifact, so this will need to locate
+        the resources needed for this set of arguments to function.
+
+        Implementations must return the associated modpaths, targets, and
+        the export_module_name as a 3-tuple, after the copying or
+        transpilation step was done.  Example:
+
+        return (
+            {'text!text_file.txt': 'text!/some/path/text_file.txt'},
+            {'text_file.txt': 'text_file.txt'},
+            ['text!text_file.txt'],
+        )
+
+        Note that implementations can trigger further lookups through
+        the registry instance attached to this instance of the plugin,
+        and implementations must also address the handling of this
+        lookup and usage of the return values.
+
+        Also note that while the toolchain and spec arguments are also
+        provided, they should only be used for lookups; out of band
+        modifications results in convoluted code flow.
+        """
+
+        raise NotImplementedError

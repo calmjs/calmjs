@@ -676,6 +676,7 @@ class SourcePackageToolchainRuntimeTestCase(unittest.TestCase):
         tc = toolchain.NullToolchain()
         rt = runtime.SourcePackageToolchainRuntime(tc)
         text = rt.argparser.format_help()
+        self.assertNotIn("--loaderplugin-registry", text)
         self.assertIn("--source-registry", text)
         self.assertTrue(isinstance(rt.create_spec(), toolchain.Spec))
 
@@ -689,6 +690,65 @@ class SourcePackageToolchainRuntimeTestCase(unittest.TestCase):
             ['--source-registry', 'reg1,reg2', 'example.package'])
         self.assertEqual(
             known.calmjs_module_registry_names, ['reg1', 'reg2'])
+        self.assertEqual(
+            known.source_package_names, ['example.package'])
+
+    def test_source_package_toolchain_default(self):
+        stub_stdouts(self)
+        parser = ArgumentParser()
+        tc = toolchain.NullToolchain()
+        rt = runtime.SourcePackageToolchainRuntime(tc)
+        rt.init_argparser(parser)
+        known, extras = parser.parse_known_args(['example.package'])
+        self.assertEqual(known.calmjs_module_registry_names, None)
+
+    def test_source_package_toolchain_argparser_default_registry(self):
+        class CustomRuntime(runtime.SourcePackageToolchainRuntime):
+            def init_argparser_source_registry(self, argparser):
+                super(CustomRuntime, self).init_argparser_source_registry(
+                    argparser, default=('default_reg',))
+
+        stub_stdouts(self)
+        parser = ArgumentParser()
+        tc = toolchain.NullToolchain()
+        rt = CustomRuntime(tc)
+        rt.init_argparser(parser)
+        known, extras = parser.parse_known_args(['example.package'])
+        self.assertEqual(
+            known.calmjs_module_registry_names, ('default_reg',))
+        self.assertEqual(
+            known.source_package_names, ['example.package'])
+
+
+class LoaderPluginToolchainRuntime(runtime.SourcePackageToolchainRuntime):
+
+    def init_argparser(self, argparser):
+        super(LoaderPluginToolchainRuntime, self).init_argparser(argparser)
+        self.init_argparser_loaderplugin_registry(argparser)
+
+
+class RuntimeLoaderPluginRegistryOptionTestCase(unittest.TestCase):
+    """
+    Test out the --loaderplugin-registry flag.
+    """
+
+    def test_loaderplugin_toolchain_basic(self):
+        tc = toolchain.NullToolchain()
+        rt = LoaderPluginToolchainRuntime(tc)
+        text = rt.argparser.format_help()
+        self.assertIn("--loaderplugin-registry", text)
+        self.assertTrue(isinstance(rt.create_spec(), toolchain.Spec))
+
+    def test_loaderplugin_toolchain_argparser(self):
+        stub_stdouts(self)
+        parser = ArgumentParser()
+        tc = toolchain.NullToolchain()
+        rt = LoaderPluginToolchainRuntime(tc)
+        rt.init_argparser(parser)
+        known, extras = parser.parse_known_args(
+            ['--loaderplugin-registry', 'reg1,reg2', 'example.package'])
+        self.assertEqual(
+            known.calmjs_loaderplugin_registry_name, 'reg1,reg2')
         self.assertEqual(
             known.source_package_names, ['example.package'])
 

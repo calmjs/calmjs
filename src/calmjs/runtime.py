@@ -31,6 +31,7 @@ from calmjs.toolchain import ADVICE_PACKAGES
 from calmjs.toolchain import AFTER_PREPARE
 from calmjs.toolchain import BUILD_DIR
 from calmjs.toolchain import CALMJS_MODULE_REGISTRY_NAMES
+from calmjs.toolchain import CALMJS_LOADERPLUGIN_REGISTRY_NAME
 from calmjs.toolchain import CALMJS_TOOLCHAIN_ADVICE
 from calmjs.toolchain import DEBUG
 from calmjs.toolchain import EXPORT_TARGET
@@ -668,6 +669,7 @@ class ToolchainRuntime(DriverRuntime):
 
         argparser.add_argument(
             '--export-target', dest=EXPORT_TARGET,
+            metavar=EXPORT_TARGET,
             default=default,
             help=help,
         )
@@ -693,6 +695,7 @@ class ToolchainRuntime(DriverRuntime):
         cwd = self.toolchain.join_cwd()
         argparser.add_argument(
             '--working-dir', dest=WORKING_DIR,
+            metavar=WORKING_DIR,
             default=cwd,
             help=help_template % {'explanation': explanation, 'cwd': cwd},
         )
@@ -712,7 +715,9 @@ class ToolchainRuntime(DriverRuntime):
         """
 
         argparser.add_argument(
-            '--build-dir', default=None, dest=BUILD_DIR, help=help)
+            '--build-dir', default=None, dest=BUILD_DIR,
+            metavar=BUILD_DIR, help=help,
+        )
 
     def init_argparser_optional_advice(
             self, argparser, default=[], help=(
@@ -729,6 +734,7 @@ class ToolchainRuntime(DriverRuntime):
         argparser.add_argument(
             '--optional-advice', default=default, required=False,
             dest=ADVICE_PACKAGES, action=StoreRequirementList,
+            metavar='advice[,advice[...]]',
             help=help
         )
 
@@ -855,15 +861,37 @@ class SourcePackageToolchainRuntime(ToolchainRuntime):
         """
 
         argparser.add_argument(
-            '--source-registry', default=None,
+            '--source-registry', default=default,
             dest=CALMJS_MODULE_REGISTRY_NAMES, action=StoreDelimitedList,
+            metavar='registry_name[,registry_name[...]]',
             help=help,
         )
 
         argparser.add_argument(
-            '--source-registries', default=None,
+            '--source-registries', default=default,
             dest=CALMJS_MODULE_REGISTRY_NAMES, action=StoreDelimitedList,
             help=SUPPRESS,
+        )
+
+    def init_argparser_loaderplugin_registry(
+            self, argparser, default=None, help=(
+                'the name of the registry to use for the handling of loader '
+                'plugins that may be loaded from the given Python packages'
+            )):
+        """
+        Default helper for setting up the loaderplugin registries flags.
+
+        Note that this is NOT part of the init_argparser due to
+        implementation specific requirements.  Subclasses should
+        consider modifying the default value help message to cater to the
+        toolchain it encapsulates.
+        """
+
+        argparser.add_argument(
+            '--loaderplugin-registry', default=default,
+            dest=CALMJS_LOADERPLUGIN_REGISTRY_NAME, action='store',
+            metavar='registry_name',
+            help=help,
         )
 
     def init_argparser_package_names(
@@ -874,7 +902,7 @@ class SourcePackageToolchainRuntime(ToolchainRuntime):
 
         argparser.add_argument(
             SOURCE_PACKAGE_NAMES, help=help,
-            metavar='package_names', nargs='+',
+            metavar='package_name', nargs='+',
         )
 
     def init_argparser(self, argparser):
@@ -1013,7 +1041,7 @@ class PackageManagerRuntime(DriverRuntime):
 
         argparser.add_argument(
             'package_names', help='names of the python package to use',
-            metavar='package_names', nargs='+',
+            metavar='package_name', nargs='+',
         )
 
     def run(self, argpaser=None, interactive=False, **kwargs):

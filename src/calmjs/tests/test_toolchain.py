@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 import unittest
+import logging
 import json
 import tempfile
 import warnings
+from collections import OrderedDict
+from functools import partial
 from inspect import currentframe
 from os import makedirs
 from os.path import basename
@@ -21,15 +24,24 @@ from calmjs.exc import ToolchainCancel
 from calmjs import toolchain as calmjs_toolchain
 from calmjs.utils import pretty_logging
 from calmjs.registry import get
+from calmjs.loaderplugin import LoaderPluginRegistry
+from calmjs.loaderplugin import BaseLoaderPluginRegistry
+from calmjs.loaderplugin import BaseLoaderPluginHandler
+
 from calmjs.toolchain import CALMJS_TOOLCHAIN_ADVICE
 from calmjs.toolchain import AdviceRegistry
 from calmjs.toolchain import Spec
 from calmjs.toolchain import Toolchain
 from calmjs.toolchain import NullToolchain
 from calmjs.toolchain import ES5Toolchain
-from calmjs.toolchain import dict_get
-from calmjs.toolchain import dict_key_update_overwrite_check
-from calmjs.toolchain import spec_update_plugins_sourcepath_dict
+from calmjs.toolchain import ToolchainSpecCompileEntry
+from calmjs.toolchain import dict_setget
+from calmjs.toolchain import dict_setget_dict
+from calmjs.toolchain import dict_update_overwrite_check
+from calmjs.toolchain import spec_update_sourcepath_filter_loaderplugins
+from calmjs.toolchain import spec_update_loaderplugin_registry
+from calmjs.toolchain import toolchain_spec_compile_entries
+from calmjs.toolchain import toolchain_spec_prepare_loaderplugins
 
 from calmjs.toolchain import CLEANUP
 from calmjs.toolchain import SUCCESS
@@ -44,6 +56,7 @@ from calmjs.toolchain import BEFORE_COMPILE
 from calmjs.toolchain import AFTER_PREPARE
 from calmjs.toolchain import BEFORE_PREPARE
 
+from calmjs.testing.mocks import WorkingSet
 from calmjs.testing.mocks import StringIO
 from calmjs.testing.spec import create_spec_advise_fault
 from calmjs.testing.utils import mkdtemp
@@ -70,70 +83,157 @@ def dummy(spec, extras):
         spec['extras'] = extras
 
 
-class DictGetTestCase(unittest.TestCase):
+class DictSetGetTestCase(unittest.TestCase):
     """
     A special get that also creates keys.
     """
 
-    def test_dict_get(self):
+    def test_dict_setget(self):
         items = {}
-        dict_get(items, 'a_key')
+        value = []
+        dict_setget(items, 'a_key', value)
+        self.assertIs(value, items['a_key'])
+        other = []
+        dict_setget(items, 'a_key', other)
+        self.assertIsNot(other, items['a_key'])
+
+    def test_dict_setget_dict(self):
+        items = {}
+        dict_setget_dict(items, 'a_key')
         self.assertEqual(items, {'a_key': {}})
 
         a_key = items['a_key']
-        dict_get(items, 'a_key')
+        dict_setget_dict(items, 'a_key')
         self.assertIs(items['a_key'], a_key)
 
 
-class DictKeyGetUpdateTestCase(unittest.TestCase):
+class DictUpdateOverwriteTestCase(unittest.TestCase):
     """
     A function for updating specific dict/spec via a key, and ensure
     that any overwritten values are warned with the specified message.
     """
 
     def test_dict_key_update_overwrite_check_standard(self):
-        a = {}
-        a['base_key'] = {'k1': 'v1'}
-        mapping = {'k2': 'v2'}
-        with pretty_logging(stream=StringIO()) as s:
-            dict_key_update_overwrite_check(a, 'base_key', mapping)
-        self.assertEqual(s.getvalue(), '')
-        self.assertEqual(a['base_key'], {'k1': 'v1', 'k2': 'v2'})
+        a = {'k1': 'v1'}
+        b = {'k2': 'v2'}
+        self.assertEqual([], dict_update_overwrite_check(a, b))
+        self.assertEqual(a, {'k1': 'v1', 'k2': 'v2'})
 
     def test_dict_key_update_overwrite_check_no_update(self):
-        a = {}
-        a['base_key'] = {'k1': 'v1'}
-        mapping = {'k1': 'v1'}
-        with pretty_logging(stream=StringIO()) as s:
-            dict_key_update_overwrite_check(a, 'base_key', mapping)
-        self.assertEqual(s.getvalue(), '')
-        self.assertEqual(a['base_key'], {'k1': 'v1'})
+        a = {'k1': 'v1'}
+        b = {'k1': 'v1'}
+        self.assertEqual([], dict_update_overwrite_check(a, b))
+        self.assertEqual(a, {'k1': 'v1'})
 
     def test_dict_key_update_overwrite_check_overwritten_single(self):
-        a = {}
-        a['base_key'] = {'k1': 'v1'}
-        mapping = {'k1': 'v2'}
-        with pretty_logging(stream=StringIO()) as s:
-            dict_key_update_overwrite_check(a, 'base_key', mapping)
-        self.assertIn(
-            "base_key['k1'] is being rewritten from 'v1' to 'v2'; "
-            "configuration may be in an invalid state.",
-            s.getvalue())
-        self.assertEqual(a['base_key'], {'k1': 'v2'})
+        a = {'k1': 'v1'}
+        b = {'k1': 'v2'}
+        self.assertEqual([
+            ('k1', 'v1', 'v2'),
+        ], dict_update_overwrite_check(a, b))
+        self.assertEqual(a, {'k1': 'v2'})
 
     def test_dict_key_update_overwrite_check_overwritten_multi(self):
-        a = {}
-        a['base_key'] = {'k1': 'v1', 'k2': 'v2'}
-        mapping = {'k1': 'v2', 'k2': 'v4'}
+        a = {'k1': 'v1', 'k2': 'v2'}
+        b = {'k1': 'v2', 'k2': 'v4'}
+        self.assertEqual([
+            ('k1', 'v1', 'v2'),
+            ('k2', 'v2', 'v4'),
+        ], sorted(dict_update_overwrite_check(a, b)))
+        self.assertEqual(a, {'k1': 'v2', 'k2': 'v4'})
+
+
+class SpecResolveRegistryTestCase(unittest.TestCase):
+
+    def test_basic(self):
+        spec = {}
         with pretty_logging(stream=StringIO()) as s:
-            dict_key_update_overwrite_check(a, 'base_key', mapping, 'oops.')
+            registry = spec_update_loaderplugin_registry(spec)
+        self.assertTrue(isinstance(registry, BaseLoaderPluginRegistry))
         self.assertIn(
-            "base_key['k1'] is being rewritten from 'v1' to 'v2'; oops.",
-            s.getvalue())
+            'no loaderplugin registry referenced in spec', s.getvalue())
+        self.assertIn('<default_loaderplugins>', s.getvalue())
+
+    def test_default(self):
+        spec = {}
+        default = BaseLoaderPluginRegistry('my.default')
+        with pretty_logging(stream=StringIO()) as s:
+            registry = spec_update_loaderplugin_registry(spec, default=default)
+        self.assertIs(registry, default)
         self.assertIn(
-            "base_key['k2'] is being rewritten from 'v2' to 'v4'; oops.",
+            'no loaderplugin registry referenced in spec', s.getvalue())
+        self.assertIn('my.default', s.getvalue())
+
+        registries = {'my.default': default}
+        stub_item_attr_value(
+            self, calmjs_toolchain, 'get_registry', registries.get)
+        spec = {}
+        with pretty_logging(stream=StringIO()) as s:
+            self.assertEqual('my.default', spec_update_loaderplugin_registry(
+                spec, default='my.default').registry_name)
+
+    def test_wrong(self):
+        spec = {'calmjs_loaderplugin_registry': object()}
+        with pretty_logging(stream=StringIO()) as s:
+            registry = spec_update_loaderplugin_registry(spec)
+        self.assertIn(
+            "object referenced in spec is not a valid", s.getvalue())
+        # still got the base instance instead.
+        self.assertTrue(isinstance(registry, BaseLoaderPluginRegistry))
+
+    def test_wrong_registry_type(self):
+        advice = AdviceRegistry('adv', _working_set=WorkingSet({}))
+        registries = {'adv': advice}
+        stub_item_attr_value(
+            self, calmjs_toolchain, 'get_registry', registries.get)
+
+        spec = {'calmjs_loaderplugin_registry_name': 'adv'}
+        with pretty_logging(stream=StringIO()) as s:
+            registry = spec_update_loaderplugin_registry(spec)
+        self.assertIn(
+            "object referenced in spec is not a valid", s.getvalue())
+        self.assertIsNot(registry, advice)
+        self.assertTrue(isinstance(registry, BaseLoaderPluginRegistry))
+
+        spec = {}
+        with pretty_logging(stream=StringIO()) as s:
+            registry = spec_update_loaderplugin_registry(spec, default='adv')
+        self.assertIn(
+            "provided default is not a valid loaderplugin registry",
             s.getvalue())
-        self.assertEqual(a['base_key'], {'k1': 'v2', 'k2': 'v4'})
+        self.assertIsNot(registry, advice)
+        self.assertTrue(isinstance(registry, BaseLoaderPluginRegistry))
+
+    def test_provided(self):
+        spec = {'calmjs_loaderplugin_registry': LoaderPluginRegistry(
+            'some.registry', _working_set=WorkingSet({})
+        )}
+        with pretty_logging(stream=StringIO()) as s:
+            registry = spec_update_loaderplugin_registry(spec)
+        self.assertIn(
+            "loaderplugin registry 'some.registry' already assigned to spec",
+            s.getvalue())
+        self.assertTrue(isinstance(registry, LoaderPluginRegistry))
+
+    def test_resolve_and_order(self):
+        fake = LoaderPluginRegistry('fake_registry', _working_set=WorkingSet({
+            'fake_registry': [
+                'foo = calmjs.tests.test_toolchain:MockLPHandler']}))
+        registries = {'fake_registry': fake}
+        stub_item_attr_value(
+            self, calmjs_toolchain, 'get_registry', registries.get)
+
+        spec = {'calmjs_loaderplugin_registry_name': 'fake_registry'}
+        with pretty_logging(stream=StringIO()) as s:
+            registry = spec_update_loaderplugin_registry(spec)
+        self.assertIn(
+            "using loaderplugin registry 'fake_registry'", s.getvalue())
+        self.assertIs(registry, fake)
+
+        spec = {
+            'calmjs_loaderplugin_registry_name': 'fake_registry',
+            'calmjs_loaderplugin_registry': BaseLoaderPluginRegistry('raw'),
+        }
 
 
 class SpecUpdatePluginsSourcepathDictTestCase(unittest.TestCase):
@@ -148,9 +248,12 @@ class SpecUpdatePluginsSourcepathDictTestCase(unittest.TestCase):
             'standard.module': 'standard.module',
         }
         spec = {}
-        spec_update_plugins_sourcepath_dict(
+        spec_update_sourcepath_filter_loaderplugins(
             spec, sourcepath_dict, 'sourcepath_key', 'plugins_key')
+        self.assertTrue(isinstance(spec.pop(
+            'calmjs_loaderplugin_registry'), BaseLoaderPluginRegistry))
         self.assertEqual(spec, {
+            'plugins_key': {},
             'sourcepath_key': {
                 'standard/module': 'standard/module',
                 'standard.module': 'standard.module',
@@ -164,37 +267,51 @@ class SpecUpdatePluginsSourcepathDictTestCase(unittest.TestCase):
         base_map = {}
         spec = {'sourcepath_key': base_map}
 
-        spec_update_plugins_sourcepath_dict(
+        spec_update_sourcepath_filter_loaderplugins(
             spec, sourcepath_dict, 'sourcepath_key', 'plugins_key')
+        self.assertTrue(isinstance(spec.pop(
+            'calmjs_loaderplugin_registry'), BaseLoaderPluginRegistry))
         self.assertIs(spec['sourcepath_key'], base_map)
         self.assertEqual(base_map, {
             'standard/module': 'standard/module',
         })
 
-    def test_modules(self):
+    def test_various_modules(self):
         sourcepath_dict = {
+            'plugin/module': 'path/to/plugin/module',
             'plugin/module!argument': 'some/filesystem/path',
+            'plugin/module!css!argument': 'some/style/file.css',
             'text!argument': 'some/text/file.txt',
+            'css?module!target.css': 'some/stylesheet/target.css',
+            'css!main.css': 'some/stylesheet/main.css',
         }
         spec = {}
 
-        spec_update_plugins_sourcepath_dict(
+        spec_update_sourcepath_filter_loaderplugins(
             spec, sourcepath_dict, 'sourcepath_key', 'plugins_key')
-        self.maxDiff = 123123
+        self.assertTrue(isinstance(spec.pop(
+            'calmjs_loaderplugin_registry'), BaseLoaderPluginRegistry))
         self.assertEqual(spec, {
             'plugins_key': {
                 'plugin/module': {
                     'plugin/module!argument': 'some/filesystem/path',
+                    'plugin/module!css!argument': 'some/style/file.css',
                 },
                 'text': {
                     'text!argument': 'some/text/file.txt',
                 },
+                'css': {
+                    'css?module!target.css': 'some/stylesheet/target.css',
+                    'css!main.css': 'some/stylesheet/main.css',
+                },
             },
             'sourcepath_key': {
+                'plugin/module': 'path/to/plugin/module',
             },
         })
 
-        spec_update_plugins_sourcepath_dict(spec, {
+        # subsequent update will do update, not overwrite.
+        spec_update_sourcepath_filter_loaderplugins(spec, {
             'text!argument2': 'some/text/file2.txt',
         }, 'sourcepath_key', 'plugins_key')
 
@@ -812,10 +929,10 @@ class ToolchainTestCase(unittest.TestCase):
         # compile step error messages
         self.assertIn(
             ("aborting compile step %r due to existing key" % (
-                (u'transpile', u'transpile', u'transpiled'),)), msg)
+                self.toolchain.compile_entries[0],)), msg)
         self.assertIn(
             ("aborting compile step %r due to existing key" % (
-                (u'bundle', u'bundle', u'bundled'),)), msg)
+                self.toolchain.compile_entries[1],)), msg)
 
         # All should be same identity
         self.assertIs(spec['transpiled_modpaths'], transpiled_modpaths)
@@ -894,6 +1011,115 @@ class ToolchainTestCase(unittest.TestCase):
         self.assertNotIn('bundled_modpaths', spec)
         self.assertNotIn('transpiled_targetpaths', spec)
         self.assertNotIn('bundled_targetpaths', spec)
+
+    def test_toolchain_standard_compile_alternate_entries_called(self):
+        added = []
+
+        class CustomToolchain(Toolchain):
+            def build_compile_entries(self):
+                return (('here', 'fake', 'faked'),)
+
+            def compile_here(self, spec, entries):
+                added.extend(list(entries))
+                return {'here': 'mod'}, {'here': 'target'}, ['here']
+
+        # Again, this is not the right way, should subclass/define a new
+        # build_compile_entries method.
+        custom_toolchain = CustomToolchain()
+        spec = Spec(fake_sourcepath={'here': 'source'})
+
+        with pretty_logging(stream=StringIO()) as s:
+            custom_toolchain.compile(spec)
+
+        msg = s.getvalue()
+        self.assertNotIn("'here' not a callable attribute for", msg)
+
+        self.assertNotIn('transpiled_modpaths', spec)
+        self.assertNotIn('bundled_modpaths', spec)
+        self.assertNotIn('transpiled_targetpaths', spec)
+        self.assertNotIn('bundled_targetpaths', spec)
+
+        self.assertEqual([('here', 'source', 'here', 'here')], added)
+        self.assertEqual({'here': 'mod'}, spec['faked_modpaths'])
+        self.assertEqual({'here': 'target'}, spec['faked_targetpaths'])
+        self.assertEqual(['here'], spec['export_module_names'])
+
+    def test_toolchain_spec_compile_entry_logging(self):
+        # this test constructs a situation where the individual compile
+        # entry methods are capable of generating the paths with
+        # duplicated modnames (keys) - could be unusual, and
+        # implementations may use the extended attributes in the
+        # ToolchainSpecCompileEntry to trigger logging.
+
+        class CustomToolchain(Toolchain):
+            def build_compile_entries(self):
+                return [
+                    ToolchainSpecCompileEntry('silent', 'silent', 'silented'),
+                    ToolchainSpecCompileEntry(
+                        'logged', 'log', 'logged',
+                        'calmjs_testing', logging.WARNING,
+                    ),
+                ]
+
+            def compile_silent_entry(self, spec, entry):
+                modname, source, target, modpath = entry
+                return {'module': modpath}, {'module': source}, ['module']
+
+            def compile_logged_entry(self, spec, entry):
+                modname, source, target, modpath = entry
+                return {'module': modpath}, {'module': source}, ['module']
+
+        custom_toolchain = CustomToolchain()
+        spec = Spec(
+            silent_sourcepath=OrderedDict([
+                ('original', 'original'),
+                ('silent', 'silent'),
+            ]),
+            log_sourcepath=OrderedDict([
+                ('original', 'static'),
+                ('log', 'static'),
+                ('final', 'changed'),
+            ]),
+        )
+
+        with pretty_logging(logger='calmjs_testing', stream=StringIO()) as s:
+            custom_toolchain.compile(spec)
+
+        msg = s.getvalue()
+        self.assertNotIn(
+            "silented_modpaths['module'] is being rewritten from "
+            "'original' to 'silent'", msg
+        )
+        self.assertNotIn(
+            "silented_targetpaths['module'] is being rewritten from "
+            "'original' to 'silent'", msg
+        )
+
+        self.assertIn(
+            "logged_modpaths['module'] is being rewritten from "
+            "'original' to 'log'", msg
+        )
+        self.assertNotIn(
+            "logged_targetpaths['module'] is being rewritten from "
+            "'static' to 'static'", msg
+        )
+        self.assertIn(
+            "logged_targetpaths['module'] is being rewritten from "
+            "'static' to 'changed'", msg
+        )
+
+        self.assertEqual({
+            'module': 'silent',
+        }, spec['silented_modpaths'])
+        self.assertEqual({
+            'module': 'silent',
+        }, spec['silented_targetpaths'])
+        self.assertEqual({
+            'module': 'final',
+        }, spec['logged_modpaths'])
+        self.assertEqual({
+            'module': 'changed',
+        }, spec['logged_targetpaths'])
 
     def test_toolchain_standard_good(self):
         # good, with a mock
@@ -981,10 +1207,10 @@ class ToolchainTestCase(unittest.TestCase):
             s.getvalue(),
         )
 
-    def test_toolchain_compile_bundle(self):
+    def test_toolchain_compile_bundle_entry(self):
         """
-        Test out the compile bundle being actually flexible for variety
-        of cases.
+        Test out the compile_bundle_entry being flexible in handling the
+        different cases of paths.
         """
 
         build_dir = mkdtemp(self)
@@ -1002,7 +1228,11 @@ class ToolchainTestCase(unittest.TestCase):
         target3 = join('nested', 'namespace', 'mod3.js')
         target4 = 'namespace.mod4.js'
 
-        self.toolchain.compile_bundle(spec, [
+        compile_bundle = partial(
+            toolchain_spec_compile_entries, self.toolchain,
+            process_name='bundle')
+
+        compile_bundle(spec, [
             ('mod1', src, target1, 'mod1'),
             ('mod2', src, target2, 'mod2'),
             ('mod3', src, target3, 'mod3'),
@@ -1013,6 +1243,154 @@ class ToolchainTestCase(unittest.TestCase):
         self.assertTrue(exists(join(build_dir, target2)))
         self.assertTrue(exists(join(build_dir, target3)))
         self.assertTrue(exists(join(build_dir, target4)))
+
+
+class MockLPHandler(BaseLoaderPluginHandler):
+
+    def __call__(self, toolchain, spec, modname, source, target, modpath):
+        return {modname: target}, {modname: modpath}, [modname]
+
+    def generate_handler_sourcepath(self, toolchain, spec, value):
+        return {self.name: self.name}
+
+
+class ToolchainLoaderPluginTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.toolchain = Toolchain()
+
+    def test_toolchain_compile_loaderplugin_entry_empty(self):
+        """
+        A rough standalone test for handling of loader plugins.
+        """
+
+        spec = Spec()
+        with self.assertRaises(KeyError):
+            # as the registry is not in the spec
+            self.toolchain.compile_loaderplugin_entry(spec, (
+                'foo!target.txt', 'foo', 'foo!target.txt', 'foo!target.txt'))
+
+    def test_toolchain_compile_loaderplugin_entry_not_found(self):
+        """
+        A rough standalone test for handling of loader plugins.
+        """
+
+        src_dir = mkdtemp(self)
+        src = join(src_dir, 'target.txt')
+        spec = Spec(calmjs_loaderplugin_registry={})
+        with pretty_logging(stream=StringIO()) as s:
+            results = self.toolchain.compile_loaderplugin_entry(spec, (
+                'foo!target.txt', src, 'foo!target.txt', 'foo!target.txt'))
+        self.assertIn(
+            "no loaderplugin handler found for plugin entry 'foo!target.txt'",
+            s.getvalue())
+        self.assertEqual(({}, {}, []), results)
+
+    def test_toolchain_compile_loaderplugin_entry_registered(self):
+        """
+        A rough standalone test for handling of loader plugins.
+        """
+
+        reg = LoaderPluginRegistry('simple', _working_set=WorkingSet({
+            'simple': [
+                'foo = calmjs.tests.test_toolchain:MockLPHandler',
+                'bar = calmjs.tests.test_toolchain:MockLPHandler',
+            ],
+        }))
+
+        src_dir = mkdtemp(self)
+        src = join(src_dir, 'target.txt')
+
+        spec = Spec(calmjs_loaderplugin_registry=reg)
+        with pretty_logging(stream=StringIO()) as s:
+            bar_results = self.toolchain.compile_loaderplugin_entry(spec, (
+                'bar!target.txt', src, 'bar!target.txt', 'bar!target.txt'))
+            foo_results = self.toolchain.compile_loaderplugin_entry(spec, (
+                'foo!target.txt', src, 'foo!target.txt', 'foo!target.txt'))
+
+        self.assertEqual('', s.getvalue())
+
+        self.assertEqual((
+            {'foo!target.txt': 'foo!target.txt'},
+            {'foo!target.txt': 'foo!target.txt'},
+            ['foo!target.txt'],
+        ), foo_results)
+
+        self.assertEqual((
+            {'bar!target.txt': 'bar!target.txt'},
+            {'bar!target.txt': 'bar!target.txt'},
+            ['bar!target.txt'],
+        ), bar_results)
+
+        # recursive lookups are generally not needed, if the target
+        # supplied _is_ the target.
+
+    def test_toolchain_spec_prepare_loaderplugins_unsupported(self):
+        spec = Spec()
+        # really though, providing None shouldn't be supported, but
+        # leaving this in for now until it is formalized.
+        toolchain_spec_prepare_loaderplugins(
+            self.toolchain, spec, 'plugin', None)
+        self.assertIn('plugin_sourcepath', spec)
+
+    def test_toolchain_spec_prepare_loaderplugins_standard(self):
+        reg = LoaderPluginRegistry('simple', _working_set=WorkingSet({
+            'simple': [
+                'foo = calmjs.tests.test_toolchain:MockLPHandler',
+                'bar = calmjs.tests.test_toolchain:MockLPHandler',
+            ],
+        }))
+        spec = Spec(
+            calmjs_loaderplugin_registry=reg,
+            loaderplugin_sourcepath_maps={
+                'foo': {'foo!thing': 'thing'},
+                'bar': {'bar!thing': 'thing'},
+            },
+        )
+        toolchain_spec_prepare_loaderplugins(
+            self.toolchain, spec, 'loaderplugin', 'loaders')
+        self.assertEqual({
+            'foo!thing': 'thing',
+            'bar!thing': 'thing',
+        }, spec['loaderplugin_sourcepath'])
+        self.assertEqual({
+            'foo': 'foo',
+            'bar': 'bar',
+        }, spec['loaders'])
+
+    def test_toolchain_spec_prepare_loaderplugins_missing(self):
+        reg = LoaderPluginRegistry('simple', _working_set=WorkingSet({
+            'simple': [
+                'foo = calmjs.tests.test_toolchain:MockLPHandler',
+                'bar = calmjs.tests.test_toolchain:MockLPHandler',
+            ],
+        }))
+        spec = Spec(
+            calmjs_loaderplugin_registry=reg,
+            loaderplugin_sourcepath_maps={
+                'foo': {'foo!thing': 'thing'},
+                'missing': {'missing!thing': 'thing'},
+                'bar': {'bar!thing': 'thing'},
+            },
+        )
+        with pretty_logging(stream=StringIO()) as s:
+            toolchain_spec_prepare_loaderplugins(
+                self.toolchain, spec, 'loaderplugin', 'loaders')
+        self.assertEqual({
+            'foo!thing': 'thing',
+            'bar!thing': 'thing',
+        }, spec['loaderplugin_sourcepath'])
+        self.assertEqual({
+            'foo': 'foo',
+            'bar': 'bar',
+        }, spec['loaders'])
+
+        self.assertIn(
+            "loaderplugin handler for 'missing' not found in loaderplugin "
+            "registry 'simple'", s.getvalue())
+        self.assertIn(
+            "will not be compiled into the build target: ['missing!thing']",
+            s.getvalue())
 
 
 class NullToolchainTestCase(unittest.TestCase):
@@ -1099,6 +1477,41 @@ class NullToolchainTestCase(unittest.TestCase):
             s,
             'template.tmpl', '/tmp/example.module/src/template.tmpl'),
             'template.tmpl',
+        )
+
+    def test_toolchain_naming_modname_source_to_target_loaderplugin(self):
+        s = Spec(calmjs_loaderplugin_registry=LoaderPluginRegistry(
+            'simloaders', _working_set=WorkingSet({'simloaders': [
+                'foo = calmjs.loaderplugin:LoaderPluginHandler',
+                'bar = calmjs.loaderplugin:LoaderPluginHandler',
+                'py/loader = calmjs.loaderplugin:LoaderPluginHandler',
+            ]})
+        ))
+        self.assertEqual(self.toolchain.modname_source_to_target(
+            s, 'example/module', '/tmp/example.module/src/example/module.js'),
+            'example/module.js',
+        )
+        self.assertEqual(self.toolchain.modname_source_to_target(
+            s, 'foo!example/module.txt', '/tmp/example.module/src/example'),
+            'example/module.txt',
+        )
+        self.assertEqual(self.toolchain.modname_source_to_target(
+            s, 'foo!bar!module.txt', '/tmp/example.module/src/example'),
+            'module.txt',
+        )
+        # baz not handled.
+        self.assertEqual(self.toolchain.modname_source_to_target(
+            s, 'foo!baz!bar!module.txt', '/tmp/example.module/src/example'),
+            'baz!bar!module.txt',
+        )
+        # python provided loaders
+        self.assertEqual(self.toolchain.modname_source_to_target(
+            s, 'py/module', '/tmp/py.module/py/module.js'),
+            'py/module.js',
+        )
+        self.assertEqual(self.toolchain.modname_source_to_target(
+            s, 'py/loader', '/tmp/py.module/py/loader.js'),
+            'py/loader.js',
         )
 
     def test_toolchain_gen_modname_source_target_modpath(self):
