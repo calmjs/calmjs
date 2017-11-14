@@ -99,7 +99,10 @@ setup(
             'calmjs.py.module = calmjs',
             'calmjs.py.module.tests = calmjs',
             'calmjs.toolchain.advice = calmjs',
-        ]
+        ],
+        'calmjs.toolchain.advice': [
+            'calmjs.toolchain:Toolchain = calmjs.toolchain:debugger',
+        ],
     },
     test_suite="calmjs.tests.make_suite",
 )

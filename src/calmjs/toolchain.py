@@ -98,6 +98,7 @@ from calmjs.exc import ValueSkip
 from calmjs.exc import ToolchainAbort
 from calmjs.exc import ToolchainCancel
 from calmjs.utils import raise_os_error
+from calmjs.utils import pdb_set_trace
 from calmjs.vlqsm import SourceWriter
 
 logger = logging.getLogger(__name__)
@@ -534,6 +535,15 @@ def toolchain_spec_compile_entries(
 ToolchainSpecCompileEntry = namedtuple('ToolchainSpecCompileEntry', [
     'process_name', 'read_key', 'store_key', 'logger', 'log_level'])
 ToolchainSpecCompileEntry.__new__.__defaults__ = (None, None)
+
+
+def debugger(spec, extras):
+    for key in extras:
+        if not key.startswith('debug_'):
+            continue
+        name = key.split('_', 1)[1]
+        logger.debug("debugger advised at '%s'", name)
+        spec.advise(name, pdb_set_trace)
 
 
 def null_transpiler(spec, reader, writer):

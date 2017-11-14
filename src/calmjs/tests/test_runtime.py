@@ -566,6 +566,35 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         result = rt(['--export-target', 'dummy'])
         self.assertNotIn('dummy', result)
 
+    def test_spec_advise_debugger(self):
+        # this is meant for advanced usage, thus undocumented.
+        from calmjs import utils
+        stub_stdouts(self)
+        skipped = []
+        traced = []
+
+        class FakePdb(object):
+            def __init__(self, skip, *a, **kw):
+                skipped.append(skip)
+
+            def set_trace(self):
+                traced.append(True)
+
+        stub_item_attr_value(self, utils, 'Pdb', FakePdb)
+
+        tc = toolchain.NullToolchain()
+        rt = runtime.ToolchainRuntime(tc)
+
+        rt([
+            '--export-target', 'dummy',
+            '--optional-advice', 'calmjs[welp,debug_before_assemble]', '-vv',
+        ])
+
+        self.assertEqual(skipped[0], ['calmjs.utils'])
+        self.assertEqual(1, len(traced))
+        err = sys.stderr.getvalue()
+        self.assertIn("debugger advised at 'before_assemble'", err)
+
     def test_spec_optional_advice_extras(self):
         from calmjs.registry import _inst as root_registry
         key = toolchain.CALMJS_TOOLCHAIN_ADVICE

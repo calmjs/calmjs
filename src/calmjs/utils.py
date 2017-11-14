@@ -20,6 +20,7 @@ from os.path import defpath
 from os.path import normcase
 from os.path import pathsep
 from pdb import post_mortem
+from pdb import Pdb
 from subprocess import Popen
 from subprocess import PIPE
 
@@ -168,4 +169,8 @@ def which(cmd, mode=os.F_OK | os.X_OK, path=None):
 
 
 def pdb_post_mortem(*a, **kw):
-    post_mortem(*a, **kw)
+    post_mortem()
+
+
+def pdb_set_trace(*a, **kw):
+    Pdb(skip=[__name__], *a, **kw).set_trace()
