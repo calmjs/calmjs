@@ -720,17 +720,27 @@ class AdviceRegistryTestCase(unittest.TestCase):
         ])
 
     def test_not_toolchain_process(self):
-        reg = AdviceRegistry(CALMJS_TOOLCHAIN_ADVICE)
-        self.assertIsNone(
-            reg.process_toolchain_spec_package(object(), Spec(), 'calmjs'))
+        working_set = pkg_resources.WorkingSet([])
+        reg = AdviceRegistry(CALMJS_TOOLCHAIN_ADVICE, _working_set=working_set)
+        with pretty_logging(stream=StringIO()) as s:
+            self.assertIsNone(
+                reg.process_toolchain_spec_package(object(), Spec(), 'calmjs'))
+        self.assertIn(
+            "must call process_toolchain_spec_package with a toolchain",
+            s.getvalue(),
+        )
 
     def test_standard_toolchain_process_nothing(self):
-        reg = AdviceRegistry(CALMJS_TOOLCHAIN_ADVICE)
+        working_set = pkg_resources.WorkingSet([])
+        reg = AdviceRegistry(CALMJS_TOOLCHAIN_ADVICE, _working_set=working_set)
         toolchain = Toolchain()
         spec = Spec()
         with pretty_logging(stream=StringIO()) as s:
             reg.process_toolchain_spec_package(toolchain, spec, 'calmjs')
-        self.assertEqual(s.getvalue(), '')
+        self.assertIn(
+            "no advice setup steps registered for package/requirement "
+            "'calmjs'", s.getvalue(),
+        )
 
     def test_standard_toolchain_process(self):
         make_dummy_dist(self, ((
@@ -749,7 +759,7 @@ class AdviceRegistryTestCase(unittest.TestCase):
 
         self.assertEqual(spec, {'dummy': ['dummy']})
         self.assertIn(
-            "found advice setup steps registered for package "
+            "found advice setup steps registered for package/requirement "
             "'example.package' for toolchain 'calmjs.toolchain:Toolchain'",
             s.getvalue(),
         )
@@ -794,7 +804,7 @@ class AdviceRegistryTestCase(unittest.TestCase):
         err = s.getvalue()
         # inheritance applies.
         self.assertIn(
-            "found advice setup steps registered for package "
+            "found advice setup steps registered for package/requirement "
             "'example.package' for toolchain 'calmjs.toolchain:NullToolchain'",
             err,
         )
@@ -823,8 +833,19 @@ class AdviceRegistryTestCase(unittest.TestCase):
                 toolchain, spec, 'example.package[a,bc,d]')
         self.assertEqual(spec['extras'], ['a', 'bc', 'd'])
         self.assertIn(
-            "found advice setup steps registered for package "
+            "found advice setup steps registered for package/requirement "
             "'example.package[a,bc,d]' for toolchain ", s.getvalue()
+        )
+
+    def test_standard_toolchain_advice_malformed(self):
+        reg = AdviceRegistry(CALMJS_TOOLCHAIN_ADVICE)
+        toolchain = Toolchain()
+        spec = Spec()
+        with pretty_logging(stream=StringIO()) as s:
+            reg.process_toolchain_spec_package(toolchain, spec, 'calmjs:thing')
+        self.assertIn(
+            "the specified value 'calmjs:thing' for advice setup is not valid",
+            s.getvalue(),
         )
 
     def test_toolchain_advice_integration(self):

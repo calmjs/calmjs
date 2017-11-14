@@ -813,16 +813,27 @@ class AdviceRegistry(BaseRegistry):
             return
 
         toolchain_cls = type(toolchain)
-        req = Requirement.parse(value)
+        try:
+            req = Requirement.parse(value)
+        except ValueError as e:
+            logger.error(
+                "the specified value '%s' for advice setup is not valid for "
+                "a package/requirement: %s", value, e,
+            )
+            return
+
         pkg_name = req.project_name
         toolchain_advices = self.get_record(pkg_name)
 
         if not toolchain_advices:
+            logger.debug(
+                "no advice setup steps registered for package/requirement "
+                "'%s'", value)
             return
 
         logger.debug(
-            "found advice setup steps registered for package '%s' for "
-            "toolchain '%s'", value, self._to_name(toolchain_cls)
+            "found advice setup steps registered for package/requirement "
+            "'%s' for toolchain '%s'", value, self._to_name(toolchain_cls)
         )
 
         for cls in getattr(toolchain_cls, '__mro__'):
