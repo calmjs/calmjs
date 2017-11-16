@@ -177,6 +177,9 @@ environment, they need to be available within the environment; if they
 are not installed please follow the installation steps for `Node.js`_
 appropriate for the target operating system/environment/platform.
 
+The support of |yarn| is available as of ``calmjs-3.0.0``, as an
+interface to the alternative client to the |npm| package repository.
+
 To install |calmjs| into a given Python environment, the following
 command can be executed to install directly from PyPI:
 
@@ -230,7 +233,7 @@ Usage
 When installed to a particular Python environment, the |calmjs|
 command-line utility will become available within there.
 
-.. code:: sh
+.. code::
 
     $ calmjs
     usage: calmjs [-h] [-d] [-q] [-v] [-V] <command> ...
@@ -238,9 +241,17 @@ command-line utility will become available within there.
     positional arguments:
       <command>
         npm          npm support for the calmjs framework
+        yarn         yarn support for the calmjs framework
 
     optional arguments:
       -h, --help     show this help message and exit
+
+    global options:
+      -d, --debug    show traceback on error; twice for post_mortem
+                     '--debugger' when execution cannot continue
+      -q, --quiet    be more quiet
+      -v, --verbose  be more verbose
+      -V, --version  print version information
 
 As mentioned, |npm| support is built-in so it is always available; to
 access its help, simply execute ``calmjs npm -h``, which will then list
@@ -501,30 +512,34 @@ As mentioned, it is possible to make use of the ``package.json``
 generation capabilities from outside of |setuptools|.  Users can easily
 do the same through the built-in ``calmjs npm`` tool:
 
-.. code:: sh
+.. code::
 
-    usage: calmjs npm [-h] [-d] [-q] [-v] [-V] [--view] [--init]
-                      [--install] [-i] [-m] [-w] [-E]
-                      package_names [package_names ...]
+    $ calmjs npm --help
+    usage: calmjs npm [-h] [-d] [-q] [-v] [-V] [--view] [--init] [--install]
+                      [-i] [-m] [-w] [-E] [-P] [-D]
+                      package_name [package_name ...]
+
+    npm support for the calmjs framework
 
     positional arguments:
-      package_names      names of the python package to use
+      package_name       names of the python package to use
 
     optional arguments:
+      -D, --development  explicitly specify development mode for npm install
+      -E, --explicit     explicit mode disables resolution for dependencies;
+                         only the specified Python package(s) will be used.
       -h, --help         show this help message and exit
-      -i, --interactive  enable interactive prompt; if an action
-                         requires an explicit response but none were
-                         specified through flags (i.e. overwrite),
-                         prompt for response; disabled by default
+      -i, --interactive  enable interactive prompt; if an action requires an
+                         explicit response but none were specified through
+                         flags (i.e. overwrite), prompt for response;
+                         disabled by default
       -m, --merge        merge generated 'package.json' with the one in
                          current directory; if interactive mode is not
-                         enabled, implies overwrite, else the difference
-                         will be displayed
-      -w, --overwrite    automatically overwrite any file changes to
-                         current directory without prompting
-      -E, --explicit     explicit mode disables resolution for
-                         dependencies; only the specified Python
-                         package(s) will be used.
+                         enabled, implies overwrite, else the difference will
+                         be displayed
+      -P, --production   explicitly specify production mode for npm install
+      -w, --overwrite    automatically overwrite any file changes to current
+                         directory without prompting
 
 Naturally, the same ``--init`` functionality shown above with the
 |setuptools| framework is available, however package names can be
@@ -534,7 +549,7 @@ required packages installed.  For instance, if the Node.js packages for
 ``example.package`` is to be installed, this can be invoked to view the
 ``package.json`` that would be generated:
 
-.. code:: sh
+.. code::
 
     $ calmjs -v npm --view example.package
     2016-09-01 16:37:18,398 INFO calmjs.cli generating a flattened

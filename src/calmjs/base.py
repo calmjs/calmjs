@@ -772,6 +772,11 @@ class BaseLoaderPluginHandler(object):
         each and every loader plugin and their specific toolchain, so
         this default implementation is not going to attempt to consume
         everything in one go.
+
+        Another note: if this is to be subclassed and if the return
+        value does not actually remove the loaderplugin fragment, issues
+        like default implmenetation of ``modname_source_to_target`` in
+        this class to recurse forever.
         """
 
         globs = value.split('!', 1)
