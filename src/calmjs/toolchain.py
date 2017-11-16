@@ -538,6 +538,8 @@ ToolchainSpecCompileEntry.__new__.__defaults__ = (None, None)
 
 
 def debugger(spec, extras):
+    if not spec.get(DEBUG):
+        return
     for key in extras:
         if not key.startswith('debug_'):
             continue

@@ -590,6 +590,15 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
             '--optional-advice', 'calmjs[welp,debug_before_assemble]', '-vv',
         ])
 
+        self.assertEqual(0, len(skipped))
+        self.assertEqual(0, len(traced))
+
+        # now with the debug flag
+        rt([
+            '--export-target', 'dummy', '-d',
+            '--optional-advice', 'calmjs[welp,debug_before_assemble]', '-vv',
+        ])
+
         self.assertEqual(skipped[0], ['calmjs.utils'])
         self.assertEqual(1, len(traced))
         err = sys.stderr.getvalue()
