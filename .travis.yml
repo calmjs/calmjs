@@ -122,12 +122,6 @@ install:
   - python setup.py develop
 script: 
   - flake8 setup.py src
-  # with pypy version >= 2.5.0 (maybe earlier, definitely after 2.2.1),
-  # coverage fails to produce meaningful results running with nose.
-  # Check that and only use nose (which is only somewhat useful only
-  # when errors happen) with CPython.  This happened on the prior
-  # changeset (ee599b4d) where checks and testing with callbacks that
-  # lead to recursive calling of functions were added.
   - coverage run --include=src/* -m unittest calmjs.tests.make_suite
   - coverage report -m
 # Alternatively without nose
@@ -143,3 +137,4 @@ branches:
     - master
     - 1.0.x
     - 2.0.x
+    - 3.0.x
