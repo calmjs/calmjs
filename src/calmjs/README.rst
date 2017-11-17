@@ -1,9 +1,15 @@
 Module layout
 =============
 
-To give a guide on how modules should be laid out, in the case for other
-packages that that may depend on ``calmjs`` for integration and other
-uses, the following are how things are done here:
+A listing of all modules in the ``calmjs`` package; also serves as a
+guide on how modules should be laid out for packages that directly
+depend on and extend off of ``calmjs``.
+
+As a rule, a module should not inherit from modules listed below
+their respective position on the following list.  If inheritance must be
+done, it must be done within a local scope to ensure that circular
+dependencies do not form.  This rule also extends to the unittest
+modules.
 
 exc
     Generic exception classes specific for this project.
@@ -13,8 +19,13 @@ utils
     inherit from other calmjs modules.  As a result this is safe to be
     imported from any ``test_`` modules.
 
+interrogate
+    Helper functions that make use of ``calmjs.parse`` for interrogating
+    JavaScript source files for various information.
+
 vlqsm
-    VLQ and source map module.
+    Deprecated module - contains stub import points for VLQ helpers,
+    along with a legacy source map generator helper class.
 
 argparse
     Extensions to the built-in ``argparse`` module.  Due to this name,
@@ -92,8 +103,11 @@ npm
     done like so for the integrated thing that could inherit from
     anything.
 
+yarn
+    Provides the interface to npm package repository but through yarn.
+
 loaderplugin
-    While loader plugin handers of this package can be considered as
+    While loader plugin handlers of this package can be considered as
     part of the lower level infrastructure, the actual items being
     encapsulated is actually JavaScript code that interfaces with the
     JavaScript/Node.js ecosystem in a rather tightly coupled manner,
@@ -101,5 +115,6 @@ loaderplugin
     target source files.  Given that, these objects should only be
     accessed through the registry system.
 
-As a general rule, a module should not inherit from modules listed below
-their respective position on the above list.
+calmjs
+    Provide an alternative execution method of the runtime, which may be
+    accessed by running ``python -m calmjs.calmjs``.

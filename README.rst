@@ -18,6 +18,7 @@ with the Node.js ecosystem from within a Python environment.
 .. |npm| replace:: ``npm``
 .. |r.js| replace:: ``r.js``
 .. |setuptools| replace:: ``setuptools``
+.. |yarn| replace:: ``yarn``
 .. _AMD: https://github.com/amdjs/amdjs-api/blob/master/AMD.md
 .. _Bower: https://bower.io/
 .. _calmjs.bower: https://pypi.python.org/pypi/calmjs.bower
@@ -26,6 +27,7 @@ with the Node.js ecosystem from within a Python environment.
 .. _npm: https://www.npmjs.com/
 .. _r.js: https://github.com/requirejs/r.js
 .. _setuptools: https://pypi.python.org/pypi/setuptools
+.. _yarn: https://yarnpkg.com/
 
 
 Introduction
@@ -177,8 +179,8 @@ environment, they need to be available within the environment; if they
 are not installed please follow the installation steps for `Node.js`_
 appropriate for the target operating system/environment/platform.
 
-The support of |yarn| is available as of ``calmjs-3.0.0``, as an
-interface to the alternative client to the |npm| package repository.
+The support of |yarn|_ as an alternative client to the |npm| package
+repository is available as of ``calmjs-3.0.0``,
 
 To install |calmjs| into a given Python environment, the following
 command can be executed to install directly from PyPI:
