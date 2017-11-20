@@ -1,7 +1,90 @@
 # -*- coding: utf-8 -*-
 """
 Classes for tracking of built artifacts.
+
+The design for the artifact registry system makes a number of tradeoffs
+to increase end-user usability and simplicity, by not using another
+registry to delegate the construction of the actual builder.  The
+reliance of the name function referenced as registered
+(EntryPoint.attrs) as the authoritative identifier for the group of
+compatible artifact builders without delegating this role to another
+registry has the benefit of simplifying lookup, but this means that any
+future changes to the meaning of the name of that group should not be
+done as the versioning of this can become quite complicated.  This also
+mean that the usage of extra metadata is required for recording which
+version of what package actually resulted in the construction of that
+package.  Also, this means the various toolchain packages must cooperate
+on what the meaning of the words are, in order for a single artifact
+registry instance to function in an unambiguous manner.
+
+Actual functionality, of course, depends fully on the package and the
+developer who built the artifact, and requires that the process as
+outlined in the API is fully followed without artificial out-of-band
+manipulation, as no enforcement option is possible.
+
+For example, given the two following calmjs toolchain packages:
+
+- calmjs.gloop
+- calmjs.glump
+
+They could provide a ``builder`` module that contain functions such
+as:
+
+- calmjs.gloop.builder:gloop_artifact
+- calmjs.glump.builder:glump_artifact
+
+A package that require artifacts built, ``example.package``, may have
+this declaration in its entry points:
+
+    [calmjs.artifacts]
+    deploy.gloop.js = calmjs.gloop.builder:gloop_artifact
+    deploy.glump.js = calmjs.glump.builder:glump_artifact
+
+The build process for both artifacts can be manually trigger by the
+following code:
+
+    >>> from calmjs.parse import get
+    >>> artifacts = get('calmjs.artifacts')
+    >>> artifacts.build_artifacts('example.package')
+    Building artifact for deploy.gloop.js
+    Building artifact for deploy.glump.js
+
+When the build process is done, inside the egg-info or dist-info
+directory of the ``example.package`` package will have a new
+``calmjs_artifacts`` directory that contain both those new artifact
+files.
+
+Resolution for the location of the artifact can be done using the
+``resolve_artifacts_by_builder_compat`` method on the registry instance,
+for example:
+
+    >>> list(artifacts.resolve_artifacts_by_builder_compat('example.package'))
+    ['/.../src/example.package.egg-info/calmjs_artifacts/deploy.gloop.js']
+
+However, if the ``example.package`` wish to have its own build process
+for either of those artifacts, it can declare a new builder with the
+same name in itself like so:
+
+- example.package.builder:gloop_artifact
+
+Thus changing the entry point to this:
+
+    [calmjs.artifacts]
+    deploy.gloop.js = example.gloop.builder:gloop_artifact
+    deploy.glump.js = calmjs.glump.builder:glump_artifact
+
+The resolve method should bring up the information.
+
+However, the metadata associated with what actually produced the
+artifact still needs work.
 """
+
+# TODO XXX master builder name (for anchoring THE authoritative package)
+# conflict resolution at some registry?
+# What if we can avoid this using a compulsory Toolchain argument
+# defined as a default keyword on the function signature?
+# Either way, how to guarantee that the actual toolchain was used?  Is
+# this necessary?
 
 from __future__ import absolute_import
 
