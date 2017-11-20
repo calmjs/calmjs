@@ -169,9 +169,18 @@ class ArtifactRegistry(BaseRegistry):
         Build artifacts declared for the given package.
         """
 
-        entry_points = self.packages.get(package_name, [])
+        entry_points = self.packages.get(package_name, NotImplemented)
+        if entry_points is NotImplemented:
+            logger.debug(
+                "package '%s' has not declared any entry points for the '%s' "
+                "registry for artifact construction",
+                package_name, self.registry_name,
+            )
+            return
+
         logger.debug(
-            "package '%s' has %d entry points for the '%s' registry",
+            "package '%s' has declared %d entry points for the '%s' "
+            "registry for artifact construction",
             package_name, len(entry_points), self.registry_name,
         )
 

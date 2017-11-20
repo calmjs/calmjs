@@ -339,6 +339,11 @@ class ArtifactRegistryTestCase(unittest.TestCase):
             registry.build_artifacts('app')
 
         log = stream.getvalue()
+        self.assertIn(
+            "package 'app' has declared 3 entry points for the "
+            "'calmjs.artifacts' registry for artifact construction", log
+        )
+        log = stream.getvalue()
         self.assertIn("unlinking existing export target at ", log)
         self.assertFalse(exists(target))
 
@@ -360,4 +365,23 @@ class ArtifactRegistryTestCase(unittest.TestCase):
             "the entry point "
             "'nothing.js = calmjs_testing_dummy:nothing_builder' from package "
             "'nothing 1.0' failed to generate an artifact", log
+        )
+
+        with pretty_logging(stream=mocks.StringIO()) as stream:
+            registry.build_artifacts('nothing')
+
+        log = stream.getvalue()
+        self.assertIn(
+            "the entry point "
+            "'nothing.js = calmjs_testing_dummy:nothing_builder' from package "
+            "'nothing 1.0' failed to generate an artifact", log
+        )
+
+        with pretty_logging(stream=mocks.StringIO()) as stream:
+            registry.build_artifacts('undeclared')
+
+        log = stream.getvalue()
+        self.assertIn(
+            "package 'undeclared' has not declared any entry points for the "
+            "'calmjs.artifacts' registry for artifact construction", log
         )
