@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 import unittest
 import sys
+import os
 from os.path import basename
 from os.path import dirname
 from os.path import exists
+from os.path import isfile
 from os.path import join
 from os.path import normcase
 from types import ModuleType
@@ -17,6 +19,7 @@ from calmjs import dist
 from calmjs.utils import pretty_logging
 from calmjs.registry import get
 from calmjs.artifact import ArtifactRegistry
+from calmjs.artifact import prepare_export_location
 from calmjs.artifact import verify_builder
 
 from calmjs.testing import utils
@@ -30,15 +33,68 @@ class IntegrationTestCase(unittest.TestCase):
         self.assertTrue(isinstance(get('calmjs.artifacts'), ArtifactRegistry))
 
 
-class ArtifactRegistryTestCase(unittest.TestCase):
-    """
-    Standard test cases.
-    """
+class UtilsTestCase(unittest.TestCase):
 
-    def assertPathsEqual(self, first, second):
-        def norm(items):
-            return [normcase(i) for i in items]
-        self.assertEqual(norm(first), norm(second))
+    def test_prepare_base(self):
+        basedir = utils.mkdtemp(self)
+        export_target = join(basedir, 'artifacts', 'export.js')
+        with pretty_logging(stream=mocks.StringIO()) as s:
+            self.assertTrue(prepare_export_location(export_target))
+
+        self.assertTrue(exists(join(basedir, 'artifacts')))
+        self.assertIn("artifacts", s.getvalue())
+
+    def test_prepare_base_parent_is_file(self):
+        basedir = utils.mkdtemp(self)
+        export_target = join(basedir, 'artifacts', 'export.js')
+        with open(join(basedir, 'artifacts'), 'w'):
+            pass
+
+        with pretty_logging(stream=mocks.StringIO()) as s:
+            self.assertFalse(prepare_export_location(export_target))
+
+        self.assertIn("cannot export to '%s'" % export_target, s.getvalue())
+        self.assertTrue(isfile(join(basedir, 'artifacts')))
+
+    def test_prepare_existed_file_removed(self):
+        basedir = utils.mkdtemp(self)
+        export_target = join(basedir, 'export.js')
+        with open(export_target, 'w'):
+            pass
+
+        with pretty_logging(stream=mocks.StringIO()) as s:
+            self.assertTrue(prepare_export_location(export_target))
+
+        self.assertIn(
+            "removing existing export target at '%s'" % export_target,
+            s.getvalue())
+        self.assertFalse(exists(export_target))
+
+    def test_prepare_existed_dir_removed(self):
+        basedir = utils.mkdtemp(self)
+        export_target = join(basedir, 'export.js')
+        os.mkdir(export_target)
+
+        with pretty_logging(stream=mocks.StringIO()) as s:
+            self.assertTrue(prepare_export_location(export_target))
+
+        self.assertIn(
+            "removing existing export target directory at '%s'" %
+            export_target, s.getvalue())
+        self.assertFalse(exists(export_target))
+
+    def test_prepare_existed_dir_collision(self):
+        basedir = utils.mkdtemp(self)
+        conflict = join(basedir, 'some')
+        export_target = join(conflict, 'target', 'export.js')
+        with open(conflict, 'w'):
+            pass
+
+        with pretty_logging(stream=mocks.StringIO()) as s:
+            self.assertFalse(prepare_export_location(export_target))
+
+        self.assertIn("failed to prepare export location", s.getvalue())
+        self.assertFalse(exists(export_target))
 
     def test_verify(self):
         def good_builder(package_names, export_target):
@@ -49,6 +105,17 @@ class ArtifactRegistryTestCase(unittest.TestCase):
 
         self.assertTrue(verify_builder(good_builder))
         self.assertFalse(verify_builder(bad_builder))
+
+
+class ArtifactRegistryTestCase(unittest.TestCase):
+    """
+    Standard test cases.
+    """
+
+    def assertPathsEqual(self, first, second):
+        def norm(items):
+            return [normcase(i) for i in items]
+        self.assertEqual(norm(first), norm(second))
 
     def test_basic(self):
         working_dir = utils.mkdtemp(self)

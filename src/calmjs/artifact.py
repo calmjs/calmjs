@@ -97,6 +97,7 @@ from os.path import join
 from os.path import normcase
 from os import makedirs
 from os import unlink
+from shutil import rmtree
 
 from calmjs.base import BaseRegistry
 from calmjs.dist import find_packages_requirements_dists
@@ -118,6 +119,36 @@ def verify_builder(builder):
     except TypeError:
         return False
     return d == {'package_names': [], 'export_target': 'some_path'}
+
+
+def prepare_export_location(export_target):
+    target_dir = dirname(export_target)
+    try:
+        if not exists(target_dir):
+            makedirs(target_dir)
+            logger.debug("created '%s' for '%s'", target_dir, export_target)
+        elif not isdir(target_dir):
+            logger.error(
+                "cannot export to '%s' as its dirname does not lead to a "
+                "directory", export_target
+            )
+            return False
+        elif isdir(export_target):
+            logger.debug(
+                "removing existing export target directory at '%s'",
+                export_target
+            )
+            rmtree(export_target)
+        elif exists(export_target):
+            logger.debug(
+                "removing existing export target at '%s'", export_target)
+            unlink(export_target)
+    except (IOError, OSError) as e:
+        logger.error(
+            "failed to prepare export location '%s': %s", target_dir, e)
+        return False
+
+    return True
 
 
 class ArtifactRegistry(BaseRegistry):
