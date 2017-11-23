@@ -89,6 +89,7 @@ artifact still needs work.
 from __future__ import absolute_import
 
 from inspect import getcallargs
+from inspect import getmro
 from logging import getLogger
 from os.path import dirname
 from os.path import exists
@@ -101,11 +102,28 @@ from shutil import rmtree
 
 from calmjs.base import BaseRegistry
 from calmjs.dist import find_packages_requirements_dists
+from calmjs.dist import find_pkg_dist
 from calmjs.dist import pkg_names_to_dists
+from calmjs.toolchain import Toolchain
+from calmjs.toolchain import Spec
 
 ARTIFACT_BASENAME = 'calmjs_artifacts'
 
 logger = getLogger(__name__)
+
+
+def _cls_lookup_dist(cls):
+    """
+    Attempt to resolve the distribution from the provided class in the
+    most naive way - this assumes the Python module path to the class
+    contains the name of the package that provided the module and class.
+    """
+
+    frags = cls.__module__.split('.')
+    for name in ('.'.join(frags[:x]) for x in range(len(frags), 0, -1)):
+        dist = find_pkg_dist(name)
+        if dist:
+            return dist
 
 
 def verify_builder(builder):
@@ -119,6 +137,41 @@ def verify_builder(builder):
     except TypeError:
         return False
     return d == {'package_names': [], 'export_target': 'some_path'}
+
+
+def extract_builder_result(builder_result):
+    """
+    Extract the builder result to produce a ``Toolchain`` and ``Spec``
+    instance.
+    """
+
+    try:
+        toolchain, spec = builder_result
+    except Exception:
+        return None, None
+    if not isinstance(toolchain, Toolchain) or not isinstance(spec, Spec):
+        return None, None
+    return toolchain, spec
+
+
+def trace_toolchain(toolchain):
+    """
+    Trace the versions of the involved packages for the provided
+    toolchain instance.
+    """
+
+    pkgs = []
+    for cls in getmro(type(toolchain)):
+        if not issubclass(cls, Toolchain):
+            continue
+        dist = _cls_lookup_dist(cls)
+        value = {
+            'project_name': dist.project_name,
+            'version': dist.version,
+        } if dist else {}
+        key = '%s:%s' % (cls.__module__, cls.__name__)
+        pkgs.append({key: value})
+    return pkgs
 
 
 def prepare_export_location(export_target):

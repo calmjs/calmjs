@@ -17,10 +17,15 @@ from pkg_resources import WorkingSet
 from calmjs import artifact
 from calmjs import dist
 from calmjs.utils import pretty_logging
+from calmjs.dist import find_pkg_dist
 from calmjs.registry import get
 from calmjs.artifact import ArtifactRegistry
+from calmjs.artifact import extract_builder_result
 from calmjs.artifact import prepare_export_location
+from calmjs.artifact import trace_toolchain
 from calmjs.artifact import verify_builder
+from calmjs.toolchain import NullToolchain
+from calmjs.toolchain import Spec
 
 from calmjs.testing import utils
 from calmjs.testing import mocks
@@ -96,7 +101,7 @@ class UtilsTestCase(unittest.TestCase):
         self.assertIn("failed to prepare export location", s.getvalue())
         self.assertFalse(exists(export_target))
 
-    def test_verify(self):
+    def test_verify_builder(self):
         def good_builder(package_names, export_target):
             "An expected argument signature"
 
@@ -105,6 +110,30 @@ class UtilsTestCase(unittest.TestCase):
 
         self.assertTrue(verify_builder(good_builder))
         self.assertFalse(verify_builder(bad_builder))
+
+    def test_extract_builder_result(self):
+        self.assertEqual(2, len(
+            extract_builder_result((NullToolchain(), Spec(),))))
+        self.assertEqual((None, None), extract_builder_result(
+            (Spec(), NullToolchain(),)))
+        self.assertEqual((None, None), extract_builder_result(
+            (NullToolchain(), None,)))
+        self.assertEqual((None, None), extract_builder_result(None))
+
+    def test_trace_toolchain(self):
+        version = find_pkg_dist('calmjs').version
+        results = trace_toolchain(NullToolchain())
+        self.assertEqual(results, [{
+            'calmjs.toolchain:NullToolchain': {
+                'project_name': 'calmjs',
+                'version': version,
+            },
+        }, {
+            'calmjs.toolchain:Toolchain': {
+                'project_name': 'calmjs',
+                'version': version,
+            }
+        }])
 
 
 class ArtifactRegistryTestCase(unittest.TestCase):
