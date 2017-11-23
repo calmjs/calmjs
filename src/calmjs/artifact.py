@@ -1,49 +1,61 @@
 # -*- coding: utf-8 -*-
 """
-Classes for tracking of built artifacts.
+Management of the production and querying of prebuilt artifacts.
 
 The design for the artifact registry system makes a number of tradeoffs
 to increase end-user usability and simplicity, by not using another
-registry to delegate the construction of the actual builder.  The
-reliance of the name function referenced as registered
-(EntryPoint.attrs) as the authoritative identifier for the group of
-compatible artifact builders without delegating this role to another
-registry has the benefit of simplifying lookup, but this means that any
-future changes to the meaning of the name of that group should not be
-done as the versioning of this can become quite complicated.  This also
-mean that the usage of extra metadata is required for recording which
-version of what package actually resulted in the construction of that
-package.  Also, this means the various toolchain packages must cooperate
-on what the meaning of the words are, in order for a single artifact
-registry instance to function in an unambiguous manner.
+registry to manage the sets of common functions for artifact production
+that are designated to be compatible.  The usage of the
+``EntryPoint.attrs`` as the authoritative identifier for the group of
+common functions without delegating this role to another registry has
+the benefit of simplifying lookup, but this means that any future
+changes to the meaning of the name of that group should not be done as
+the versioning of this can become quite complicated.
 
-Actual functionality, of course, depends fully on the package and the
+This also mean that the usage of extra metadata is required for
+recording which version of what package actually resulted in the
+construction of that package.  Also, this means the various toolchain
+packages must cooperate on what the meaning of the words are, in order
+for a single artifact registry instance to function in an unambiguous
+manner.
+
+To achieve this, the functions registered to the registry MUST accept
+the two required arguments, ``package_names`` and ``export_target`` (for
+the production of the ``Spec`` instance), and MUST NOT produce the
+artifacts directly, but instead return a 2-tuple containing a
+``Toolchain`` and ``Spec`` instance.  This return value is then invoked
+by the build method within the ``ArtifactRegistry`` instance which will
+complete the build task.  The results can be queried through the methods
+offered by the registry.
+
+Correct functionality, of course, depends fully on the package and the
 developer who built the artifact, and requires that the process as
 outlined in the API is fully followed without artificial out-of-band
-manipulation, as no enforcement option is possible.
+manipulation, as there are zero enforcement options for guarding against
+what actually goes into a wheel.
 
-For example, given the two following calmjs toolchain packages:
+For example, given the two following packages that provide a calmjs
+toolchain implementation:
 
-- calmjs.gloop
-- calmjs.glump
+- default.gloop
+- default.glump
 
-They could provide a ``builder`` module that contain functions such
-as:
+They could provide a module that contain functions such as:
 
-- calmjs.gloop.builder:gloop_artifact
-- calmjs.glump.builder:glump_artifact
+- default.gloop.build:gloop_artifact
+- default.glump.build:glump_artifact
 
 A package that require artifacts built, ``example.package``, may have
 this declaration in its entry points:
 
     [calmjs.artifacts]
-    deploy.gloop.js = calmjs.gloop.builder:gloop_artifact
-    deploy.glump.js = calmjs.glump.builder:glump_artifact
+    deploy.gloop.js = default.gloop.build:gloop_artifact
+    deploy.glump.js = default.glump.build:glump_artifact
 
 The build process for both artifacts can be manually trigger by the
 following code:
 
-    >>> from calmjs.parse import get
+    >>> from calmjs.registry import get
     >>> artifacts = get('calmjs.artifacts')
     >>> artifacts.build_artifacts('example.package')
     Building artifact for deploy.gloop.js
@@ -58,7 +70,8 @@ Resolution for the location of the artifact can be done using the
 ``resolve_artifacts_by_builder_compat`` method on the registry instance,
 for example:
 
-    >>> list(artifacts.resolve_artifacts_by_builder_compat('example.package'))
+    >>> list(artifacts.resolve_artifacts_by_builder_compat(
+    ...     'example.package', 'gloop_artifact'))
     ['/.../src/example.package.egg-info/calmjs_artifacts/deploy.gloop.js']
 
 However, if the ``example.package`` wish to have its own build process
@@ -70,21 +83,14 @@ same name in itself like so:
 Thus changing the entry point to this:
 
     [calmjs.artifacts]
-    deploy.gloop.js = example.gloop.builder:gloop_artifact
-    deploy.glump.js = calmjs.glump.builder:glump_artifact
+    deploy.gloop.js = example.package.builder:gloop_artifact
+    deploy.glump.js = default.glump.builder:glump_artifact
 
 The resolve method should bring up the information.
 
 However, the metadata associated with what actually produced the
 artifact still needs work.
 """
-
-# TODO XXX master builder name (for anchoring THE authoritative package)
-# conflict resolution at some registry?
-# What if we can avoid this using a compulsory Toolchain argument
-# defined as a default keyword on the function signature?
-# Either way, how to guarantee that the actual toolchain was used?  Is
-# this necessary?
 
 from __future__ import absolute_import
 
@@ -198,7 +204,10 @@ def prepare_export_location(export_target):
             unlink(export_target)
     except (IOError, OSError) as e:
         logger.error(
-            "failed to prepare export location '%s': %s", target_dir, e)
+            "failed to prepare export location '%s': %s; ensure that any file "
+            "permission issues are corrected and/or remove the egg-info "
+            "directory for this package before trying again",
+            target_dir, e)
         return False
 
     return True
@@ -351,44 +360,52 @@ class ArtifactRegistry(BaseRegistry):
             package_name, len(entry_points), self.registry_name,
         )
 
-        for ep in entry_points.values():
-            try:
-                builder = ep.resolve()
-            except ImportError:
-                logger.error(
-                    "unable to import the target builder for the entry point "
-                    "'%s' from package '%s'", ep, ep.dist,
-                )
-                continue
+        for entry_point in entry_points.values():
+            self._build_artifact_from_entry_point(entry_point)
 
-            export_target = self.records[(ep.dist.project_name, ep.name)]
-            target_dir = dirname(export_target)
-            if not exists(target_dir):
-                makedirs(target_dir)
-            elif not isdir(target_dir):
-                logger.error(
-                    "cannot export to '%s' as this target's parent is not a "
-                    "directory", export_target
-                )
-                continue
+    def _build_artifact_from_entry_point(self, entry_point):
+        try:
+            builder = entry_point.resolve()
+        except ImportError:
+            logger.error(
+                "unable to import the target builder for the entry point "
+                "'%s' from package '%s'", entry_point, entry_point.dist,
+            )
+            return
 
-            if not verify_builder(builder):
-                logger.error(
-                    "the builder referenced by the entry point '%s' "
-                    "from package '%s' has an incompatible signature",
-                    ep, ep.dist,
-                )
-                continue
+        export_target = self.records[
+            (entry_point.dist.project_name, entry_point.name)]
 
-            if exists(export_target):
-                logger.debug(
-                    "unlinking existing export target at '%s'", export_target)
-                unlink(export_target)
+        if not verify_builder(builder):
+            logger.error(
+                "the builder referenced by the entry point '%s' "
+                "from package '%s' has an incompatible signature",
+                entry_point, entry_point.dist,
+            )
+            return
+        if not prepare_export_location(export_target):
+            return
 
-            builder([ep.dist.project_name], export_target=export_target)
+        toolchain, spec = extract_builder_result(builder(
+            [entry_point.dist.project_name], export_target=export_target))
+        if not toolchain:
+            logger.error(
+                "the builder referenced by the entry point '%s' "
+                "from package '%s' failed to produce a valid "
+                "toolchain and spec",
+                entry_point, entry_point.dist,
+            )
+            return
 
-            if not exists(export_target):
-                logger.error(
-                    "the entry point '%s' from package '%s' failed to "
-                    "generate an artifact at '%s'", ep, ep.dist, export_target
-                )
+        toolchain(spec)
+
+        # TODO figure out how to persist the following information
+        # python_packages = trace_toolchain(toolchain)
+        # verify spec[TOOLCHAIN_BIN_PATH] version and log that down.
+
+        if not exists(export_target):
+            logger.error(
+                "the entry point '%s' from package '%s' failed to "
+                "generate an artifact at '%s'",
+                entry_point, entry_point.dist, export_target
+            )

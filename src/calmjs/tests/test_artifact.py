@@ -31,6 +31,21 @@ from calmjs.testing import utils
 from calmjs.testing import mocks
 
 
+class ArtifactToolchain(NullToolchain):
+
+    def link(self, spec):
+        with open(spec['export_target'], 'w') as fd:
+            fd.write('\n'.join(spec['package_names']))
+
+
+# the generic builder
+def generic_builder(package_names, export_target):
+    return ArtifactToolchain(), Spec(
+        package_names=package_names,
+        export_target=export_target,
+    )
+
+
 class IntegrationTestCase(unittest.TestCase):
 
     def test_integrated_get(self):
@@ -321,15 +336,10 @@ class ArtifactRegistryTestCase(unittest.TestCase):
         )
 
     def test_build_artifacts_success(self):
-        # dummy builder
-        def builder(package_names, export_target):
-            with open(export_target, 'w') as fd:
-                fd.writelines(package_names)
-
         # inject dummy module and add cleanup
         mod = ModuleType('calmjs_testing_dummy')
-        mod.complete = builder
-        mod.partial = builder
+        mod.complete = generic_builder
+        mod.partial = generic_builder
         self.addCleanup(sys.modules.pop, 'calmjs_testing_dummy')
         sys.modules['calmjs_testing_dummy'] = mod
 
@@ -369,14 +379,21 @@ class ArtifactRegistryTestCase(unittest.TestCase):
         def bad_builder():
             "Wrong function signature"
 
-        # dummy builder
+        # produces wrong output
+        def malformed_builder(package_names, export_target):
+            "does not produce an artifact"
+            return NullToolchain()
+
+        # nothing dummy builder
         def nothing_builder(package_names, export_target):
-            "does nothing"
+            "does not produce an artifact"
+            return NullToolchain(), Spec()
 
         # inject dummy module and add cleanup
         mod = ModuleType('calmjs_testing_dummy')
         mod.bad_builder = bad_builder
         mod.nothing_builder = nothing_builder
+        mod.malformed_builder = malformed_builder
         self.addCleanup(sys.modules.pop, 'calmjs_testing_dummy')
         sys.modules['calmjs_testing_dummy'] = mod
 
@@ -398,6 +415,13 @@ class ArtifactRegistryTestCase(unittest.TestCase):
                 'nothing.js = calmjs_testing_dummy:nothing_builder',
             ])),
         ), 'bad', '1.0', working_dir=working_dir)
+
+        utils.make_dummy_dist(self, (
+            ('entry_points.txt', '\n'.join([
+                '[calmjs.artifacts]',
+                'malformed.js = calmjs_testing_dummy:malformed_builder',
+            ])),
+        ), 'malformed', '1.0', working_dir=working_dir)
 
         utils.make_dummy_dist(self, (
             ('entry_points.txt', '\n'.join([
@@ -440,7 +464,7 @@ class ArtifactRegistryTestCase(unittest.TestCase):
             "'calmjs.artifacts' registry for artifact construction", log
         )
         log = stream.getvalue()
-        self.assertIn("unlinking existing export target at ", log)
+        self.assertIn("removing existing export target at ", log)
         self.assertFalse(exists(target))
 
         # clog the directory location with a file
@@ -451,7 +475,14 @@ class ArtifactRegistryTestCase(unittest.TestCase):
             registry.build_artifacts('bad')
 
         log = stream.getvalue()
-        self.assertIn("this target's parent is not a directory", log)
+        self.assertIn("its dirname does not lead to a directory", log)
+
+        # test the malformed builder
+        with pretty_logging(stream=mocks.StringIO()) as stream:
+            registry.build_artifacts('malformed')
+
+        log = stream.getvalue()
+        self.assertIn("failed to produce a valid toolchain and spec", log)
 
         with pretty_logging(stream=mocks.StringIO()) as stream:
             registry.build_artifacts('nothing')
