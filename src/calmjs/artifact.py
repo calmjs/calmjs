@@ -94,9 +94,12 @@ artifact still needs work.
 
 from __future__ import absolute_import
 
+import json
+from codecs import open
 from inspect import getcallargs
 from inspect import getmro
 from logging import getLogger
+from os.path import basename
 from os.path import dirname
 from os.path import exists
 from os.path import isdir
@@ -109,9 +112,12 @@ from shutil import rmtree
 from calmjs.base import BaseRegistry
 from calmjs.dist import find_packages_requirements_dists
 from calmjs.dist import find_pkg_dist
+from calmjs.dist import is_json_compat
 from calmjs.dist import pkg_names_to_dists
+from calmjs.cli import get_bin_version_str
 from calmjs.toolchain import Toolchain
 from calmjs.toolchain import Spec
+from calmjs.toolchain import TOOLCHAIN_BIN_PATH
 
 ARTIFACT_BASENAME = 'calmjs_artifacts'
 
@@ -224,6 +230,8 @@ class ArtifactRegistry(BaseRegistry):
         # this is the reverse lookup for that
         self.reverse = {}
         self.packages = {}
+        # metadata file about the artifacts for the package
+        self.metadata = {}
         # for storing builders that are assumed to be compatible due to
         # their identical attribute names.
         self.compat_builders = {}
@@ -260,11 +268,16 @@ class ArtifactRegistry(BaseRegistry):
         p[ep.name] = ep
 
         # for lookup of the path by the builder identified by the
-        # compat name for Python packages.
+        # compat name (the attrs of the provided entry points) for
+        # Python packages.
         cb_key = '.'.join(ep.attrs)
         cb = self.compat_builders[cb_key] = self.compat_builders.get(
             cb_key, {})
         cb[ep.dist.project_name] = path
+
+        # for looking up/storage of metadata about the built artifacts.
+        self.metadata[ep.dist.project_name] = join(
+            ep.dist.egg_info, ARTIFACT_BASENAME + '.json')
 
         # standard get_artifact_filename lookup for standalone,
         # complete artifacts at some path.
@@ -340,6 +353,25 @@ class ArtifactRegistry(BaseRegistry):
             if path:
                 yield path
 
+    def get_artifact_metadata(self, package_name):
+        """
+        Return metadata of the artifacts built through this registry.
+        """
+
+        filename = self.metadata.get(package_name)
+        if not filename or not exists(filename):
+            return {}
+        with open(filename, encoding='utf8') as fd:
+            contents = fd.read()
+
+        try:
+            is_json_compat(contents)
+        except ValueError:
+            logger.info("artifact metadata file '%s' is invalid", filename)
+            return {}
+
+        return json.loads(contents)
+
     def build_artifacts(self, package_name):
         """
         Build artifacts declared for the given package.
@@ -398,10 +430,21 @@ class ArtifactRegistry(BaseRegistry):
             return
 
         toolchain(spec)
+        metadata = self.get_artifact_metadata(entry_point.dist.project_name)
+        metadata_filename = self.metadata.get(entry_point.dist.project_name)
 
-        # TODO figure out how to persist the following information
-        # python_packages = trace_toolchain(toolchain)
-        # verify spec[TOOLCHAIN_BIN_PATH] version and log that down.
+        toolchain_bases = trace_toolchain(toolchain)
+        toolchain_bin_path = spec.get(TOOLCHAIN_BIN_PATH)
+        toolchain_bin = ([
+            basename(toolchain_bin_path),  # bin_name
+            get_bin_version_str(toolchain_bin_path),  # bin_version
+        ] if toolchain_bin_path else [])
+        metadata.update({basename(export_target): {
+            'toolchain_bases': toolchain_bases,
+            'toolchain_bin': toolchain_bin
+        }})
+        with open(metadata_filename, 'w', encoding='utf8') as fd:
+            json.dump(metadata, fd)
 
         if not exists(export_target):
             logger.error(

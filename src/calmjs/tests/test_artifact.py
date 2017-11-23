@@ -29,13 +29,7 @@ from calmjs.toolchain import Spec
 
 from calmjs.testing import utils
 from calmjs.testing import mocks
-
-
-class ArtifactToolchain(NullToolchain):
-
-    def link(self, spec):
-        with open(spec['export_target'], 'w') as fd:
-            fd.write('\n'.join(spec['package_names']))
+from calmjs.testing.toolchain import ArtifactToolchain
 
 
 # the generic builder
@@ -353,9 +347,22 @@ class ArtifactRegistryTestCase(unittest.TestCase):
             ])),
         ), 'app', '1.0', working_dir=working_dir)
 
+        # mock a version of calmjs within that environment too
+        utils.make_dummy_dist(self, (
+            ('entry_points.txt', ''),
+        ), 'calmjs', '1.0', working_dir=working_dir)
+
+        def version(bin_path, version_flag='-v', kw={}):
+            return '0.0.0'
+
         mock_ws = WorkingSet([working_dir])
         utils.stub_item_attr_value(self, dist, 'default_working_set', mock_ws)
+        utils.stub_item_attr_value(
+            self, artifact, 'get_bin_version_str', version)
         registry = ArtifactRegistry('calmjs.artifacts', _working_set=mock_ws)
+
+        # quick check of the artifact metadata beforehand
+        self.assertEqual({}, registry.get_artifact_metadata('app'))
 
         registry.build_artifacts('app')
         complete = list(registry.resolve_artifacts_by_builder_compat(
@@ -374,7 +381,49 @@ class ArtifactRegistryTestCase(unittest.TestCase):
         with open(partial[0]) as fd:
             self.assertEqual(fd.read(), 'app')
 
-    def test_build_artifacts_logs_and_failures(self):
+        self.assertEqual({
+            'artifact.js': {
+                'toolchain_bases': [
+                    {'calmjs.testing.toolchain:ArtifactToolchain': {
+                        'project_name': 'calmjs',
+                        'version': '1.0',
+                    }},
+                    {'calmjs.toolchain:NullToolchain': {
+                        'project_name': 'calmjs',
+                        'version': '1.0',
+                    }},
+                    {'calmjs.toolchain:Toolchain': {
+                        'project_name': 'calmjs',
+                        'version': '1.0',
+                    }}
+                ],
+                'toolchain_bin': ['artifact', '0.0.0'],
+            },
+            'partial.js': {
+                'toolchain_bases': [
+                    {'calmjs.testing.toolchain:ArtifactToolchain': {
+                        'project_name': 'calmjs',
+                        'version': '1.0'}},
+                    {'calmjs.toolchain:NullToolchain': {
+                        'project_name': 'calmjs',
+                        'version': '1.0',
+                    }},
+                    {'calmjs.toolchain:Toolchain': {
+                        'project_name': 'calmjs',
+                        'version': '1.0',
+                    }}
+                ],
+                'toolchain_bin': ['artifact', '0.0.0'],
+            }
+        }, registry.get_artifact_metadata('app'))
+
+
+class ArtifactRegistryBuildFailureTestCase(unittest.TestCase):
+    """
+    Test out various build failure cases.
+    """
+
+    def setUp(self):
         # bad dummy builder
         def bad_builder():
             "Wrong function signature"
@@ -432,10 +481,12 @@ class ArtifactRegistryTestCase(unittest.TestCase):
 
         mock_ws = WorkingSet([working_dir])
         utils.stub_item_attr_value(self, dist, 'default_working_set', mock_ws)
-        registry = ArtifactRegistry('calmjs.artifacts', _working_set=mock_ws)
+        self.registry = ArtifactRegistry(
+            'calmjs.artifacts', _working_set=mock_ws)
 
+    def test_build_artifacts_logs_and_failures(self):
         with pretty_logging(stream=mocks.StringIO()) as stream:
-            registry.build_artifacts('app')
+            self.registry.build_artifacts('app')
 
         log = stream.getvalue()
         self.assertIn(
@@ -450,13 +501,15 @@ class ArtifactRegistryTestCase(unittest.TestCase):
             "'app 1.0' has an incompatible signature", log
         )
 
+    def test_existing_removed(self):
         # force an existing file
-        target = registry.records[('app', 'nothing.js')]
+        target = self.registry.records[('app', 'nothing.js')]
+        os.mkdir(dirname(target))
         with open(target, 'w'):
             pass
 
         with pretty_logging(stream=mocks.StringIO()) as stream:
-            registry.build_artifacts('app')
+            self.registry.build_artifacts('app')
 
         log = stream.getvalue()
         self.assertIn(
@@ -467,25 +520,26 @@ class ArtifactRegistryTestCase(unittest.TestCase):
         self.assertIn("removing existing export target at ", log)
         self.assertFalse(exists(target))
 
-        # clog the directory location with a file
-        with open(dirname(registry.records[('bad', 'bad.js')]), 'w'):
+    def test_grandparent_not_removed(self):
+        with open(dirname(self.registry.records[('bad', 'bad.js')]), 'w'):
             pass
 
         with pretty_logging(stream=mocks.StringIO()) as stream:
-            registry.build_artifacts('bad')
+            self.registry.build_artifacts('bad')
 
         log = stream.getvalue()
         self.assertIn("its dirname does not lead to a directory", log)
 
-        # test the malformed builder
+    def test_malformed_builder_handling(self):
         with pretty_logging(stream=mocks.StringIO()) as stream:
-            registry.build_artifacts('malformed')
+            self.registry.build_artifacts('malformed')
 
         log = stream.getvalue()
         self.assertIn("failed to produce a valid toolchain and spec", log)
 
+    def test_artifact_generation_failure(self):
         with pretty_logging(stream=mocks.StringIO()) as stream:
-            registry.build_artifacts('nothing')
+            self.registry.build_artifacts('nothing')
 
         log = stream.getvalue()
         self.assertIn(
@@ -494,21 +548,17 @@ class ArtifactRegistryTestCase(unittest.TestCase):
             "'nothing 1.0' failed to generate an artifact", log
         )
 
+    def test_no_declaration(self):
         with pretty_logging(stream=mocks.StringIO()) as stream:
-            registry.build_artifacts('nothing')
-
-        log = stream.getvalue()
-        self.assertIn(
-            "the entry point "
-            "'nothing.js = calmjs_testing_dummy:nothing_builder' from package "
-            "'nothing 1.0' failed to generate an artifact", log
-        )
-
-        with pretty_logging(stream=mocks.StringIO()) as stream:
-            registry.build_artifacts('undeclared')
+            self.registry.build_artifacts('undeclared')
 
         log = stream.getvalue()
         self.assertIn(
             "package 'undeclared' has not declared any entry points for the "
             "'calmjs.artifacts' registry for artifact construction", log
         )
+
+    def test_artifact_metadata_malformed(self):
+        with open(self.registry.metadata.get('app'), 'w') as fd:
+            fd.write('{{{invalidjson')
+        self.assertEqual({}, self.registry.get_artifact_metadata('app'))
