@@ -133,6 +133,7 @@ __all__ = [
     'EXPORT_TARGET', 'EXPORT_TARGET_OVERWRITE',
     'SOURCE_MODULE_NAMES', 'SOURCE_PACKAGE_NAMES',
     'TEST_MODULE_NAMES', 'TEST_MODULE_PATHS_MAP', 'TEST_PACKAGE_NAMES',
+    'TOOLCHAIN_BIN_PATH',
     'WORKING_DIR',
 ]
 
@@ -208,6 +209,8 @@ TEST_MODULE_NAMES = 'test_module_names'
 TEST_MODULE_PATHS_MAP = 'test_module_paths_map'
 # name of test package
 TEST_PACKAGE_NAMES = 'test_package_names'
+# the binary that the toolchain encapsulates.
+TOOLCHAIN_BIN_PATH = 'toolchain_bin_path'
 # the working directory
 WORKING_DIR = 'working_dir'
 

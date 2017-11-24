@@ -521,7 +521,8 @@ def make_dummy_dist(testcase_inst, metadata_map=(),
 
     egg_info = '%s-%s.egg-info' % (pkgname, version)
     egg_info_dir = join(working_dir, egg_info)
-    makedirs(egg_info_dir)
+    if not exists(egg_info_dir):
+        makedirs(egg_info_dir)
     metadata = PathMetadata(working_dir, egg_info_dir)
 
     for fn, data in metadata_map:

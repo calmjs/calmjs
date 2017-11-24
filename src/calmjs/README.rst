@@ -65,10 +65,6 @@ dist
     provides the functions that interfaces with the registry system that
     setuptools provide.
 
-artifact
-    Defines artifact related registries.  Uses dist to resolve the
-    dependency of packages.
-
 toolchain
     The exported primitive of this project.  Provides the skeleton
     Toolchain class for other packages to extend upon.  While some
@@ -96,6 +92,12 @@ command
     part for the underlying binary for the command, and runtime for the
     help tests.  The classes will hold onto an instance of a cli Driver
     and also the appropriate runtime constructed using that.
+
+artifact
+    Defines all artifact integration functionalities; includes the
+    related registries, makes use of the dist and command modules for
+    the resolution of dependencies of packages and hooks into the
+    setuptools infrastructure.
 
 npm
     The npm specific tools.  Whole module can in theory be generated

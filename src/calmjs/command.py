@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Module providing npm distutil command that ultimately integrates with
-setuptools
+Module for providing various distutil command that integrates with
+setuptools, and for setting up the build environments and building
+JavaScript artifacts.
 """
 
 from __future__ import absolute_import
@@ -14,11 +15,12 @@ from distutils.core import Command
 from distutils import log
 
 from calmjs.ui import prompt_overwrite_json
+from calmjs.registry import get
 
 
 class DistutilsLogHandler(logging.Handler):
     """
-    A handler that streams the logs to the distutils logger
+    A handler that streams the logs to the distutils logger.
     """
 
     def __init__(self, distutils_log=log):
@@ -50,9 +52,34 @@ class DistutilsLogHandler(logging.Handler):
 distutils_log_handler = DistutilsLogHandler()
 
 
+def use_distutils_logger(logger_ids=('calmjs',)):
+    def decorator(method):
+        def run(cmd):
+            root_logger = logging.getLogger()
+            old_level = root_logger.level
+            root_logger.setLevel(logging.DEBUG)
+
+            for logger_id in logger_ids:
+                logger = logging.getLogger(logger_id)
+                logger.addHandler(distutils_log_handler)
+
+            try:
+                method(cmd)
+            finally:
+                # Remove the logging handlers and restore the level.
+                for logger_id in logger_ids:
+                    logger = logging.getLogger(logger_id)
+                    logger.removeHandler(distutils_log_handler)
+
+                root_logger.setLevel(old_level)
+
+        return run
+    return decorator
+
+
 class PackageManagerCommand(Command):
     """
-    Simple compatibility hook for a package manager
+    Simple compatibility hook for a package manager runtime.
     """
 
     # subclasses need to define these
@@ -60,9 +87,6 @@ class PackageManagerCommand(Command):
     # description = "base command for package manager compatibility helper"
 
     indent = 4
-
-    # We are really only interested logs from these modules.
-    handle_logger_ids = ('calmjs',)
 
     @classmethod
     def _initialize_user_options(cls):
@@ -122,33 +146,42 @@ class PackageManagerCommand(Command):
         self.production = True if self.production else None
         self.development = True if self.development else None
 
+    @use_distutils_logger()
     def run(self):
         if self.dry_run:
             # Do the default action and finish, as everything else may
             # cause permanent changes.
             self.do_view()
             return
+        self.run_command('egg_info')
+        if self.install:
+            self.do_install()
+        elif self.init:
+            self.do_init()
+        elif self.view:
+            self.do_view()
 
-        root_logger = logging.getLogger()
-        old_level = root_logger.level
-        root_logger.setLevel(logging.DEBUG)
 
-        for logger_id in self.handle_logger_ids:
-            logger = logging.getLogger(logger_id)
-            logger.addHandler(distutils_log_handler)
+class BuildArtifactCommand(Command):
+    """
+    Command for building artifacts for the given package.
+    """
 
-        try:
-            self.run_command('egg_info')
-            if self.install:
-                self.do_install()
-            elif self.init:
-                self.do_init()
-            elif self.view:
-                self.do_view()
-        finally:
-            # Remove the logging handlers and restore the level.
-            for logger_id in self.handle_logger_ids:
-                logger = logging.getLogger(logger_id)
-                logger.removeHandler(distutils_log_handler)
+    user_options = []
 
-            root_logger.setLevel(old_level)
+    def initialize_options(self):
+        """
+        Implement items that could go into the spec, such as setting of
+        build dir prefix.
+        """
+
+    def finalize_options(self):
+        """
+        If finalization is needed.
+        """
+
+    @use_distutils_logger()
+    def run(self):
+        if self.dry_run:
+            return
+        get('calmjs.artifacts').build_artifacts(self.distribution.get_name())

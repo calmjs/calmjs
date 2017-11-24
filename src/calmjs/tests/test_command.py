@@ -2,10 +2,14 @@
 import logging
 import unittest
 import sys
+from distutils.dist import Distribution
 
+from calmjs import command
 from calmjs.command import distutils_log_handler
+from calmjs.command import BuildArtifactCommand
 
 from calmjs.testing.utils import stub_stdouts
+from calmjs.testing.utils import stub_item_attr_value
 
 
 # the actual command class kind of requires integration test for most
@@ -66,3 +70,41 @@ class DistLoggerTestCase(unittest.TestCase):
         logger.warning('Warning')
         self.assertEqual(sys.stdout.getvalue(), '')
         self.assertEqual(sys.stderr.getvalue(), 'Warning\n')
+
+
+class BuildArtifactCommandTestcase(unittest.TestCase):
+    """
+    Just a basic test with stubbed contents.
+    """
+
+    def setUp(self):
+        # complete integration test will be difficult to achieve, so
+        # this series of stubs and direct invocation will be done
+        # instead.
+        built_names = []
+
+        class FakeBuilder(object):
+            def build_artifacts(self, name):
+                built_names.append(name)
+
+        self.built_names = built_names
+        stub_item_attr_value(self, command, 'get', {
+            'calmjs.artifacts': FakeBuilder(),
+        }.get)
+
+    def test_build_calmjs_artifacts_dry_run(self):
+        dist = Distribution(attrs={
+            'name': 'some.package',
+            'dry_run': True,
+        })
+        cmd = BuildArtifactCommand(dist=dist)
+        cmd.run()
+        self.assertEqual([], self.built_names)
+
+    def test_build_calmjs_artifacts_basic(self):
+        dist = Distribution(attrs={
+            'name': 'some.package',
+        })
+        cmd = BuildArtifactCommand(dist=dist)
+        cmd.run()
+        self.assertEqual(['some.package'], self.built_names)

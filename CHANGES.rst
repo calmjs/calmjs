@@ -45,6 +45,7 @@ Changelog
   ``extras_calmjs`` to specify the location of loaders for all the
   different toolchains (which inevitably collide and cause conflicts).
   Toolchains downstream will need to implement support for this.
+- Artifact production support, including integration with setuptools.
 
 2.1.0 (2016-11-29)
 ------------------

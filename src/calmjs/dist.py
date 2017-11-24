@@ -12,6 +12,7 @@ import json
 from functools import partial
 from logging import getLogger
 
+from distutils.command.build import build as BuildCommand
 from distutils.errors import DistutilsSetupError
 
 from pkg_resources import Requirement
@@ -487,3 +488,35 @@ def flatten_module_registry_names(pkg_names, working_set=None):
 
 write_module_registry_names = partial(
     write_line_list, CALMJS_MODULE_REGISTRY_FIELD)
+
+
+# These depend on the artifact registry that is defined in the artifact
+# module.
+
+def has_calmjs_artifact_declarations(cmd, registry_name='calmjs.artifacts'):
+    """
+    For a distutils command to verify that the artifact build step is
+    possible.
+    """
+
+    return any(get(registry_name).iter_records_for(
+        cmd.distribution.get_name()))
+
+
+def build_calmjs_artifacts(dist, key, value, cmdclass=BuildCommand):
+    """
+    Trigger the artifact build process through the setuptools.
+    """
+
+    if value is not True:
+        return
+
+    build_cmd = dist.get_command_obj('build')
+    if not isinstance(build_cmd, cmdclass):
+        logger.error(
+            "'build' command in Distribution is not an instance of "
+            "'%s:%s' (got %r instead)",
+            cmdclass.__module__, cmdclass.__name__, build_cmd)
+        return
+
+    build_cmd.sub_commands.append((key, has_calmjs_artifact_declarations))

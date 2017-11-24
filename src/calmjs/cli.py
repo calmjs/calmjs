@@ -43,13 +43,16 @@ logger = logging.getLogger(__name__)
 version_expr = re.compile('((?:\d+)(?:\.\d+)*)')
 
 
-def get_bin_version(bin_path, version_flag='-v', kw={}):
+def get_bin_version_str(bin_path, version_flag='-v', kw={}):
+    """
+    Get the version string through the binary.
+    """
+
     try:
         prog = _get_exec_binary(bin_path, kw)
         version_str = version_expr.search(
             check_output([prog, version_flag], **kw).decode(locale)
         ).groups()[0]
-        version = tuple(int(i) for i in version_str.split('.'))
     except OSError:
         logger.warning("failed to execute '%s'", bin_path)
         return None
@@ -60,7 +63,18 @@ def get_bin_version(bin_path, version_flag='-v', kw={}):
         )
         return None
     logger.info("found '%s' version '%s'", bin_path, version_str)
-    return version
+    return version_str
+
+
+def get_bin_version(bin_path, version_flag='-v', kw={}):
+    """
+    Get the version string through the binary and return a tuple of
+    integers.
+    """
+
+    version_str = get_bin_version_str(bin_path, version_flag, kw)
+    if version_str:
+        return tuple(int(i) for i in version_str.split('.'))
 
 
 _get_bin_version = get_bin_version  # BBB backward compat
