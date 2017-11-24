@@ -219,6 +219,18 @@ class TestingUtilsTestCase(unittest.TestCase):
         self.assertEqual(distributions[1].requires(), [
             Requirement.parse('parentpkg>=0.8')])
 
+        # overwrite should work
+        make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([
+                'parentpkg>=0.7',
+            ])),
+        ), 'childpkg', '0.1')
+        # but the data have to be recreated
+        working_set = WorkingSet([self._calmjs_testing_tmpdir])
+        distributions = working_set.resolve(grandchildpkg.requires())
+        self.assertEqual(distributions[1].requires(), [
+            Requirement.parse('parentpkg>=0.7')])
+
     # both of these incidentally will test mkdtemp's behavior with chdir
     # inside windows, too.
 

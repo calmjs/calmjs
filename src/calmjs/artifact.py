@@ -466,13 +466,16 @@ class ArtifactRegistry(BaseRegistry):
         metadata = self.get_artifact_metadata(entry_point.dist.project_name)
         metadata_filename = self.metadata.get(entry_point.dist.project_name)
 
+        artifacts = metadata[ARTIFACT_BASENAME] = metadata.get(
+            ARTIFACT_BASENAME, {})
+
         toolchain_bases = trace_toolchain(toolchain)
         toolchain_bin_path = spec.get(TOOLCHAIN_BIN_PATH)
         toolchain_bin = ([
             basename(toolchain_bin_path),  # bin_name
             get_bin_version_str(toolchain_bin_path),  # bin_version
         ] if toolchain_bin_path else [])
-        metadata.update({basename(export_target): {
+        artifacts.update({basename(export_target): {
             'toolchain_bases': toolchain_bases,
             'toolchain_bin': toolchain_bin
         }})

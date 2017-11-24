@@ -332,6 +332,7 @@ class ArtifactRegistryTestCase(unittest.TestCase):
     def test_build_artifacts_success(self):
         # inject dummy module and add cleanup
         mod = ModuleType('calmjs_testing_dummy')
+        mod.extra = generic_builder
         mod.complete = generic_builder
         mod.partial = generic_builder
         self.addCleanup(sys.modules.pop, 'calmjs_testing_dummy')
@@ -381,7 +382,7 @@ class ArtifactRegistryTestCase(unittest.TestCase):
         with open(partial[0]) as fd:
             self.assertEqual(fd.read(), 'app')
 
-        self.assertEqual({
+        self.assertEqual({'calmjs_artifacts': {
             'artifact.js': {
                 'toolchain_bases': [
                     {'calmjs.testing.toolchain:ArtifactToolchain': {
@@ -415,7 +416,28 @@ class ArtifactRegistryTestCase(unittest.TestCase):
                 ],
                 'toolchain_bin': ['artifact', '0.0.0'],
             }
-        }, registry.get_artifact_metadata('app'))
+        }}, registry.get_artifact_metadata('app'))
+
+        # test that the 'calmjs_artifacts' listing only grows - the only
+        # way to clean this is to remove and rebuild egg-info directly.
+        utils.make_dummy_dist(self, (
+            ('entry_points.txt', '\n'.join([
+                '[calmjs.artifacts]',
+                'extra.js = calmjs_testing_dummy:extra',
+            ])),
+        ), 'app', '1.0', working_dir=working_dir)
+
+        mock_ws = WorkingSet([working_dir])
+        utils.stub_item_attr_value(self, dist, 'default_working_set', mock_ws)
+        utils.stub_item_attr_value(
+            self, artifact, 'get_bin_version_str', version)
+        registry = ArtifactRegistry('calmjs.artifacts', _working_set=mock_ws)
+
+        registry.build_artifacts('app')
+        self.assertEqual(3, len(registry.get_artifact_metadata('app')[
+            'calmjs_artifacts']))
+        self.assertIn('extra.js', registry.get_artifact_metadata('app')[
+            'calmjs_artifacts'])
 
 
 class ArtifactRegistryBuildFailureTestCase(unittest.TestCase):
