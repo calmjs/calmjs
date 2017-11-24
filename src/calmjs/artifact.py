@@ -425,8 +425,20 @@ class ArtifactRegistry(BaseRegistry):
         Build artifacts declared for the given package.
         """
 
+        if not any(self.iter_records_for(package_name)):
+            return
+
+        metadata = self.get_artifact_metadata(package_name)
+        metadata_filename = self.metadata.get(package_name)
+        artifacts = metadata[ARTIFACT_BASENAME] = metadata.get(
+            ARTIFACT_BASENAME, {})
+
         for entry_point in self.iter_records_for(package_name):
-            self._build_artifact_from_entry_point(entry_point)
+            artifacts.update(
+                self._build_artifact_from_entry_point(entry_point))
+
+        with open(metadata_filename, 'w', encoding='utf8') as fd:
+            json.dump(metadata, fd)
 
     def _build_artifact_from_entry_point(self, entry_point):
         try:
@@ -436,7 +448,7 @@ class ArtifactRegistry(BaseRegistry):
                 "unable to import the target builder for the entry point "
                 "'%s' from package '%s'", entry_point, entry_point.dist,
             )
-            return
+            return {}
 
         export_target = self.records[
             (entry_point.dist.project_name, entry_point.name)]
@@ -447,9 +459,9 @@ class ArtifactRegistry(BaseRegistry):
                 "from package '%s' has an incompatible signature",
                 entry_point, entry_point.dist,
             )
-            return
+            return {}
         if not prepare_export_location(export_target):
-            return
+            return {}
 
         toolchain, spec = extract_builder_result(builder(
             [entry_point.dist.project_name], export_target=export_target))
@@ -460,27 +472,9 @@ class ArtifactRegistry(BaseRegistry):
                 "toolchain and spec",
                 entry_point, entry_point.dist,
             )
-            return
+            return {}
 
         toolchain(spec)
-        metadata = self.get_artifact_metadata(entry_point.dist.project_name)
-        metadata_filename = self.metadata.get(entry_point.dist.project_name)
-
-        artifacts = metadata[ARTIFACT_BASENAME] = metadata.get(
-            ARTIFACT_BASENAME, {})
-
-        toolchain_bases = trace_toolchain(toolchain)
-        toolchain_bin_path = spec.get(TOOLCHAIN_BIN_PATH)
-        toolchain_bin = ([
-            basename(toolchain_bin_path),  # bin_name
-            get_bin_version_str(toolchain_bin_path),  # bin_version
-        ] if toolchain_bin_path else [])
-        artifacts.update({basename(export_target): {
-            'toolchain_bases': toolchain_bases,
-            'toolchain_bin': toolchain_bin
-        }})
-        with open(metadata_filename, 'w', encoding='utf8') as fd:
-            json.dump(metadata, fd)
 
         if not exists(export_target):
             logger.error(
@@ -488,3 +482,17 @@ class ArtifactRegistry(BaseRegistry):
                 "generate an artifact at '%s'",
                 entry_point, entry_point.dist, export_target
             )
+
+        toolchain_bases = trace_toolchain(toolchain)
+        toolchain_bin_path = spec.get(TOOLCHAIN_BIN_PATH)
+        toolchain_bin = ([
+            basename(toolchain_bin_path),  # bin_name
+            get_bin_version_str(toolchain_bin_path),  # bin_version
+        ] if toolchain_bin_path else [])
+
+        return {basename(export_target): {
+            'toolchain_bases': toolchain_bases,
+            'toolchain_bin': toolchain_bin,
+            'builder': '%s:%s' % (
+                entry_point.module_name, '.'.join(entry_point.attrs)),
+        }}

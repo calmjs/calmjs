@@ -384,6 +384,7 @@ class ArtifactRegistryTestCase(unittest.TestCase):
 
         self.assertEqual({'calmjs_artifacts': {
             'artifact.js': {
+                'builder': 'calmjs_testing_dummy:complete',
                 'toolchain_bases': [
                     {'calmjs.testing.toolchain:ArtifactToolchain': {
                         'project_name': 'calmjs',
@@ -401,6 +402,7 @@ class ArtifactRegistryTestCase(unittest.TestCase):
                 'toolchain_bin': ['artifact', '0.0.0'],
             },
             'partial.js': {
+                'builder': 'calmjs_testing_dummy:partial',
                 'toolchain_bases': [
                     {'calmjs.testing.toolchain:ArtifactToolchain': {
                         'project_name': 'calmjs',
