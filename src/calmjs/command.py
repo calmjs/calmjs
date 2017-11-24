@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Module providing npm distutil command that ultimately integrates with
-setuptools
+Module for providing various distutil command that integrates with
+setuptools, and for setting up the build environments and building
+JavaScript artifacts.
 """
 
 from __future__ import absolute_import
@@ -14,11 +15,12 @@ from distutils.core import Command
 from distutils import log
 
 from calmjs.ui import prompt_overwrite_json
+from calmjs.registry import get
 
 
 class DistutilsLogHandler(logging.Handler):
     """
-    A handler that streams the logs to the distutils logger
+    A handler that streams the logs to the distutils logger.
     """
 
     def __init__(self, distutils_log=log):
@@ -77,7 +79,7 @@ def use_distutils_logger(logger_ids=('calmjs',)):
 
 class PackageManagerCommand(Command):
     """
-    Simple compatibility hook for a package manager
+    Simple compatibility hook for a package manager runtime.
     """
 
     # subclasses need to define these
@@ -158,3 +160,28 @@ class PackageManagerCommand(Command):
             self.do_init()
         elif self.view:
             self.do_view()
+
+
+class BuildArtifactCommand(Command):
+    """
+    Command for building artifacts for the given package.
+    """
+
+    user_options = []
+
+    def initialize_options(self):
+        """
+        Implement items that could go into the spec, such as setting of
+        build dir prefix.
+        """
+
+    def finalize_options(self):
+        """
+        If finalization is needed.
+        """
+
+    @use_distutils_logger()
+    def run(self):
+        if self.dry_run:
+            return
+        get('calmjs.artifacts').build_artifacts(self.distribution.get_name())

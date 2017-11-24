@@ -88,8 +88,28 @@ Thus changing the entry point to this:
 
 The resolve method should bring up the information.
 
-However, the metadata associated with what actually produced the
-artifact still needs work.
+To enable the building of artifacts while building the package using
+setuptools, in the ``setup`` function (typically of ``setup.py``) the
+``build_calmjs_artifacts` should be set to True.  Combining together
+with the entry point setup, the setup call may look something like this:
+
+    setup(
+        name='example.package',
+        # ...
+        build_calmjs_artifacts=True,
+        entry_points={
+            # module declaration
+            'calmjs.module': [
+                'example.package = example.package',
+            ],
+            'calmjs.artifacts': [
+                'deploy.gloop.js = example.package.builder:gloop_artifact',
+                'deploy.glump.js = default.glump.builder:glump_artifact',
+            ],
+        },
+        build_calmjs_artifacts=True,
+        # ...
+    )
 """
 
 from __future__ import absolute_import
@@ -115,6 +135,7 @@ from calmjs.dist import find_pkg_dist
 from calmjs.dist import is_json_compat
 from calmjs.dist import pkg_names_to_dists
 from calmjs.cli import get_bin_version_str
+from calmjs.command import BuildArtifactCommand
 from calmjs.toolchain import Toolchain
 from calmjs.toolchain import Spec
 from calmjs.toolchain import TOOLCHAIN_BIN_PATH
@@ -217,6 +238,12 @@ def prepare_export_location(export_target):
         return False
 
     return True
+
+
+class build_calmjs_artifacts(BuildArtifactCommand):
+    """
+    The main artifact build command for calmjs
+    """
 
 
 class ArtifactRegistry(BaseRegistry):
@@ -372,9 +399,9 @@ class ArtifactRegistry(BaseRegistry):
 
         return json.loads(contents)
 
-    def build_artifacts(self, package_name):
+    def iter_records_for(self, package_name):
         """
-        Build artifacts declared for the given package.
+        Iterate records for a specific package.
         """
 
         entry_points = self.packages.get(package_name, NotImplemented)
@@ -384,15 +411,21 @@ class ArtifactRegistry(BaseRegistry):
                 "registry for artifact construction",
                 package_name, self.registry_name,
             )
-            return
+            return iter([])
 
         logger.debug(
             "package '%s' has declared %d entry points for the '%s' "
             "registry for artifact construction",
             package_name, len(entry_points), self.registry_name,
         )
+        return iter(entry_points.values())
 
-        for entry_point in entry_points.values():
+    def build_artifacts(self, package_name):
+        """
+        Build artifacts declared for the given package.
+        """
+
+        for entry_point in self.iter_records_for(package_name):
             self._build_artifact_from_entry_point(entry_point)
 
     def _build_artifact_from_entry_point(self, entry_point):

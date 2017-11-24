@@ -7,6 +7,7 @@ from os.path import join
 from subprocess import Popen
 from subprocess import PIPE
 from distutils.errors import DistutilsSetupError
+from distutils import dist as distutils_dist
 from setuptools.dist import Distribution
 
 import pkg_resources
@@ -14,8 +15,10 @@ import pkg_resources
 from calmjs.module import ModuleRegistry
 from calmjs import dist as calmjs_dist
 from calmjs.cli import locale
+from calmjs.utils import pretty_logging
 from calmjs.testing.mocks import Mock_egg_info
 from calmjs.testing.mocks import MockProvider
+from calmjs.testing.mocks import StringIO
 from calmjs.testing.utils import make_dummy_dist
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import stub_stdouts
@@ -982,6 +985,87 @@ class DistTestCase(unittest.TestCase):
             ['nothing'], working_set=working_set), [])
 
 
+class ArtifactIntegrationTestCase(unittest.TestCase):
+
+    def test_calmjs_artifact_declarations(self):
+        from calmjs.registry import _inst
+
+        # the actual implementations this is supporting
+        from calmjs.artifact import build_calmjs_artifacts
+        from calmjs.artifact import ArtifactRegistry
+
+        working_dir = mkdtemp(self)
+        make_dummy_dist(self, (
+            ('entry_points.txt', '\n'.join([
+                '[calmjs.registry]',
+                'calmjs.artifacts = calmjs.artifact:ArtifactsRegistry',
+            ])),
+        ), 'calmjs', '1.0', working_dir=working_dir)
+
+        make_dummy_dist(self, (
+            ('entry_points.txt', '\n'.join([
+                '[calmjs.artifacts]',
+                'example.js = example:builder',
+            ])),
+        ), 'some.package', '1.0', working_dir=working_dir)
+
+        mock_ws = pkg_resources.WorkingSet([working_dir])
+        registry_id = 'calmjs.artifacts'
+        registry = ArtifactRegistry(registry_id, _working_set=mock_ws)
+        # cleanup the about to be injected version.
+        self.addCleanup(_inst.records.pop, registry_id, None)
+        _inst.records['calmjs.artifacts'] = registry
+
+        # construct a command for the declaration check.
+        cmd = build_calmjs_artifacts(dist=distutils_dist.Distribution(
+            attrs={'name': 'some.package'}))
+        self.assertTrue(calmjs_dist.has_calmjs_artifact_declarations(cmd))
+
+        cmd = build_calmjs_artifacts(dist=distutils_dist.Distribution(
+            attrs={'name': 'missing.package'}))
+        self.assertFalse(calmjs_dist.has_calmjs_artifact_declarations(cmd))
+
+        cmd = build_calmjs_artifacts(dist=distutils_dist.Distribution(
+            attrs={'name': 'calmjs'}))
+        self.assertFalse(calmjs_dist.has_calmjs_artifact_declarations(cmd))
+
+    def test_build_calmjs_artifacts_standard(self):
+        dist = distutils_dist.Distribution()
+        build_cmd = dist.get_command_obj('build')
+        original_subcmds = list(build_cmd.sub_commands)
+        calmjs_dist.build_calmjs_artifacts(dist, 'build_artifact', False)
+        self.assertEqual(original_subcmds, build_cmd.sub_commands)
+
+        # keys are named after the build step.
+        calmjs_dist.build_calmjs_artifacts(dist, 'build_artifact', True)
+        self.assertEqual(
+            ('build_artifact', calmjs_dist.has_calmjs_artifact_declarations),
+            build_cmd.sub_commands[-1],
+        )
+
+        calmjs_dist.build_calmjs_artifacts(dist, 'calmjs_artifact', True)
+        self.assertEqual(
+            ('calmjs_artifact', calmjs_dist.has_calmjs_artifact_declarations),
+            build_cmd.sub_commands[-1],
+        )
+
+    def test_build_calmjs_artifacts_failure(self):
+        def fakecmd(*a, **kw):
+            return object
+
+        dist = distutils_dist.Distribution(attrs={
+            'cmdclass': {'build': fakecmd},
+        })
+
+        with pretty_logging(stream=StringIO()) as stream:
+            calmjs_dist.build_calmjs_artifacts(dist, 'build_again', True)
+
+        self.assertIn(
+            "'build' command in Distribution is not an instance of "
+            "'distutils.command.build:build'", stream.getvalue(),
+        )
+
+
 class DistIntegrationTestCase(unittest.TestCase):
     """
     Testing integration of dist with the rest of calmjs and setuptools.
@@ -1061,3 +1145,22 @@ class DistIntegrationTestCase(unittest.TestCase):
 
         with open(join(egg_root, 'calmjs_module_registry.txt')) as fd:
             self.assertEqual(fd.read().split(), ['reg1', 'reg2'])
+
+    def test_build_calmjs_artifact(self):
+        """
+        Emulate the execution of ``python setup.py egg_info``.
+
+        Ensure everything is covered.
+        """
+
+        # run the step directly to see that the command is registered,
+        # though the actual effects cannot be tested, as the test
+        # package is not going to be installed and there are no valid
+        # artifact build functions defined.
+        p = Popen(
+            [sys.executable, 'setup.py', 'build_calmjs_artifacts'],
+            stdout=PIPE, stderr=PIPE, cwd=self.pkg_root,
+        )
+        stdout, stderr = p.communicate()
+        stdout = stdout.decode(locale)
+        self.assertIn('running build_calmjs_artifacts', stdout)

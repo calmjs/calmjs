@@ -61,11 +61,13 @@ setup(
         'distutils.commands': [
             'npm = calmjs.npm:npm',
             'yarn = calmjs.yarn:yarn',
+            'build_calmjs_artifacts = calmjs.artifact:build_calmjs_artifacts',
         ],
         'distutils.setup_keywords': [
             'package_json = calmjs.dist:validate_json_field',
             'extras_calmjs = calmjs.dist:validate_json_field',
             'calmjs_module_registry = calmjs.dist:validate_line_list',
+            'build_calmjs_artifacts = calmjs.dist:build_calmjs_artifacts',
         ],
         'egg_info.writers': [
             'package.json = calmjs.npm:write_package_json',
