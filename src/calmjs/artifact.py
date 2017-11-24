@@ -437,6 +437,10 @@ class ArtifactRegistry(BaseRegistry):
             artifacts.update(
                 self._build_artifact_from_entry_point(entry_point))
 
+        metadata['versions'] = sorted(set(
+            '%s' % i for i in find_packages_requirements_dists(
+                [package_name])))
+
         with open(metadata_filename, 'w', encoding='utf8') as fd:
             json.dump(metadata, fd)
 

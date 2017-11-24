@@ -341,6 +341,9 @@ class ArtifactRegistryTestCase(unittest.TestCase):
         working_dir = utils.mkdtemp(self)
 
         utils.make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([
+                'calmjs',
+            ])),
             ('entry_points.txt', '\n'.join([
                 '[calmjs.artifacts]',
                 'artifact.js = calmjs_testing_dummy:complete',
@@ -382,43 +385,49 @@ class ArtifactRegistryTestCase(unittest.TestCase):
         with open(partial[0]) as fd:
             self.assertEqual(fd.read(), 'app')
 
-        self.assertEqual({'calmjs_artifacts': {
-            'artifact.js': {
-                'builder': 'calmjs_testing_dummy:complete',
-                'toolchain_bases': [
-                    {'calmjs.testing.toolchain:ArtifactToolchain': {
-                        'project_name': 'calmjs',
-                        'version': '1.0',
-                    }},
-                    {'calmjs.toolchain:NullToolchain': {
-                        'project_name': 'calmjs',
-                        'version': '1.0',
-                    }},
-                    {'calmjs.toolchain:Toolchain': {
-                        'project_name': 'calmjs',
-                        'version': '1.0',
-                    }}
-                ],
-                'toolchain_bin': ['artifact', '0.0.0'],
+        self.assertEqual({
+            'calmjs_artifacts': {
+                'artifact.js': {
+                    'builder': 'calmjs_testing_dummy:complete',
+                    'toolchain_bases': [
+                        {'calmjs.testing.toolchain:ArtifactToolchain': {
+                            'project_name': 'calmjs',
+                            'version': '1.0',
+                        }},
+                        {'calmjs.toolchain:NullToolchain': {
+                            'project_name': 'calmjs',
+                            'version': '1.0',
+                        }},
+                        {'calmjs.toolchain:Toolchain': {
+                            'project_name': 'calmjs',
+                            'version': '1.0',
+                        }}
+                    ],
+                    'toolchain_bin': ['artifact', '0.0.0'],
+                },
+                'partial.js': {
+                    'builder': 'calmjs_testing_dummy:partial',
+                    'toolchain_bases': [
+                        {'calmjs.testing.toolchain:ArtifactToolchain': {
+                            'project_name': 'calmjs',
+                            'version': '1.0'}},
+                        {'calmjs.toolchain:NullToolchain': {
+                            'project_name': 'calmjs',
+                            'version': '1.0',
+                        }},
+                        {'calmjs.toolchain:Toolchain': {
+                            'project_name': 'calmjs',
+                            'version': '1.0',
+                        }}
+                    ],
+                    'toolchain_bin': ['artifact', '0.0.0'],
+                }
             },
-            'partial.js': {
-                'builder': 'calmjs_testing_dummy:partial',
-                'toolchain_bases': [
-                    {'calmjs.testing.toolchain:ArtifactToolchain': {
-                        'project_name': 'calmjs',
-                        'version': '1.0'}},
-                    {'calmjs.toolchain:NullToolchain': {
-                        'project_name': 'calmjs',
-                        'version': '1.0',
-                    }},
-                    {'calmjs.toolchain:Toolchain': {
-                        'project_name': 'calmjs',
-                        'version': '1.0',
-                    }}
-                ],
-                'toolchain_bin': ['artifact', '0.0.0'],
-            }
-        }}, registry.get_artifact_metadata('app'))
+            'versions': [
+                'app 1.0',
+                'calmjs 1.0',
+            ]
+        }, registry.get_artifact_metadata('app'))
 
         # test that the 'calmjs_artifacts' listing only grows - the only
         # way to clean this is to remove and rebuild egg-info directly.
