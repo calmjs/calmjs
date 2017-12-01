@@ -15,18 +15,22 @@ with the Node.js ecosystem from within a Python environment.
 .. |calmjs.bower| replace:: ``calmjs.bower``
 .. |calmjs| replace:: ``calmjs``
 .. |calmjs.rjs| replace:: ``calmjs.rjs``
+.. |calmjs.webpack| replace:: ``calmjs.webpack``
 .. |npm| replace:: ``npm``
 .. |r.js| replace:: ``r.js``
 .. |setuptools| replace:: ``setuptools``
+.. |webpack| replace:: ``webpack``
 .. |yarn| replace:: ``yarn``
 .. _AMD: https://github.com/amdjs/amdjs-api/blob/master/AMD.md
 .. _Bower: https://bower.io/
 .. _calmjs.bower: https://pypi.python.org/pypi/calmjs.bower
 .. _calmjs.rjs: https://pypi.python.org/pypi/calmjs.rjs
+.. _calmjs.webpack: https://pypi.python.org/pypi/calmjs.webpack
 .. _Node.js: https://nodejs.org/
 .. _npm: https://www.npmjs.com/
 .. _r.js: https://github.com/requirejs/r.js
 .. _setuptools: https://pypi.python.org/pypi/setuptools
+.. _webpack: https://webpack.js.org/
 .. _yarn: https://yarnpkg.com/
 
 
@@ -34,10 +38,14 @@ Introduction
 ------------
 
 Calmjs defines an extensible framework for interoperability between
-Python and `Node.js`_ runtime for Python packages, so they can
-interoperate with all aspects of Node.js/JavaScript development
-ecosystems.  The goal of the Calmjs framework is to aid the development,
-testing, and deployment of Python packages that also include JavaScript.
+Python and `Node.js`_ runtime for Python packages, to provide their
+developers a well defined interface for bi-directional access between
+Node.js/Javascript development tools and the JavaScript code within
+their Python packages, such that a proper, formal integration with
+Node.js/JavaScript environment from a Python environment can be
+facilitated.  The goal of the Calmjs framework is to aid the
+development, testing, and deployment of Python packages that also
+include and/or integrate with external JavaScript code.
 
 
 Methodology
@@ -50,9 +58,11 @@ will ensure the accessibility of these metadata under a common protocol,
 to avoid incompatible declarations that are not portable between
 different projects and environments, or being otherwise scattered across
 different tools or locations or be duplicated within the same working
-environments by different sets of tools that are unable to communicate
-states between each other, which are common sources of errors and
-hardships for building and deployment.
+environments by different sets of tools.  Without a common framework,
+the result is that Python packages will be unable to properly
+communicate their non-Python requirements and states between each other,
+resulting in difficulties in building, development and deployment of the
+software stack, and/or becoming a source of errors for those processes.
 
 Second, by offering a set of tools built on top of this extensible
 framework to work with these declarations for generating the
@@ -91,8 +101,8 @@ typically turned into a minimally usable level by other tools and
 framework.
 
 
-Features
---------
+Features overview
+-----------------
 
 A framework for integration with Node.js based package managers
     Through |setuptools| command hooks, |calmjs| provides Python
@@ -112,7 +122,8 @@ A framework for integration with Node.js based package managers
     within the completed application stack, tailored for all the
     packages at hand.
 
-    |calmjs| includes the support for |npm| by default.
+    |calmjs| includes the integration support with |npm| and |yarn| by
+    default.
 
 Export JavaScript code out of Python packages with the same namespace
     A given Python package that included associated JavaScript source
@@ -132,9 +143,9 @@ Export JavaScript code out of Python packages with the same namespace
     JavaScript (and in ES6 towards the future).
 
     Other tools that works with the Calmjs framework can then make use
-    of these raw JavaScript source files, turning them into actual
-    usable Node.js modules for local consumption, or |AMD|_ artifacts
-    for consumption over the web.  This leads to...
+    of these raw JavaScript source files in conjunction with the local
+    Node.js environment, or generate artifacts for deployment over the
+    web.  This leads to...
 
 Better integration of JavaScript toolchains into Python environments
     This is achieved by providing a framework for building toolchains
@@ -145,8 +156,10 @@ Better integration of JavaScript toolchains into Python environments
     There are no limitations as to how or what can be done with the
     tools or the source files, as this is left as an implementation
     detail.  For an example please refer to the |calmjs.rjs|_ Python
-    package, which allows the production of AMD artifacts from
-    JavaScript packages embedded inside Python packages.
+    package, which allows the production of |AMD|_ artifacts from
+    JavaScript packages embedded inside Python packages, or
+    |calmjs.webpack|_ which integrates with |webpack|_ for the
+    production of another commonly used bundled artifact format.
 
     Generally, toolchains can be built to find and load all Python
     packages (through the |calmjs| registry system) that have any
@@ -164,23 +177,21 @@ Well-defined modular architecture to ensure code reuse and extensibility
     parameters with the relevant |setuptools| entry points.
 
     In fact, |calmjs| out of the box only ships with just the core
-    framework plus the |npm| interfacing part, with the support for
-    tools like `Bower`_ or |r.js|_ as completely separate packages (as
-    |calmjs.bower|_ and |calmjs.rjs|_ respectively), such that projects,
-    environments or sites that do not need the functionality those
-    packages provide can simply opt to not have them installed.
+    framework plus the |npm|/|yarn| interfacing part, with the support
+    for tools like `Bower`_ or |r.js|_ as completely separate packages
+    (as |calmjs.bower|_ and |calmjs.rjs|_ respectively), such that
+    projects, environments or sites that do not need the functionality
+    those packages provide can simply opt to not have them installed.
 
 
 Installation
 ------------
 
-As the goal of |calmjs| is to integrate Node.js and |npm| into a Python
-environment, they need to be available within the environment; if they
-are not installed please follow the installation steps for `Node.js`_
-appropriate for the target operating system/environment/platform.
-
-The support of |yarn|_ as an alternative client to the |npm| package
-repository is available as of ``calmjs-3.0.0``,
+As the goal of |calmjs| is to integrate Node.js and |npm| (or |yarn|)
+into a Python environment, they need to be available within the
+environment; if they are not installed please follow the installation
+steps for `Node.js`_ appropriate for the target operating
+system/environment/platform.
 
 To install |calmjs| into a given Python environment, the following
 command can be executed to install directly from PyPI:
@@ -229,8 +240,8 @@ version, operating system environments and version, and other related
 information related to the issue at hand.
 
 
-Usage
------
+Usage and description of key features
+-------------------------------------
 
 When installed to a particular Python environment, the |calmjs|
 command-line utility will become available within there.
@@ -476,11 +487,12 @@ declared like so:
 The separator for the namespace and the module will use the ``.``
 character instead of ``/``.  However given that the ``.`` character is a
 valid name for a JavaScript module, the usage of this may create issues
-with certain JavaScript tools.  However, AMD based module systems can
-generally deal with ``.`` without issues so using those may end up
-resulting in somewhat more Python-like feel when dealing with imports
-while using JavaScript, though at a slight cost of whatever standards
-compliance with it.
+with certain JavaScript tools.  While AMD based module systems can
+generally handle ``.`` characters in imports without issues, allowing
+somewhat more Python-like feel importing using dotted names within the
+JavaScript environment, however, this may lead to incompatabilities with
+other JavaScript libraries thus the usage of this naming scheme is not
+recommended.
 
 By default, another registry with the ``.tests`` suffix is also declared
 as a compliment to the previously introduced registries, which packages
@@ -497,15 +509,15 @@ respective modules that have been declared.  For example:
         example.package = example.package
 
         [calmjs.module.tests]
-        example.package = example.package.tests
+        example.package.tests = example.package.tests
         """,
         ...
     )
 
 Much like the first example, this declares ``example.package`` as a
 Python namespace module that exports JavaScript code, with the
-declaration following that declaring the module that contains the tests
-that accompanies that.
+subsequent declaration section being the module that contains the tests
+that accompanies the first.
 
 Integration with |npm| through ``calmjs npm``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -572,9 +584,51 @@ Documentation on how to extend the Toolchain class to support use cases
 is currently incomplete.  This is usually combined together with a
 ``calmjs.runtime.DriverRuntime`` to hook into the ``calmjs`` runtime.
 
-Unfortunately at this time a detailed guide on how to do this is not yet
-written, however working extensions have been created - for a working
-example on how this may be achieved please refer to |calmjs.rjs|_.
+Unfortunately at this time a detailed guide on how to create a complete
+implementation is not completed (only documentation within the class
+are, however).  For a working example on how this may be achieved please
+refer to the implementations provided by |calmjs.rjs|_ or
+|calmjs.webpack|_.
+
+Pre-defined artifact generation through |setuptools|
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+It is possible to define the artifacts to be generated for a given
+package and the rule to do so.  Simply define a function that return an
+instance of a ``calmjs.toolchain.Toolchain`` subclass that have
+integrated with the desired tool, and a ``calmjs.toolchain.Spec`` object
+with the rules needed.  These specific functions are often provided by
+the package that offers them, please refer to the toolchain packages
+listed and linked in the previous section for further details on how
+these might be used.
+
+As these are also implemented through the registry system, the entry
+points generally look like this:
+
+.. code:: python
+
+    setup(
+        ...
+        build_calmjs_artifacts=True,
+        entry_points="""
+        ...
+        [calmjs.artifacts]
+        complete.bundle.js = example.toolchain:builder
+        """,
+        ...
+    )
+
+In the example, the ``builder`` function from the module
+``example.toolchain`` is used to generate the ``complete.bundle.js``
+file.  The generated artifact files will reside in the
+``calmjs_artifacts`` directory within the package metadata directory
+(one that ends with either ``.dist-info`` or ``.egg-info``) for that
+package.  An accompanied ``calmjs_artifacts.json`` file will also be
+generated, listing the versions of the various Python packages that were
+involved with construction of that artifact, and the version of binary
+that was used for the task.  Note that the argument
+``build_calmjs_artifacts`` must be to ``True`` to enable this build
+functionality.
 
 
 Troubleshooting
@@ -608,7 +662,8 @@ where a debugger will be fired at the point of failure.  Authors of
 runtime modules may find this useful during their development cycles.
 Do note that the default debugger is set up to only be triggered only on
 this termination; if errors and/or exceptions occur during the setup
-stage of the |calmjs| runtime, the errors will only simply be logged.
+stage of the |calmjs| runtime, any errors will only simply be logged,
+while warnings will be discarded (unless extra verbose flags are used).
 
 ERROR bad 'calmjs.runtime' entry point
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
