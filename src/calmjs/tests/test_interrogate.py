@@ -141,6 +141,12 @@ var target = window.target;
 var dynamic = define([target], function(target_mod) {});
 """
 
+# amd dynamic define
+requirejs_dynamic_define = """
+define(a_name, ['static1', 'static2'], function(static1) {
+});
+"""
+
 
 class SimpleConversionTestCase(unittest.TestCase):
     """
@@ -248,6 +254,17 @@ class RequireJSHelperTestCase(unittest.TestCase):
             })();
             """, 'report', 0)
 
+    def test_yield_imports_bad_type(self):
+        with self.assertRaises(TypeError):
+            next(interrogate.yield_module_imports('string = "invalid";'))
+
+    def test_yield_imports_basic(self):
+        self.assertEqual([
+            'mod1',
+            "name/mod/mod2",
+        ], sorted(set(interrogate.yield_module_imports(es5(
+            commonjs_require)))))
+
     def test_extract_all_commonjs_requires(self):
         self.assertEqual([
             'mod1',
@@ -262,6 +279,40 @@ class RequireJSHelperTestCase(unittest.TestCase):
             'some/dummy/module2',
             'some/dummy/module3',
         ], sorted(set(interrogate.extract_module_imports(requirejs_require))))
+
+    def test_extract_all_dynamic_amd_define_require(self):
+        self.assertEqual([
+            'static1',
+            'static2',
+        ], sorted(set(interrogate.extract_module_imports(
+            requirejs_dynamic_define
+        ))))
+
+    def test_yield_imports_node_bad_type(self):
+        with self.assertRaises(TypeError):
+            next(interrogate.yield_module_imports_nodes('string = "invalid";'))
+
+    def test_dynamic_amd_define_require_yield_node(self):
+        self.assertEqual(2, len(list(interrogate.yield_module_imports_nodes(
+            es5(requirejs_dynamic_define)))))
+
+    def test_dynamic_define_dynamic_cjs_require(self):
+        self.assertEqual(2, len(list(interrogate.yield_module_imports_nodes(
+            es5("""
+            var foobar = 'module';
+            var mod = require(foobar);
+            var mod2 = require('foobar');
+            var invalid = require(foobar, 'foobar');
+            """)
+        ))))
+
+    def test_dynamic_define_dynamic_amd_require(self):
+        self.assertEqual(2, len(list(interrogate.yield_module_imports_nodes(
+            es5("""
+            require([foobar, 'foobar'], function(dyn, static) {
+            });
+            """)
+        ))))
 
     def test_extract_all_amd_requires_skip_reserved(self):
         src = (

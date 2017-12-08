@@ -92,12 +92,34 @@ def extract_function_argument(text, f_name, f_argn, f_argt=asttypes.String):
     return list(filter_function_argument(tree, f_name, f_argn, f_argt))
 
 
-def yield_require_list_arguments(
+def yield_argument_items(node, pos):
+    """
+    This yields all items from the list provided at pos within the
+    FunctionCall which is provided through the node argument.
+    """
+
+    for child in node.args.items[pos]:
+        yield child
+
+
+def yield_argument(node, pos):
+    """
+    This yields the argument at the position.
+    """
+
+    yield node.args.items[pos]
+
+
+def yield_amd_require_string_arguments(
         node, pos,
         reserved_module=reserved_module, wrapped=define_wrapped):
     """
-    This is for generating the list of imports for the given node, which
-    must be of the FunctionCall type.
+    This yields only strings within the lists provided in the argument
+    list at the specified position from a function call.
+
+    Originally, this was implemented for yield a list of module names to
+    be imported as represented by this given node, which must be of the
+    FunctionCall type.
     """
 
     for i, child in enumerate(node.args.items[pos]):
@@ -110,44 +132,67 @@ def yield_require_list_arguments(
         # will have to be derived by some other means.
 
 
-def yield_require_argument(node, pos):
+def yield_string_argument(node, pos):
+    """
+    Yield just a string argument from position of the function call.
+    """
+
+    if not isinstance(node.args.items[pos], asttypes.String):
+        return
     yield to_str(node.args.items[pos])
 
 
-import_checks = (
-    (partial(yield_require_argument, pos=0), lambda node: (
-        len(node.args.items) == 1 and
-        isinstance(node.args.items[0], asttypes.String) and
-        node.identifier.value == 'require'
-    )),
-    (partial(yield_require_list_arguments, pos=0), lambda node: (
-        len(node.args.items) >= 2 and
-        isinstance(node.args.items[0], asttypes.Array) and
-        isinstance(node.args.items[1], asttypes.FuncExpr) and
-        node.identifier.value == 'require'
-    )),
-    (partial(yield_require_list_arguments, pos=0), lambda node: (
-        len(node.args.items) >= 2 and
-        isinstance(node.args.items[0], asttypes.Array) and
-        isinstance(node.args.items[1], asttypes.FuncExpr) and
-        node.identifier.value == 'define'
-    )),
-    (partial(yield_require_list_arguments, pos=1), lambda node: (
-        len(node.args.items) >= 3 and
-        isinstance(node.args.items[0], asttypes.String) and
-        isinstance(node.args.items[1], asttypes.Array) and
-        isinstance(node.args.items[2], asttypes.FuncExpr) and
-        node.identifier.value == 'define'
-    )),
+def build_import_check_list(amd, cjs):
+    return (
+        (partial(cjs, pos=0), lambda node: (
+            len(node.args.items) == 1 and
+            node.identifier.value == 'require'
+        )),
+        (partial(amd, pos=0), lambda node: (
+            len(node.args.items) >= 2 and
+            isinstance(node.args.items[0], asttypes.Array) and
+            isinstance(node.args.items[1], asttypes.FuncExpr) and
+            node.identifier.value == 'require'
+        )),
+        (partial(amd, pos=0), lambda node: (
+            len(node.args.items) >= 2 and
+            isinstance(node.args.items[0], asttypes.Array) and
+            isinstance(node.args.items[1], asttypes.FuncExpr) and
+            node.identifier.value == 'define'
+        )),
+        (partial(amd, pos=1), lambda node: (
+            len(node.args.items) >= 3 and
+            isinstance(node.args.items[0], (
+                asttypes.String, asttypes.Identifier)) and
+            isinstance(node.args.items[1], asttypes.Array) and
+            isinstance(node.args.items[2], asttypes.FuncExpr) and
+            node.identifier.value == 'define'
+        )),
+    )
+
+
+string_imports = partial(
+    build_import_check_list,
+    amd=yield_amd_require_string_arguments,
+    cjs=yield_string_argument,
+)
+
+import_nodes = partial(
+    build_import_check_list,
+    amd=yield_argument_items,
+    cjs=yield_argument,
 )
 
 
-def yield_module_imports(root, checks=import_checks):
+def yield_module_imports(root, checks=string_imports()):
     """
     Gather all require and define calls from unbundled JavaScript source
     files and yield all module names.  The imports can either be of the
     CommonJS or AMD syntax.
     """
+
+    if not isinstance(root, asttypes.Node):
+        raise TypeError('provided root must be a node')
 
     for child in yield_function(root, deep_filter):
         for f, condition in checks:
@@ -165,3 +210,19 @@ def extract_module_imports(text):
 
     tree = parse(text)
     return yield_module_imports(tree)
+
+
+def yield_module_imports_nodes(root, checks=import_nodes()):
+    """
+    Yield all nodes that provide an import
+    """
+
+    if not isinstance(root, asttypes.Node):
+        raise TypeError('provided root must be a node')
+
+    for child in yield_function(root, deep_filter):
+        for f, condition in checks:
+            if condition(child):
+                for name in f(child):
+                    yield name
+                continue
