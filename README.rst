@@ -276,6 +276,8 @@ specific help messages will be accessible in the same manner.
 Declare and use a ``package.json`` for a given Python package
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. _using package_json:
+
 If a package wish to declare dependencies on packages hosted by |npm|,
 it may do something like this in its ``setup.py``:
 
@@ -293,7 +295,7 @@ it may do something like this in its ``setup.py``:
     setup(
         name='example.package',
         ...
-        install_requires=[
+        setup_requires=[
             'calmjs',
             ...
         ],
@@ -301,22 +303,32 @@ it may do something like this in its ``setup.py``:
         ...
     )
 
-Running ``python setup.py install`` in the directory the ``setup.py``
-resides in will write that ``package_json`` fragment into the package's
-egg-info metadata section, provided that it is a valid JSON string or a
-dictionary without incompatible data types.
+Note that ``setup_requires`` section must specify |calmjs| in order to
+enable the ``package_json`` setup keyword for the generation of the
+``package.json`` metadata file for the given package whenever ``python
+setup.py egg_info`` is executed (directly or indirectly), so that even
+if |calmjs| is not already installed into the current Python
+environment, it will be acquired from PyPI and be included as part of
+the |setuptools| setup process, and without being a direct dependency of
+the given package.  The ``package.json`` will be generated if the
+provided data is either a valid JSON string or a dictionary without
+incompatible data types.
 
 All packages that ultimately depending on this ``example.package`` will
-have the option to inherit this ``package.json`` egg-info metadata.  One
-way to do this is through that package's ``setup.py``.  By invoking
+have the option to inherit this ``package.json`` metadata file.  One
+method to do this is through that package's ``setup.py``.  By invoking
 ``setup.py npm --init`` from there, a new ``package.json`` will be
-written to the current directory as if running ``npm init`` with all the
-dependencies declared through the Python package dependency tree for the
-given Python package.
+written to the current directory.  This is akin to running ``npm init``,
+with the difference being that the dependencies are being declared
+through the Python package dependency tree for the given Python package.
+Do note that ``example.package`` (and its dependent package, if that is
+the one being developed) must already be installed and be importable
+in the given Python environment first.
 
-Alternatively, call ``calmjs npm --init example.package`` will do the
-same thing, provided that the ``example.package`` is available through
-the current Python environment's import system.
+Alternatively, invoking ``calmjs npm --init example.package`` from the
+command line will achieve the same thing, provided that both |calmjs|
+and ``example.package`` are installed and available through the current
+Python environment's import system.
 
 Dealing with |npm| dependencies with Python package dependencies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -728,6 +740,16 @@ please ensure that the affected package has ``zip_safe`` declared as
 false, or alternatively generate a Python wheel then install that wheel,
 if the target Python environment has that as the standard installation
 format.
+
+UserWarning: Unknown distribution option: 'package_json'
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This also applies to other relevant options, as it is caused by the
+execution of ``setup.py`` without |calmjs| being available to
+|setuptools|, such that the handling method for these keywords remain
+undefined.  This can be corrected by providing |calmjs| as part of the
+``setup_requires`` section.  Further information on this may be found in
+the `using package_json`_ section of this document.
 
 
 Contribute
