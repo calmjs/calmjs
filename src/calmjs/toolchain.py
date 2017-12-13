@@ -511,6 +511,23 @@ def toolchain_spec_compile_entries(
         the replacement value.
     """
 
+    processor = getattr(toolchain, 'compile_%s_entry' % process_name)
+    modpath_logger = (
+        partial(overwrite_log, toolchain.modpath_suffix)
+        if callable(overwrite_log) else None)
+    targetpath_logger = (
+        partial(overwrite_log, toolchain.targetpath_suffix)
+        if callable(overwrite_log) else None)
+    return process_compile_entries(
+        processor, spec, entries, modpath_logger, targetpath_logger)
+
+
+def process_compile_entries(
+        processor, spec, entries, modpath_logger=None, targetpath_logger=None):
+    """
+    The generalized raw spec entry process invocation loop.
+    """
+
     # Contains a mapping of the module name to the compiled file's
     # relative path starting from the base build_dir.
     all_modpaths = {}
@@ -518,18 +535,18 @@ def toolchain_spec_compile_entries(
     # List of exported module names, should be equal to all keys of
     # the compiled and bundled sources.
     all_export_module_names = []
-    process = getattr(toolchain, 'compile_%s_entry' % process_name)
+
+    def update(base, fresh, logger):
+        if callable(logger):
+            for dupes in dict_update_overwrite_check(base, fresh):
+                logger(*dupes)
+        else:
+            base.update(fresh)
 
     for entry in entries:
-        modpaths, targets, export_module_names = process(spec, entry)
-        if callable(overwrite_log):
-            for dupes in dict_update_overwrite_check(all_modpaths, modpaths):
-                overwrite_log(toolchain.modpath_suffix, *dupes)
-            for dupes in dict_update_overwrite_check(all_targets, targets):
-                overwrite_log(toolchain.targetpath_suffix, *dupes)
-        else:
-            all_modpaths.update(modpaths)
-            all_targets.update(targets)
+        modpaths, targetpaths, export_module_names = processor(spec, entry)
+        update(all_modpaths, modpaths, modpath_logger)
+        update(all_targets, targetpaths, targetpath_logger)
         all_export_module_names.extend(export_module_names)
 
     return all_modpaths, all_targets, all_export_module_names
