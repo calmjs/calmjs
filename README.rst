@@ -203,25 +203,30 @@ command can be executed to install directly from PyPI:
 Alternative installation methods (for developers, advanced users)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. _development installation method:
+
 Development is still ongoing with |calmjs|, for the latest features and
 bug fixes, the development version can be installed through git like so:
 
 .. code:: sh
 
+    $ # standard installation mode
     $ pip install git+https://github.com/calmjs/calmjs.git#egg=calmjs
+    $ # for an editable installation mode; note the upgrade flag
+    $ pip install -U -e git+https://github.com/calmjs/calmjs.git#egg=calmjs
+
+Note that the ``-U`` flag for the editable installation is to ensure
+that |setuptools| be upgraded to the latest version to avoid issues
+dealing with namespaces for development packages, which is documented in
+the next paragraph.
 
 Alternatively, the git repository can be cloned directly and execute
 ``python setup.py develop`` while inside the root of the source
-directory.  However this method WILL require all packages under the
-|calmjs| namespace to be uninstalled and be reinstalled using this
-development only method.
-
-As |calmjs| is declared as both a namespace and a package, mixing
-installation methods as described above when installing with other
-|calmjs| packages may result in the module importer being unable to look
-up the target files.  If such an error does arise please remove all
-modules and only stick with a single installation method for all
-packages within the |calmjs| namespace.
+directory, however if this development installation method is done using
+any version of |setuptools| earlier than v31, there will be inconsistent
+errors with importing of modules under the |calmjs| namespace.  Various
+`symptoms of namespace import failures`_ are documented under the
+`troubleshooting`_ section of this document.
 
 Testing the installation
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -695,6 +700,57 @@ bad entry point
     This is caused by packages defining malformed entry point.  The name
     of the package triggering this error will be noted in the log; the
     error may be reported to its developer.
+
+Random ``ImportError`` when trying to import from the |calmjs| namespace
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. _symptoms of namespace import failures:
+
+As |calmjs| is declared as both namespace and package, there are certain
+low-level setup that is required on the working Python environment to
+ensure that all modules within can be located correctly.  However,
+versions of |setuptools| earlier than `v31.0.0`__ does not create the
+required package namespace declarations when a package is installed
+using a `development installation method`_ (e.g. using ``python setup.py
+develop``) into the Python environment in conjunction with another
+package that was installed through ``pip`` within the same namespace.
+Failures can manifest as inconsistent import failures for any modules
+under the |calmjs| namespace.  As an example:
+
+.. __: https://setuptools.readthedocs.io/en/latest/history.html#v31-0-0
+
+.. code:: python
+
+    >>> from calmjs import tests
+    Traceback (most recent call last):
+      File "<stdin>", line 1, in <module>
+    ImportError: cannot import name tests
+    >>> from calmjs import parse  # calmjs.parse was installed via pip
+    >>> from calmjs import tests
+    >>> # no failure, but it was failing just earlier?
+
+It could also manifest differently, such as an ``AttributeError``, which
+may be triggered through the execution of unittests for |calmjs|:
+
+.. code::
+
+    $ coverage run --include=src/* -m unittest calmjs.tests.make_suite
+    Traceback (most recent call last):
+      ...
+        parent, obj = obj, getattr(obj, part)
+    AttributeError: 'module' object has no attribute 'tests'
+    $ python -m calmjs.tests.make_suite
+    /usr/bin/python: No module named 'calmjs.tests'
+
+To resolve this issue, ensure that |setuptools| is upgraded to v31 or
+greater, which may be installed/upgraded through ``pip`` like so:
+
+.. code::
+
+    $ pip install --upgrade setuptools
+
+Then reinstall all the required packages that are under the |calmjs|
+namespace to resolve this import issue.
 
 Environmental variables being ignored/not passed to underlying tools
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
