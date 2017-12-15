@@ -40,6 +40,9 @@ targetpath
     A relative path to a build directory (build_dir) serving as the
     write target for whatever proccessing done by the toolchain
     implementation to the file provided at the associated sourcepath.
+    Note that by default this is NOT normalized to the currently running
+    OS platform at generation time, due to varying and potentially
+    complex internal/external integration usages.
 
     The relative path version (again, from build_dir) is typically
     recorded by instances of ``Spec`` objects that have undergone a
@@ -76,6 +79,7 @@ from os.path import dirname
 from os.path import exists
 from os.path import isfile
 from os.path import isdir
+from os.path import normpath
 from os.path import realpath
 from tempfile import mkdtemp
 
@@ -1070,7 +1074,8 @@ class Toolchain(BaseDriver):
     # sourcepath, and target means targetpath.
 
     def _generate_transpile_target(self, spec, target):
-        bd_target = join(spec[BUILD_DIR], target)
+        # ensure that the target is fully normalized.
+        bd_target = join(spec[BUILD_DIR], normpath(target))
         self._validate_build_target(spec, bd_target)
         if not exists(dirname(bd_target)):
             logger.debug("creating dir '%s'", dirname(bd_target))
@@ -1239,7 +1244,18 @@ class Toolchain(BaseDriver):
         """
         Create a target file name from the input module name and its
         source file name.  The result should be a path relative to the
-        build_dir.
+        build_dir, and this is derived directly from the modname with NO
+        implicit convers of path separators (i.e. '/' or any other) into
+        a system or OS specific form (e.g. '\\').  The rationale for
+        this choice is that there exists Node.js/JavaScript tools that
+        handle this internally and/or these paths and values are
+        directly exposed on the web and thus these separators must be
+        preserved.
+
+        If the specific implementation requires this to be done,
+        implementations may override by wrapping the result of this
+        using os.path.normpath.  For the generation of transpile write
+        targets, this will be done in _generate_transpile_target.
 
         Default is to append the module name with the filename_suffix
         assigned to this instance (setup by setup_filename_suffix), iff
