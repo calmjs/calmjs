@@ -5,6 +5,7 @@ The calmjs runtime collection
 
 from __future__ import absolute_import
 
+import warnings
 import logging
 import re
 import sys
@@ -259,7 +260,7 @@ class BaseRuntime(BootstrapRuntime):
         # While we would love to do this:
         # args = BootstrapRuntime.__call__(self, args)
         # It doesn't work, because we will NOT be using the argparser
-        # definition created by BootstrapRuntime... so we ened to do it
+        # definition created by BootstrapRuntime... so we need to do it
         # the long way.
         bootstrap = BootstrapRuntime()
         # Also, remember that we need to strip off all the args that
@@ -271,7 +272,18 @@ class BaseRuntime(BootstrapRuntime):
         # its help text.  Nor does it keep track of what or where the
         # extra arguments actually came from.  So we are going to do
         # this manually so the users don't get confused.
-        parsed, extras = self.argparser.parse_known_args(args)
+        with warnings.catch_warnings(record=True) as records:
+            # Technically, catch_warnings should have set up the
+            # internals correctly to not generate stderr entries and log
+            # everything, but for Python 2.7/<3.3 it doesn't quite work
+            # that way, and also this may cause issues with some
+            # versions of pypy... nothing can be done about that, except
+            # keep this workaround simplefilter here to ensure it stays
+            # working for most verions of Python.  Also note that this
+            # same issue applies for the main function.
+            warnings.simplefilter("always")
+            parsed, extras = self.argparser.parse_known_args(args)
+
         kwargs = vars(parsed)
         target = kwargs.get(self.action_key)
 
@@ -294,6 +306,9 @@ class BaseRuntime(BootstrapRuntime):
 
         with pretty_logging(
                 logger=self.logger, level=self.log_level, stream=sys.stderr):
+            # now that we have a logging scope, generate the logs.
+            for record in records:
+                logger.warning(record.message)
             try:
                 return self.run(argparser=self.argparser, **kwargs)
             except KeyboardInterrupt:
@@ -1071,7 +1086,6 @@ class PackageManagerRuntime(DriverRuntime):
 
 
 def main(args=None, runtime_cls=CalmJSRuntime):
-    import warnings
     bootstrap = BootstrapRuntime()
     # None to distinguish args from unspecified or specified as [], but
     # ultimately the value must be a list.
@@ -1081,8 +1095,11 @@ def main(args=None, runtime_cls=CalmJSRuntime):
         args = args + ['-h']
 
     # all the minimum arguments acquired, bootstrap the execution.
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore')
+    with warnings.catch_warnings(record=True) as records:
+        # Note that this is a workaround for some versions of Python.
+        # The full details as to why is documented in the
+        # BaseRuntime.__call__ implementation.
+        warnings.simplefilter('always')
         # log down the construction of the bootstrap class.
         with pretty_logging(
                 logger='', level=bootstrap.bootstrap_log_level,
@@ -1092,6 +1109,10 @@ def main(args=None, runtime_cls=CalmJSRuntime):
             # inside this logger context, so that any messages passed to
             # the logger will be correctly handled.
             runtime.argparser
+
+            # finally, ensure all captured records (thus far) are logged
+            for record in records:
+                logger.warning(record.message)
 
         # Running this outside of the logger, as the BaseRuntime will do
         # its logging.

@@ -3,6 +3,7 @@ import unittest
 import json
 import os
 import sys
+import warnings
 from argparse import ArgumentParser
 from inspect import currentframe
 from os.path import join
@@ -46,6 +47,15 @@ class BrokenRuntime(runtime.DriverRuntime):
 broken = BrokenRuntime(None)
 
 
+class DeprecatedRuntime(runtime.DriverRuntime):
+
+    def init_argparser(self, argparser):
+        warnings.warn("this runtime is deprecated", DeprecationWarning)
+
+
+deprecated = DeprecatedRuntime(None)
+
+
 class BaseRuntimeTestCase(unittest.TestCase):
 
     def tearDown(self):
@@ -74,6 +84,20 @@ class BaseRuntimeTestCase(unittest.TestCase):
         self.assertEqual(runtime.norm_args(['arg']), ['arg'])
 
     def test_global_flags(self):
+        def fake_parse(args):
+            warnings.warn('fake deprecation', DeprecationWarning)
+            return fake_parse.parse_known_args(args)
+
+        stub_stdouts(self)
+        bt = runtime.BaseRuntime()
+        fake_parse.parse_known_args = bt.argparser.parse_known_args
+        bt.argparser.parse_known_args = fake_parse
+        with pretty_logging(stream=mocks.StringIO()) as s:
+            bt(['-v'])
+
+        self.assertIn("WARNING calmjs.runtime fake deprecation", s.getvalue())
+
+    def test_argparse_warning(self):
         stub_stdouts(self)
         bt = runtime.BaseRuntime()
         bt(['-vvv', '-qq', '-d'])
@@ -175,6 +199,36 @@ class BaseRuntimeTestCase(unittest.TestCase):
         err = sys.stderr.getvalue()
         self.assertNotIn('broken', out)
         self.assertIn('broken', err)
+
+    def test_runtime_entry_point_preparse_warning(self):
+        # see next test for the condition for warning to appear.
+        stub_stdouts(self)
+        working_set = mocks.WorkingSet({'calmjs.runtime': [
+            'deprecated = calmjs.tests.test_runtime:deprecated',
+        ]})
+        with self.assertRaises(SystemExit):
+            runtime.main(
+                ['deprecated'],
+                runtime_cls=lambda: runtime.Runtime(working_set=working_set)
+            )
+        err = sys.stderr.getvalue()
+        self.assertNotIn('Traceback', err)
+        self.assertNotIn('this runtime is deprecated', err)
+
+    def test_runtime_entry_point_preparse_warning_verbose_logged(self):
+        stub_stdouts(self)
+        working_set = mocks.WorkingSet({'calmjs.runtime': [
+            'deprecated = calmjs.tests.test_runtime:deprecated',
+        ]})
+        with self.assertRaises(SystemExit):
+            # use the verbose flag to increase the log level
+            runtime.main(
+                ['-v', 'deprecated'],
+                runtime_cls=lambda: runtime.Runtime(working_set=working_set)
+            )
+        err = sys.stderr.getvalue()
+        self.assertNotIn('Traceback', err)
+        self.assertIn('this runtime is deprecated', err)
 
     def test_runtime_main_with_broken_runtime(self):
         stub_stdouts(self)
