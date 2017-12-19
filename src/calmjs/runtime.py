@@ -1115,6 +1115,10 @@ def main(args=None, runtime_cls=CalmJSRuntime):
             # finally, ensure all captured records (thus far) are logged
             for record in records:
                 logger.warning(record.message)
+                logger.debug(
+                    '%s triggered at %s:%s', record.category.__name__,
+                    record.filename, record.lineno,
+                )
 
         # Running this outside of the logger, as the BaseRuntime will do
         # its logging.

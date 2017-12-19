@@ -241,6 +241,23 @@ class BaseRuntimeTestCase(unittest.TestCase):
         err = sys.stderr.getvalue()
         self.assertNotIn('Traceback', err)
         self.assertIn('this runtime is deprecated', err)
+        self.assertNotIn('DeprecationWarning triggered at', err)
+
+    def test_runtime_entry_point_preparse_warning_verbose_debug_logged(self):
+        stub_stdouts(self)
+        working_set = mocks.WorkingSet({'calmjs.runtime': [
+            'deprecated = calmjs.tests.test_runtime:deprecated',
+        ]})
+        with self.assertRaises(SystemExit):
+            # use the verbose flag to increase the log level
+            runtime.main(
+                ['-vvv', 'deprecated'],
+                runtime_cls=lambda: runtime.Runtime(working_set=working_set)
+            )
+        err = sys.stderr.getvalue()
+        self.assertNotIn('Traceback', err)
+        self.assertIn('this runtime is deprecated', err)
+        self.assertIn('DeprecationWarning triggered at', err)
 
     def test_runtime_main_with_broken_runtime(self):
         stub_stdouts(self)
