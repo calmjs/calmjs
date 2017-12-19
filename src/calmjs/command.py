@@ -184,4 +184,4 @@ class BuildArtifactCommand(Command):
     def run(self):
         if self.dry_run:
             return
-        get('calmjs.artifacts').build_artifacts(self.distribution.get_name())
+        get('calmjs.artifacts').process_package(self.distribution.get_name())

@@ -84,7 +84,7 @@ class BuildArtifactCommandTestcase(unittest.TestCase):
         built_names = []
 
         class FakeBuilder(object):
-            def build_artifacts(self, name):
+            def process_package(self, name):
                 built_names.append(name)
 
         self.built_names = built_names

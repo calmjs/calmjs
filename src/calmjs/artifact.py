@@ -57,7 +57,7 @@ following code:
 
     >>> from calmjs.registry import get
     >>> artifacts = get('calmjs.artifacts')
-    >>> artifacts.build_artifacts('example.package')
+    >>> artifacts.process_package('example.package')
     Building artifact for deploy.gloop.js
     Building artifact for deploy.glump.js
 
@@ -246,8 +246,9 @@ class build_calmjs_artifacts(BuildArtifactCommand):
     """
 
 
-class ArtifactRegistry(BaseRegistry):
+class BaseArtifactRegistry(BaseRegistry):
     """
+    The base artifact registry implementation.
     A registry to allow a central place for Python packages to declare
     which method to generate the artifact and what name to use.
     """
@@ -420,28 +421,6 @@ class ArtifactRegistry(BaseRegistry):
         )
         return iter(entry_points.values())
 
-    def build_artifacts(self, package_name):
-        """
-        Build artifacts declared for the given package.
-        """
-
-        if not any(self.iter_records_for(package_name)):
-            return
-
-        metadata = self.get_artifact_metadata(package_name)
-        metadata_filename = self.metadata.get(package_name)
-        artifacts = metadata[ARTIFACT_BASENAME] = metadata.get(
-            ARTIFACT_BASENAME, {})
-
-        artifacts.update(self._process_package(package_name))
-
-        metadata['versions'] = sorted(set(
-            '%s' % i for i in find_packages_requirements_dists(
-                [package_name])))
-
-        with open(metadata_filename, 'w', encoding='utf8') as fd:
-            json.dump(metadata, fd)
-
     def verify_builder(self, builder):
         return verify_builder(builder)
 
@@ -451,13 +430,13 @@ class ArtifactRegistry(BaseRegistry):
     def extract_builder_result(self, builder_result):
         return extract_builder_result(builder_result)
 
-    def _process_package(self, package_name):
+    def process_package(self, package_name):
         results = {}
         for entry_point in self.iter_records_for(package_name):
-            results.update(self._process_entry_point(entry_point))
+            results.update(self.process_entry_point(entry_point))
         return results
 
-    def _process_entry_point(self, entry_point):
+    def process_entry_point(self, entry_point):
         try:
             builder = entry_point.resolve()
         except ImportError:
@@ -514,3 +493,33 @@ class ArtifactRegistry(BaseRegistry):
             'builder': '%s:%s' % (
                 entry_point.module_name, '.'.join(entry_point.attrs)),
         }}
+
+
+class ArtifactRegistry(BaseArtifactRegistry):
+    """
+    A registry to allow a central place for Python packages to declare
+    which method to generate the artifact and what name to use.
+    """
+
+    def process_package(self, package_name):
+        """
+        Build artifacts declared for the given package.
+        """
+
+        if not any(self.iter_records_for(package_name)):
+            return
+
+        metadata = self.get_artifact_metadata(package_name)
+        metadata_filename = self.metadata.get(package_name)
+        artifacts = metadata[ARTIFACT_BASENAME] = metadata.get(
+            ARTIFACT_BASENAME, {})
+
+        artifacts.update(
+            super(ArtifactRegistry, self).process_package(package_name))
+
+        metadata['versions'] = sorted(set(
+            '%s' % i for i in find_packages_requirements_dists(
+                [package_name])))
+
+        with open(metadata_filename, 'w', encoding='utf8') as fd:
+            json.dump(metadata, fd)

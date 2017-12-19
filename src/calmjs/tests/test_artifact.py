@@ -368,7 +368,7 @@ class ArtifactRegistryTestCase(unittest.TestCase):
         # quick check of the artifact metadata beforehand
         self.assertEqual({}, registry.get_artifact_metadata('app'))
 
-        registry.build_artifacts('app')
+        registry.process_package('app')
         complete = list(registry.resolve_artifacts_by_builder_compat(
             ['app'], 'complete'))
         partial = list(registry.resolve_artifacts_by_builder_compat(
@@ -444,7 +444,7 @@ class ArtifactRegistryTestCase(unittest.TestCase):
             self, artifact, 'get_bin_version_str', version)
         registry = ArtifactRegistry('calmjs.artifacts', _working_set=mock_ws)
 
-        registry.build_artifacts('app')
+        registry.process_package('app')
         self.assertEqual(3, len(registry.get_artifact_metadata('app')[
             'calmjs_artifacts']))
         self.assertIn('extra.js', registry.get_artifact_metadata('app')[
@@ -519,7 +519,7 @@ class ArtifactRegistryBuildFailureTestCase(unittest.TestCase):
 
     def test_build_artifacts_logs_and_failures(self):
         with pretty_logging(stream=mocks.StringIO()) as stream:
-            self.registry.build_artifacts('app')
+            self.registry.process_package('app')
 
         log = stream.getvalue()
         self.assertIn(
@@ -542,7 +542,7 @@ class ArtifactRegistryBuildFailureTestCase(unittest.TestCase):
             pass
 
         with pretty_logging(stream=mocks.StringIO()) as stream:
-            self.registry.build_artifacts('app')
+            self.registry.process_package('app')
 
         log = stream.getvalue()
         self.assertIn(
@@ -558,21 +558,21 @@ class ArtifactRegistryBuildFailureTestCase(unittest.TestCase):
             pass
 
         with pretty_logging(stream=mocks.StringIO()) as stream:
-            self.registry.build_artifacts('bad')
+            self.registry.process_package('bad')
 
         log = stream.getvalue()
         self.assertIn("its dirname does not lead to a directory", log)
 
     def test_malformed_builder_handling(self):
         with pretty_logging(stream=mocks.StringIO()) as stream:
-            self.registry.build_artifacts('malformed')
+            self.registry.process_package('malformed')
 
         log = stream.getvalue()
         self.assertIn("failed to produce a valid toolchain and spec", log)
 
     def test_artifact_generation_failure(self):
         with pretty_logging(stream=mocks.StringIO()) as stream:
-            self.registry.build_artifacts('nothing')
+            self.registry.process_package('nothing')
 
         log = stream.getvalue()
         self.assertIn(
@@ -583,7 +583,7 @@ class ArtifactRegistryBuildFailureTestCase(unittest.TestCase):
 
     def test_no_declaration(self):
         with pretty_logging(stream=mocks.StringIO()) as stream:
-            self.registry.build_artifacts('undeclared')
+            self.registry.process_package('undeclared')
 
         log = stream.getvalue()
         self.assertIn(
