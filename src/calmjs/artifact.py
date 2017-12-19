@@ -172,7 +172,7 @@ def verify_builder(builder):
     return d == {'package_names': [], 'export_target': 'some_path'}
 
 
-def extract_builder_result(builder_result):
+def extract_builder_result(builder_result, toolchain_cls=Toolchain):
     """
     Extract the builder result to produce a ``Toolchain`` and ``Spec``
     instance.
@@ -182,7 +182,7 @@ def extract_builder_result(builder_result):
         toolchain, spec = builder_result
     except Exception:
         return None, None
-    if not isinstance(toolchain, Toolchain) or not isinstance(spec, Spec):
+    if not isinstance(toolchain, toolchain_cls) or not isinstance(spec, Spec):
         return None, None
     return toolchain, spec
 
@@ -276,8 +276,8 @@ class ArtifactRegistry(BaseRegistry):
 
         if nc_path in self.reverse:
             logger.error(
-                "entry point '%s' from package '%s' will generate an artifact "
-                "at '%s' but it was already registered to entry point '%s'; "
+                "entry point '%s' from package '%s' resolves to the path '%s' "
+                "which was already registered to entry point '%s'; "
                 "conflicting entry point registration will be ignored.",
                 ep, ep.dist, path, self.reverse[nc_path]
             )
@@ -433,9 +433,7 @@ class ArtifactRegistry(BaseRegistry):
         artifacts = metadata[ARTIFACT_BASENAME] = metadata.get(
             ARTIFACT_BASENAME, {})
 
-        for entry_point in self.iter_records_for(package_name):
-            artifacts.update(
-                self._build_artifact_from_entry_point(entry_point))
+        artifacts.update(self._process_package(package_name))
 
         metadata['versions'] = sorted(set(
             '%s' % i for i in find_packages_requirements_dists(
@@ -444,7 +442,22 @@ class ArtifactRegistry(BaseRegistry):
         with open(metadata_filename, 'w', encoding='utf8') as fd:
             json.dump(metadata, fd)
 
-    def _build_artifact_from_entry_point(self, entry_point):
+    def verify_builder(self, builder):
+        return verify_builder(builder)
+
+    def verify_export_target(self, export_target):
+        return prepare_export_location(export_target)
+
+    def extract_builder_result(self, builder_result):
+        return extract_builder_result(builder_result)
+
+    def _process_package(self, package_name):
+        results = {}
+        for entry_point in self.iter_records_for(package_name):
+            results.update(self._process_entry_point(entry_point))
+        return results
+
+    def _process_entry_point(self, entry_point):
         try:
             builder = entry_point.resolve()
         except ImportError:
@@ -457,17 +470,18 @@ class ArtifactRegistry(BaseRegistry):
         export_target = self.records[
             (entry_point.dist.project_name, entry_point.name)]
 
-        if not verify_builder(builder):
+        if not self.verify_builder(builder):
             logger.error(
                 "the builder referenced by the entry point '%s' "
                 "from package '%s' has an incompatible signature",
                 entry_point, entry_point.dist,
             )
             return {}
-        if not prepare_export_location(export_target):
+
+        if not self.verify_export_target(export_target):
             return {}
 
-        toolchain, spec = extract_builder_result(builder(
+        toolchain, spec = self.extract_builder_result(builder(
             [entry_point.dist.project_name], export_target=export_target))
         if not toolchain:
             logger.error(

@@ -282,13 +282,13 @@ class ArtifactRegistryTestCase(unittest.TestCase):
 
         with pretty_logging(stream=mocks.StringIO()) as stream:
             registry.register_entry_point(s1)
-            # normal registry usage shouldn't do this.
+            # normal registry usage shouldn't be able to do this.
             registry.register_entry_point(s2)
 
         log = stream.getvalue()
         self.assertIn(
             "entry point 'Simple.js = dummy_builder:builder2' from package "
-            "'pkg 1.0' will generate an artifact at '%s' but it was already "
+            "'pkg 1.0' resolves to the path '%s' which was already "
             "registered to entry point 'Simple.js = dummy_builder:builder1'; "
             "conflicting entry point registration will be ignored." % st,
             log
@@ -319,7 +319,7 @@ class ArtifactRegistryTestCase(unittest.TestCase):
         log = stream.getvalue()
         self.assertIn(
             "entry point 'Case.js = dummy_builder:builder2' from package "
-            "'pkg 1.0' will generate an artifact at '%s' but it was already "
+            "'pkg 1.0' resolves to the path '%s' which was already "
             "registered to entry point 'case.js = dummy_builder:builder1'; "
             "conflicting entry point registration will be ignored." % ct,
             log
