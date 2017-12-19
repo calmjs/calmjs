@@ -87,9 +87,11 @@ _reset_global_runtime_attrs()
 
 def _initialize_global_runtime_attrs(**kwargs):
     debug = kwargs.pop('debug')
-    verbosity = min(max(kwargs.pop('verbose') - kwargs.pop('quiet'), -2), 2)
+    verbose = kwargs.pop('verbose')
+    quiet = kwargs.pop('quiet')
+    verbosity = min(max(verbose - quiet, -2), 2)
     log_level = levels.get(verbosity)
-    bootstrap_log_level = levels.get(max(-2, verbosity - 1))
+    bootstrap_log_level = levels.get(min(max(verbose - quiet - 1, -2), 2))
     _global_runtime_attrs.update({
         'debug': debug,
         'log_level': log_level,

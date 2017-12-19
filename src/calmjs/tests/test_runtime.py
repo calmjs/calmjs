@@ -10,6 +10,7 @@ from os.path import join
 from os.path import exists
 from logging import DEBUG
 from logging import INFO
+from logging import WARNING
 
 import pkg_resources
 
@@ -92,12 +93,12 @@ class BaseRuntimeTestCase(unittest.TestCase):
         bt = runtime.BaseRuntime()
         fake_parse.parse_known_args = bt.argparser.parse_known_args
         bt.argparser.parse_known_args = fake_parse
+
         with pretty_logging(stream=mocks.StringIO()) as s:
             bt(['-v'])
-
         self.assertIn("WARNING calmjs.runtime fake deprecation", s.getvalue())
 
-    def test_argparse_warning(self):
+    def test_argparse_levels(self):
         stub_stdouts(self)
         bt = runtime.BaseRuntime()
         bt(['-vvv', '-qq', '-d'])
@@ -107,6 +108,17 @@ class BaseRuntimeTestCase(unittest.TestCase):
         self.assertEqual(rt.verbosity, 1)
         self.assertEqual(rt.debug, 1)
         self.assertEqual(rt.log_level, INFO)
+        self.assertEqual(rt.bootstrap_log_level, WARNING)
+
+    def test_argparse_bootstrap_debug(self):
+        stub_stdouts(self)
+        bt = runtime.BaseRuntime()
+        bt(['-vvv'])
+
+        # should be a global state.
+        rt = runtime.BaseRuntime()
+        self.assertEqual(rt.log_level, DEBUG)
+        self.assertEqual(rt.bootstrap_log_level, DEBUG)
 
     def test_bad_global_flags(self):
         stub_stdouts(self)
