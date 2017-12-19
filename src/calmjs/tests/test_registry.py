@@ -36,9 +36,14 @@ class RegistryIntegrationTestCase(unittest.TestCase):
         ]})
         registry = calmjs.registry.Registry(
             'calmjs.registry', _working_set=working_set)
-        # This should not be registered or available
-        self.assertIsNone(registry.get_record('calmjs.module'))
-        self.assertIsNone(registry.get_record('failure'))
+
+        with pretty_logging(stream=mocks.StringIO()) as stream:
+            self.assertIsNone(registry.get_record('calmjs.module'))
+        self.assertIn("'calmjs.module' does not resolve", stream.getvalue())
+
+        with pretty_logging(stream=mocks.StringIO()) as stream:
+            self.assertIsNone(registry.get_record('failure'))
+        self.assertIn("ImportError 'failure", stream.getvalue())
 
     def test_registry_graceful_fail_bad_constructor(self):
         working_set = mocks.WorkingSet({'calmjs.registry': [

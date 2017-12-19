@@ -94,11 +94,15 @@ class Registry(BaseRegistry):
 
         entry_point = self._entry_points.get(name)
         if not entry_point:
+            logger.debug("'%s' does not resolve to a registry", name)
             return
 
         try:
             cls = entry_point.load()
         except ImportError:
+            logger.debug(
+                "ImportError '%s' from '%s'",
+                entry_point, entry_point.dist)
             return
 
         logger.debug(
