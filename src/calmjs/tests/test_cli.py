@@ -489,28 +489,7 @@ class CliDriverTestCase(unittest.TestCase):
         inst = Driver.create()
         self.assertTrue(isinstance(inst, Driver))
 
-    def test_module_level_driver_create_for_module_vars(self):
-        class Driver(cli.PackageManagerDriver):
-            def __init__(self, **kw):
-                kw['pkg_manager_bin'] = 'mgr'
-                super(Driver, self).__init__(**kw)
-
-        values = {}
-
-        with warnings.catch_warnings():
-            # Don't spat out stderr
-            warnings.simplefilter('ignore')
-            with pretty_logging(stream=mocks.StringIO()) as err:
-                Driver.create_for_module_vars(values)
-            self.assertIn(
-                "Unable to locate the 'mgr' binary or runtime", err.getvalue())
-
-        # Normally, these will be global names.
-        self.assertIn('mgr_install', values)
-        self.assertIn('mgr_init', values)
-        self.assertIn('get_mgr_version', values)
-
-    def test_create_for_module_vars_warning(self):
+    def test_create_for_module_vars_and_warning(self):
         stub_os_environ(self)
         tmpdir = mkdtemp(self)
         values = {}
@@ -523,17 +502,17 @@ class CliDriverTestCase(unittest.TestCase):
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter('always')
-            with pretty_logging(stream=mocks.StringIO()) as err:
-                driver = MgrDriver.create_for_module_vars(values)
-            self.assertIn(
-                "Unable to locate the 'mgr' binary or runtime", err.getvalue())
-
+            driver = MgrDriver.create_for_module_vars(values)
             self.assertTrue(issubclass(w[-1].category, RuntimeWarning))
             self.assertIn(
                 "Unable to locate the 'mgr' binary or runtime",
                 str(w[-1].message))
 
         self.assertTrue(isinstance(driver, MgrDriver))
+        # Normally, these will be global names.
+        self.assertIn('mgr_install', values)
+        self.assertIn('mgr_init', values)
+        self.assertIn('get_mgr_version', values)
 
     # Should really put more tests of these kind in here, but the more
     # concrete implementations have done so.  This weird version here

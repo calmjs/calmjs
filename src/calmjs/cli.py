@@ -232,9 +232,7 @@ class PackageManagerDriver(NodeDriver):
                 }
             )
             warnings.warn(msg, RuntimeWarning)
-            # Yes there may be duplicates, but warnings are governed
-            # differently.
-            logger.warning(msg)
+
         scope_vars.update(inst._aliases)
         return inst
 
