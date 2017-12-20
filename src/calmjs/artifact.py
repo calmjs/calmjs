@@ -430,48 +430,59 @@ class BaseArtifactRegistry(BaseRegistry):
     def extract_builder_result(self, builder_result):
         return extract_builder_result(builder_result)
 
+    def run(self, toolchain, spec):
+        return toolchain(spec)
+
+    def iter_builders_for(self, package_name):
+        for entry_point in self.iter_records_for(package_name):
+            try:
+                builder = entry_point.resolve()
+            except ImportError:
+                logger.error(
+                    "unable to import the target builder for the entry point "
+                    "'%s' from package '%s'", entry_point, entry_point.dist,
+                )
+                continue
+
+            export_target = self.records[
+                (entry_point.dist.project_name, entry_point.name)]
+
+            if not self.verify_builder(builder):
+                logger.error(
+                    "the builder referenced by the entry point '%s' "
+                    "from package '%s' has an incompatible signature",
+                    entry_point, entry_point.dist,
+                )
+                continue
+
+            if not self.verify_export_target(export_target):
+                continue
+
+            toolchain, spec = self.extract_builder_result(builder(
+                [entry_point.dist.project_name], export_target=export_target))
+            if not toolchain:
+                logger.error(
+                    "the builder referenced by the entry point '%s' "
+                    "from package '%s' failed to produce a valid "
+                    "toolchain and spec",
+                    entry_point, entry_point.dist,
+                )
+                continue
+
+            yield entry_point, toolchain, spec
+
+    # TODO everything below here should be moved to some runtime
+    # class - the registry SHOULD NOT actualize execution
+
     def process_package(self, package_name):
         results = {}
-        for entry_point in self.iter_records_for(package_name):
-            results.update(self.process_entry_point(entry_point))
+        for builder in self.iter_builders_for(package_name):
+            results.update(self._execute(*builder))
         return results
 
-    def process_entry_point(self, entry_point):
-        try:
-            builder = entry_point.resolve()
-        except ImportError:
-            logger.error(
-                "unable to import the target builder for the entry point "
-                "'%s' from package '%s'", entry_point, entry_point.dist,
-            )
-            return {}
-
-        export_target = self.records[
-            (entry_point.dist.project_name, entry_point.name)]
-
-        if not self.verify_builder(builder):
-            logger.error(
-                "the builder referenced by the entry point '%s' "
-                "from package '%s' has an incompatible signature",
-                entry_point, entry_point.dist,
-            )
-            return {}
-
-        if not self.verify_export_target(export_target):
-            return {}
-
-        toolchain, spec = self.extract_builder_result(builder(
-            [entry_point.dist.project_name], export_target=export_target))
-        if not toolchain:
-            logger.error(
-                "the builder referenced by the entry point '%s' "
-                "from package '%s' failed to produce a valid "
-                "toolchain and spec",
-                entry_point, entry_point.dist,
-            )
-            return {}
-
-        toolchain(spec)
+    def _execute(self, entry_point, toolchain, spec):
+        export_target = spec['export_target']
+        self.run(toolchain, spec)
 
         if not exists(export_target):
             logger.error(

@@ -46,6 +46,12 @@ registry
     Root registry class.  Inherits from base.  Should not inherit from
     anything else.
 
+command
+    Provides the primitives for distutils/setuptools integration.  It
+    should not inherit from anything but rather the downstream users
+    should compose the instances with whatever it needs, with data
+    provided by the registry.
+
 indexer
     Contains a microregistry and a number of functions for generation
     of mappings of files within modules in Python packages for the
@@ -80,24 +86,16 @@ cli
     its own shell.  This latter part could be exposed as the runtime
     library.
 
-runtime
-    The module that provides the classes and functions that aid with
-    providing the entry point into calmjs from cli and elsewhere.
-    Supports the generation of the texts for users from the shell.
-
-command
-    Provides the primitive package manager command.  While it doesn't
-    really inherit from anything here, implementations will likely
-    inherit from dist for helpers, cli for the actual cli interfacing
-    part for the underlying binary for the command, and runtime for the
-    help tests.  The classes will hold onto an instance of a cli Driver
-    and also the appropriate runtime constructed using that.
-
 artifact
     Defines all artifact integration functionalities; includes the
     related registries, makes use of the dist and command modules for
     the resolution of dependencies of packages and hooks into the
     setuptools infrastructure.
+
+runtime
+    The module that provides the classes and functions that aid with
+    providing the entry point into calmjs from cli and elsewhere.
+    Supports the generation of the texts for users from the shell.
 
 npm
     The npm specific tools.  Whole module can in theory be generated

@@ -180,6 +180,8 @@ class BuildArtifactCommand(Command):
         If finalization is needed.
         """
 
+    # TODO make use of cli_driver rather than probing for registry
+
     @use_distutils_logger()
     def run(self):
         if self.dry_run:

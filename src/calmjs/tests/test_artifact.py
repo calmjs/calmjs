@@ -469,7 +469,7 @@ class ArtifactRegistryBuildFailureTestCase(unittest.TestCase):
         # nothing dummy builder
         def nothing_builder(package_names, export_target):
             "does not produce an artifact"
-            return NullToolchain(), Spec()
+            return NullToolchain(), Spec(export_target=export_target)
 
         # inject dummy module and add cleanup
         mod = ModuleType('calmjs_testing_dummy')
