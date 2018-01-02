@@ -62,7 +62,7 @@ def get_bin_version_str(bin_path, version_flag='-v', kw={}):
             "'%s':", bin_path
         )
         return None
-    logger.info("found '%s' version '%s'", bin_path, version_str)
+    logger.info("'%s' is version '%s'", bin_path, version_str)
     return version_str
 
 
