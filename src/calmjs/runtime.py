@@ -903,8 +903,10 @@ class BaseArtifactRegistryRuntime(BaseRuntime):
     def init_argparser(self, argparser):
         super(BaseArtifactRegistryRuntime, self).init_argparser(argparser)
         argparser.add_argument(
-            'package_names', help='names of the python package to use',
-            metavar='package_name', nargs='+',
+            'package_names', metavar='package_name', nargs='+',
+            help='names of the python package to generate artifacts for; '
+                 'note that the metadata directory for the specified '
+                 'packages must be writable',
         )
 
     def run(self, argparser=None, package_names=[], *a, **kwargs):

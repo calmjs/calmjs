@@ -258,6 +258,7 @@ command-line utility will become available within there.
 
     positional arguments:
       <command>
+        artifact     helpers for the management of artifacts
         npm          npm support for the calmjs framework
         yarn         yarn support for the calmjs framework
 
@@ -643,9 +644,16 @@ file.  The generated artifact files will reside in the
 package.  An accompanied ``calmjs_artifacts.json`` file will also be
 generated, listing the versions of the various Python packages that were
 involved with construction of that artifact, and the version of binary
-that was used for the task.  Note that the argument
-``build_calmjs_artifacts`` must be to ``True`` to enable this build
-functionality.
+that was used for the task.
+
+When the ``build_calmjs_artifacts`` is set to ``True``, the hook for
+automatic generation of these artifacts through the ``setup.py build``
+step will enabled.  This is useful for automatically bundling the
+artifact file with a release such as Python wheels (e.g. running
+``setup.py bdist_wheel`` will also build the declared artifacts.
+Otherwise, this step can be manually invoked using
+``setup.py build_calmjs_artifacts`` or through the
+``calmjs artifact build`` tool.
 
 
 Troubleshooting
