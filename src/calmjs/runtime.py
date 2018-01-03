@@ -290,12 +290,10 @@ class BaseRuntime(BootstrapRuntime):
         target = kwargs.get(self.action_key)
 
         if extras:
-            # first step, figure out where exactly the problem is
+            # first step, figure out where exactly the problem is, by
+            # taking everything before the target (if any) and see where
+            # the failure happened
             before = args[:args.index(target)] if target in args else args
-            # Now, take everything before the target and see that it
-            # got consumed
-            bootstrap = BootstrapRuntime()
-            # get arguments that failed the bootstrap stage, if any
             bootfail = bootstrap(before)
             # msg has no gettext applied as in argparser module version
             msg = 'unrecognized arguments: %s' % ' '.join(bootfail or extras)
@@ -621,7 +619,7 @@ class Runtime(BaseRuntime):
         subparser = details.subparsers.get(action_key)
         if runtime:
             return runtime.run(argparser=subparser, **kwargs)
-        # nothing is going to happen otherwise?
+        return NotImplemented
 
 
 class CalmJSRuntime(Runtime):
@@ -1093,6 +1091,12 @@ def main(args=None, runtime_cls=CalmJSRuntime):
     # ultimately the value must be a list.
     args = norm_args(args)
     extras = bootstrap(args)
+
+    # Rather than forcing a "print_help" somewhere later to print out
+    # the help, trigger it through an implicit `-h` to avoid certain
+    # differences in how parsing is handled between different versions
+    # of Python and ArgumentParser, as doing it in this hacky way turns
+    # out to be most consistent.
     if not extras:
         args = args + ['-h']
 

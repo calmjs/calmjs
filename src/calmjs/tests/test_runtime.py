@@ -140,6 +140,15 @@ class BaseRuntimeTestCase(unittest.TestCase):
             bt.error(bt.argparser, None, 'error message')
         self.assertIn('error message', sys.stderr.getvalue())
 
+    def test_runtime_run_empty(self):
+        stub_stdouts(self)
+        working_set = mocks.WorkingSet({
+            'calmjs.runtime': [],
+        })
+        rt = runtime.Runtime(working_set=working_set, prog='dummy')
+        result = rt.run(rt.argparser, runtime='dummy')
+        self.assertIs(result, NotImplemented)
+
     def test_runtime_run_abort(self):
         class CustomRuntime(runtime.BaseRuntime):
             def run(self, export_target=None, **kwargs):
@@ -875,9 +884,10 @@ class RuntimeLoaderPluginRegistryOptionTestCase(unittest.TestCase):
             known.source_package_names, ['example.package'])
 
 
-class PackageManagerDriverTestCase(unittest.TestCase):
+class PackageManagerRuntimeTestCase(unittest.TestCase):
     """
-    Test cases for the package manager driver and argparse usage.
+    Test cases for the package manager driver/runtime and argparse
+    usage.
     """
 
     def test_command_creation(self):
