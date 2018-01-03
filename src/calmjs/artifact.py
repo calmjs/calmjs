@@ -400,6 +400,41 @@ class BaseArtifactRegistry(BaseRegistry):
 
         return json.loads(contents)
 
+    def generate_metadata_entry(self, entry_point, toolchain, spec):
+        """
+        After the toolchain and spec have been executed, this may be
+        called to generate the artifact export entry for persistence
+        into the metadata file.
+        """
+
+        export_target = spec['export_target']
+        toolchain_bases = trace_toolchain(toolchain)
+        toolchain_bin_path = spec.get(TOOLCHAIN_BIN_PATH)
+        toolchain_bin = ([
+            basename(toolchain_bin_path),  # bin_name
+            get_bin_version_str(toolchain_bin_path),  # bin_version
+        ] if toolchain_bin_path else [])
+
+        return {basename(export_target): {
+            'toolchain_bases': toolchain_bases,
+            'toolchain_bin': toolchain_bin,
+            'builder': '%s:%s' % (
+                entry_point.module_name, '.'.join(entry_point.attrs)),
+        }}
+
+    def update_artifact_metadata(self, package_name, new_metadata):
+        metadata = self.get_artifact_metadata(package_name)
+        metadata_filename = self.metadata.get(package_name)
+        artifacts = metadata[ARTIFACT_BASENAME] = metadata.get(
+            ARTIFACT_BASENAME, {})
+        artifacts.update(new_metadata)
+        metadata['versions'] = sorted(set(
+            '%s' % i for i in find_packages_requirements_dists(
+                [package_name])))
+
+        with open(metadata_filename, 'w', encoding='utf8') as fd:
+            json.dump(metadata, fd)
+
     def iter_records_for(self, package_name):
         """
         Iterate records for a specific package.
@@ -429,9 +464,6 @@ class BaseArtifactRegistry(BaseRegistry):
 
     def extract_builder_result(self, builder_result):
         return extract_builder_result(builder_result)
-
-    def run(self, toolchain, spec):
-        return toolchain(spec)
 
     def iter_builders_for(self, package_name):
         for entry_point in self.iter_records_for(package_name):
@@ -471,39 +503,26 @@ class BaseArtifactRegistry(BaseRegistry):
 
             yield entry_point, toolchain, spec
 
-    # TODO everything below here should be moved to some runtime
-    # class - the registry SHOULD NOT actualize execution
+    def execute_builder(self, entry_point, toolchain, spec):
+        """
+        Accepts the arguments provided by the builder and executes them.
+        """
+
+        toolchain(spec)
+        if not exists(spec['export_target']):
+            logger.error(
+                "the entry point '%s' from package '%s' failed to "
+                "generate an artifact at '%s'",
+                entry_point, entry_point.dist, spec['export_target']
+            )
+            return {}
+        return self.generate_metadata_entry(entry_point, toolchain, spec)
 
     def process_package(self, package_name):
         results = {}
         for builder in self.iter_builders_for(package_name):
-            results.update(self._execute(*builder))
+            results.update(self.execute_builder(*builder))
         return results
-
-    def _execute(self, entry_point, toolchain, spec):
-        export_target = spec['export_target']
-        self.run(toolchain, spec)
-
-        if not exists(export_target):
-            logger.error(
-                "the entry point '%s' from package '%s' failed to "
-                "generate an artifact at '%s'",
-                entry_point, entry_point.dist, export_target
-            )
-
-        toolchain_bases = trace_toolchain(toolchain)
-        toolchain_bin_path = spec.get(TOOLCHAIN_BIN_PATH)
-        toolchain_bin = ([
-            basename(toolchain_bin_path),  # bin_name
-            get_bin_version_str(toolchain_bin_path),  # bin_version
-        ] if toolchain_bin_path else [])
-
-        return {basename(export_target): {
-            'toolchain_bases': toolchain_bases,
-            'toolchain_bin': toolchain_bin,
-            'builder': '%s:%s' % (
-                entry_point.module_name, '.'.join(entry_point.attrs)),
-        }}
 
 
 class ArtifactRegistry(BaseArtifactRegistry):
@@ -517,20 +536,6 @@ class ArtifactRegistry(BaseArtifactRegistry):
         Build artifacts declared for the given package.
         """
 
-        if not any(self.iter_records_for(package_name)):
-            return
-
-        metadata = self.get_artifact_metadata(package_name)
-        metadata_filename = self.metadata.get(package_name)
-        artifacts = metadata[ARTIFACT_BASENAME] = metadata.get(
-            ARTIFACT_BASENAME, {})
-
-        artifacts.update(
-            super(ArtifactRegistry, self).process_package(package_name))
-
-        metadata['versions'] = sorted(set(
-            '%s' % i for i in find_packages_requirements_dists(
-                [package_name])))
-
-        with open(metadata_filename, 'w', encoding='utf8') as fd:
-            json.dump(metadata, fd)
+        metadata = super(ArtifactRegistry, self).process_package(package_name)
+        if metadata:
+            self.update_artifact_metadata(package_name, metadata)
