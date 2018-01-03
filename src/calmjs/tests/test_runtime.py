@@ -11,6 +11,7 @@ from os.path import exists
 from logging import DEBUG
 from logging import INFO
 from logging import WARNING
+from types import ModuleType
 
 import pkg_resources
 
@@ -882,6 +883,122 @@ class RuntimeLoaderPluginRegistryOptionTestCase(unittest.TestCase):
             known.calmjs_loaderplugin_registry_name, 'reg1,reg2')
         self.assertEqual(
             known.source_package_names, ['example.package'])
+
+
+class ArtifactRuntimeTestCase(unittest.TestCase):
+    """
+    Test cases for the artifact runtime and subruntimes.
+    """
+
+    def test_artifact_runtime_integration(self):
+        stub_stdouts(self)
+        working_set = mocks.WorkingSet({'calmjs.runtime': [
+            'artifact = calmjs.runtime:artifact',
+        ]})
+        rt = runtime.Runtime(working_set=working_set)
+        rt(['artifact'])
+        # ensure the help for the command itself is printed
+        self.assertIn(
+            'helpers for the management of artifacts', sys.stdout.getvalue())
+
+    def test_artifact_build_runtime_integration(self):
+        from calmjs import artifact
+        from calmjs.registry import _inst as root_registry
+        from calmjs.testing.artifact import generic_builder
+
+        def die():
+            raise toolchain.ToolchainAbort('desu')
+
+        def exploding_builder(package_names, export_target):
+            tc, spec = generic_builder(package_names, export_target)
+            spec.advise(toolchain.BEFORE_COMPILE, die)
+            return tc, spec
+
+        stub_stdouts(self)
+
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.registry]\n'
+            'calmjs.artifacts = calmjs.artifact:ArtifactRegistry\n'
+            '[calmjs.runtime]\n'
+            'artifact = calmjs.runtime:artifact\n'
+            '[calmjs.runtime.artifact]\n'
+            'build = calmjs.runtime:artifact_build\n'
+        ),), 'calmjs', '1.0')
+
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.artifacts]\n'
+            'full.js = calmjs_testbuilder:builder\n',
+        ),), 'example.package', '1.0')
+
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.artifacts]\n'
+            'other.js = calmjs_testbuilder:builder\n',
+        ),), 'example.other', '1.0')
+
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.artifacts]\n'
+            'full.js = calmjs_testbuilder:explosion\n',
+        ),), 'boom', '1.0')
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+
+        mod = ModuleType('calmjs_testbuilder')
+        mod.builder = generic_builder
+        mod.explosion = exploding_builder
+        self.addCleanup(sys.modules.pop, 'calmjs_testbuilder')
+        sys.modules['calmjs_testbuilder'] = mod
+
+        self.addCleanup(root_registry.records.pop, 'calmjs.artifacts')
+        artifact_registry = root_registry.records[
+            'calmjs.artifacts'] = artifact.ArtifactRegistry(
+                'calmjs.artifacts', _working_set=working_set)
+
+        rt = runtime.Runtime(working_set=working_set)
+        command = ['artifact', 'build', 'example.package']
+        rt(command)
+
+        self.assertTrue(
+            exists(artifact_registry.metadata.get('example.package')))
+
+        # try again through the main method
+        with self.assertRaises(SystemExit) as e:
+            runtime.main(command, runtime_cls=lambda: rt)
+
+        # ensure proper exit code of 0
+        self.assertEqual(e.exception.args[0], 0)
+
+        # remove artifact to try again later for multiple packages in
+        # one go.
+        os.unlink(artifact_registry.metadata.get('example.package'))
+        with self.assertRaises(SystemExit) as e:
+            runtime.main(command + ['example.other'], runtime_cls=lambda: rt)
+        # ensure proper exit code of 0
+        self.assertEqual(e.exception.args[0], 0)
+        self.assertTrue(
+            exists(artifact_registry.metadata.get('example.package')))
+        self.assertTrue(
+            exists(artifact_registry.metadata.get('example.other')))
+
+        # however, if something blows up completely...
+        with self.assertRaises(SystemExit) as e:
+            runtime.main(['artifact', 'build', 'boom'], runtime_cls=lambda: rt)
+        # ensure proper exit code of 1
+        self.assertEqual(e.exception.args[0], 1)
+
+    def test_artifact_build_runtime_live_integration(self):
+        stub_stdouts(self)
+        # using the live data this time.
+        with self.assertRaises(SystemExit) as e:
+            runtime.main(['artifact', 'build', 'calmjs', '-v'])
+        self.assertIn(
+            "package 'calmjs' has not declare", sys.stderr.getvalue())
+
+        # since no artifacts were built, it will be non-zero
+        self.assertNotEqual(e.exception.args[0], 0)
 
 
 class PackageManagerRuntimeTestCase(unittest.TestCase):

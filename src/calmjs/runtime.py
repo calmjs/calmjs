@@ -47,6 +47,7 @@ from calmjs.utils import pdb_post_mortem
 
 CALMJS = 'calmjs'
 CALMJS_RUNTIME = 'calmjs.runtime'
+CALMJS_RUNTIME_ARTIFACT = 'calmjs.runtime.artifact'
 logger = logging.getLogger(__name__)
 DEST_ACTION = 'action'
 DEST_RUNTIME = 'runtime'
@@ -866,6 +867,64 @@ class ToolchainRuntime(DriverRuntime):
         return spec
 
 
+class ArtifactRuntime(Runtime):
+    """
+    helpers for the management of artifacts
+    """
+
+    # This groups all the main artifact helpers together.
+
+    def __init__(
+            self, entry_point_group=CALMJS_RUNTIME_ARTIFACT,
+            action_key='artifact_runtime', *a, **kw):
+        super(ArtifactRuntime, self).__init__(
+            entry_point_group=entry_point_group,
+            action_key=action_key,
+            *a, **kw
+        )
+
+    def run(self, argparser=None, **kwargs):
+        result = super(ArtifactRuntime, self).run(argparser, **kwargs)
+        if result is NotImplemented:
+            argparser.print_help()
+            return False
+        return result
+
+
+class BaseArtifactRegistryRuntime(BaseRuntime):
+    """
+    The base artifact registry runtime.
+    """
+
+    def __init__(self, registry_name='calmjs.artifacts', *a, **kw):
+        self.registry_name = registry_name
+        super(BaseArtifactRegistryRuntime, self).__init__(*a, **kw)
+
+    def init_argparser(self, argparser):
+        super(BaseArtifactRegistryRuntime, self).init_argparser(argparser)
+        argparser.add_argument(
+            'package_names', help='names of the python package to use',
+            metavar='package_name', nargs='+',
+        )
+
+    def run(self, argparser=None, package_names=[], *a, **kwargs):
+        for package_name in package_names:
+            registry = get(self.registry_name)
+            metadata = {}
+            for builder in registry.iter_builders_for(package_name):
+                metadata.update(registry.execute_builder(*builder))
+            registry.update_artifact_metadata(package_name, metadata)
+
+        if metadata:
+            return True
+
+
+class ArtifactBuildRuntime(BaseArtifactRegistryRuntime):
+    """
+    build artifacts declared by package
+    """
+
+
 class SourcePackageToolchainRuntime(ToolchainRuntime):
     """
     Include the argument parser setup using the standardized keywords
@@ -1083,6 +1142,10 @@ class PackageManagerRuntime(DriverRuntime):
         kwargs['production'] = True if kwargs.get('production') else None
         kwargs['development'] = True if kwargs.get('development') else None
         return action(**kwargs)
+
+
+artifact = ArtifactRuntime()
+artifact_build = ArtifactBuildRuntime()
 
 
 def main(args=None, runtime_cls=CalmJSRuntime):
