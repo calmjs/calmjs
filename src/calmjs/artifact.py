@@ -424,7 +424,13 @@ class BaseArtifactRegistry(BaseRegistry):
 
     def update_artifact_metadata(self, package_name, new_metadata):
         metadata = self.get_artifact_metadata(package_name)
-        metadata_filename = self.metadata.get(package_name)
+        metadata_filename = self.metadata.get(package_name, NotImplemented)
+        if metadata_filename is NotImplemented:
+            logger.info(
+                "package '%s' has not declare any artifacts; not applying "
+                "updates to metadata information", package_name)
+            return
+
         artifacts = metadata[ARTIFACT_BASENAME] = metadata.get(
             ARTIFACT_BASENAME, {})
         artifacts.update(new_metadata)

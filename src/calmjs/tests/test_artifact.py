@@ -329,6 +329,38 @@ class ArtifactRegistryTestCase(unittest.TestCase):
             "insensitive filename", log
         )
 
+    def test_update_artifact_metadata(self):
+        # inject dummy module and add cleanup
+        mod = ModuleType('calmjs_testing_dummy')
+        mod.complete = generic_builder
+        self.addCleanup(sys.modules.pop, 'calmjs_testing_dummy')
+        sys.modules['calmjs_testing_dummy'] = mod
+
+        working_dir = utils.mkdtemp(self)
+        utils.make_dummy_dist(self, (
+            ('requires.txt', '\n'.join([
+                'calmjs',
+            ])),
+            ('entry_points.txt', '\n'.join([
+                '[calmjs.artifacts]',
+                'artifact.js = calmjs_testing_dummy:complete',
+            ])),
+        ), 'app', '1.0', working_dir=working_dir)
+        # mock a version of calmjs within that environment too
+        utils.make_dummy_dist(self, (
+            ('entry_points.txt', ''),
+        ), 'calmjs', '1.0', working_dir=working_dir)
+
+        mock_ws = WorkingSet([working_dir])
+        registry = ArtifactRegistry('calmjs.artifacts', _working_set=mock_ws)
+        registry.update_artifact_metadata('app', {})
+        self.assertTrue(exists(registry.metadata.get('app')))
+
+        with pretty_logging(stream=mocks.StringIO()) as s:
+            registry.update_artifact_metadata('calmjs', {})
+        self.assertIn(
+            "package 'calmjs' has not declare any artifacts", s.getvalue())
+
     def test_build_artifacts_success(self):
         # inject dummy module and add cleanup
         mod = ModuleType('calmjs_testing_dummy')
