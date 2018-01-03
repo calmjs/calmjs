@@ -29,15 +29,7 @@ from calmjs.toolchain import Spec
 
 from calmjs.testing import utils
 from calmjs.testing import mocks
-from calmjs.testing.toolchain import ArtifactToolchain
-
-
-# the generic builder
-def generic_builder(package_names, export_target):
-    return ArtifactToolchain(), Spec(
-        package_names=package_names,
-        export_target=export_target,
-    )
+from calmjs.testing.artifact import generic_builder
 
 
 class IntegrationTestCase(unittest.TestCase):
@@ -422,7 +414,7 @@ class ArtifactRegistryTestCase(unittest.TestCase):
                 'artifact.js': {
                     'builder': 'calmjs_testing_dummy:complete',
                     'toolchain_bases': [
-                        {'calmjs.testing.toolchain:ArtifactToolchain': {
+                        {'calmjs.testing.artifact:ArtifactToolchain': {
                             'project_name': 'calmjs',
                             'version': '1.0',
                         }},
@@ -440,7 +432,7 @@ class ArtifactRegistryTestCase(unittest.TestCase):
                 'partial.js': {
                     'builder': 'calmjs_testing_dummy:partial',
                     'toolchain_bases': [
-                        {'calmjs.testing.toolchain:ArtifactToolchain': {
+                        {'calmjs.testing.artifact:ArtifactToolchain': {
                             'project_name': 'calmjs',
                             'version': '1.0'}},
                         {'calmjs.toolchain:NullToolchain': {
