@@ -24,6 +24,10 @@ ATTR_INFO = '_calmjs_runtime_info'
 ATTR_ROOT_PKG = '_calmjs_root_pkg_name'
 
 
+def metavar(name):
+    return '<' + name.lower() + '>'
+
+
 class Namespace(argparse.Namespace):
     """
     This implementation retains existing parsed value for matched types,
