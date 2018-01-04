@@ -890,6 +890,15 @@ class ArtifactRuntimeTestCase(unittest.TestCase):
     Test cases for the artifact runtime and subruntimes.
     """
 
+    def setUp(self):
+        from calmjs import artifact
+
+        def version(bin_path, version_flag='-v', kw={}):
+            return '0.0.0'
+
+        # provide a fake version to avoid implied execution
+        stub_item_attr_value(self, artifact, 'get_bin_version_str', version)
+
     def test_artifact_runtime_integration(self):
         stub_stdouts(self)
         working_set = mocks.WorkingSet({'calmjs.runtime': [
