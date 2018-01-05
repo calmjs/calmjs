@@ -10,6 +10,7 @@ from __future__ import absolute_import
 import argparse
 import sys
 import textwrap
+from functools import partial
 from os import linesep
 from os.path import pathsep
 from argparse import _
@@ -207,6 +208,28 @@ class StoreRequirementList(StoreDelimitedListBase):
         return requirement_comma_list.split(values[0])
 
 
+class DeprecatedAction(Action):
+
+    def __init__(self, original_action_cls, deprecation, *a, **kw):
+        self.original_action = original_action_cls(*a, **kw)
+        # copy the kwargs from within to ensure API compatibility and
+        # expectations
+        kw.update(self.original_action._get_kwargs())
+        # only set message if it's a string.
+        self.deprecation = '' if deprecation is True else deprecation
+        kw['help'] = argparse.SUPPRESS
+        super(DeprecatedAction, self).__init__(*a, **kw)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        import warnings
+        msg = "option '%s' is deprecated" % option_string
+        if self.deprecation:
+            msg = msg + ': ' + self.deprecation
+        warnings.warn(msg, DeprecationWarning)
+        return self.original_action(
+            parser, namespace, values, option_string=option_string)
+
+
 class ArgumentParser(argparse.ArgumentParser):
 
     def __init__(self, formatter_class=CalmJSHelpFormatter, **kw):
@@ -223,3 +246,15 @@ class ArgumentParser(argparse.ArgumentParser):
         if namespace is None:
             namespace = Namespace()
         return super(ArgumentParser, self).parse_known_args(args, namespace)
+
+    def _pop_action_class(self, kwargs, default=None):
+        deprecation = kwargs.pop('deprecation', None)
+        action = super(ArgumentParser, self)._pop_action_class(kwargs, default)
+        if deprecation:
+            # as the deprecation class acts as a wrapper
+            action = partial(
+                DeprecatedAction,
+                original_action_cls=action,
+                deprecation=deprecation,
+            )
+        return action

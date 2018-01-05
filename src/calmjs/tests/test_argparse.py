@@ -320,6 +320,42 @@ class StoreCommaDelimitedListTestCase(unittest.TestCase):
         with self.assertRaises(SystemExit):
             argparser.parse_known_args(['--dot', 'a,b,c'])
 
+    def test_deprecation(self):
+        import warnings
+        argparser = ArgumentParser(prog='prog', add_help=False)
+        argparser.add_argument('-n', '--normal', action='store')
+        argparser.add_argument(
+            '-d', '--deprecated', action='store', deprecation=True)
+        argparser.add_argument(
+            '--bye', action=StoreDelimitedListBase, deprecation='bye')
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter('always')
+            # test that they store stuff
+            args = argparser.parse_args(['-n', 'hello'])
+            self.assertEqual(args.normal, 'hello')
+            args = argparser.parse_args(['-d', 'hello'])
+            self.assertEqual(args.deprecated, 'hello')
+            args = argparser.parse_args(['--deprecated', 'hello'])
+            self.assertEqual(args.deprecated, 'hello')
+            args = argparser.parse_args(['--bye', 'hello,goodbye'])
+            self.assertEqual(args.bye, ['hello', 'goodbye'])
+
+        # and the warnings are triggered
+        self.assertEqual(
+            "option '-d' is deprecated", str(w[0].message))
+        self.assertEqual(
+            "option '--deprecated' is deprecated", str(w[1].message))
+        self.assertEqual(
+            "option '--bye' is deprecated: bye", str(w[2].message))
+
+        stream = StringIO()
+        argparser.print_help(file=stream)
+        # deprecated options are not visible on help
+        self.assertNotIn("--deprecated", stream.getvalue())
+        self.assertNotIn("--bye", stream.getvalue())
+        self.assertIn("--normal", stream.getvalue())
+
 
 class StorePathSepDelimitedListTestCase(unittest.TestCase):
     """
