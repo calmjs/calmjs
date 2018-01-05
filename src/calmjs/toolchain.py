@@ -798,16 +798,18 @@ class Spec(dict):
                             'showing traceback for cancellation', exc_info=1,
                         )
                 except AdviceAbort as e:
+                    # this is a signaled error with a planned abortion
                     logger.warning(
-                        "advice %s in group '%s' raised an error "
-                        "during its execution: %s; toolchain execution will "
-                        "continue, however", advice, name, e
+                        "advice %s in group '%s' encountered a known error "
+                        "during its execution: %s; continuing with toolchain "
+                        "execution", advice, name, e
                     )
                     if self.get(DEBUG):
                         logger.warning(
                             'showing traceback for error', exc_info=1,
                         )
                 except ToolchainCancel:
+                    # this is the safe cancel
                     raise
                 except ToolchainAbort as e:
                     logger.critical(
@@ -817,8 +819,16 @@ class Spec(dict):
                     raise
                 except KeyboardInterrupt:
                     raise ToolchainCancel('interrupted')
-                except Exception:
-                    logger.exception('Spec advice execution: got %s', values)
+                except Exception as e:
+                    # a completely unplanned failure
+                    logger.critical(
+                        "advice %s in group '%s' terminated due to an "
+                        "unexpected exception: %s", advice, name, e
+                    )
+                    if self.get(DEBUG):
+                        logger.critical(
+                            'showing traceback for error', exc_info=1,
+                        )
 
 
 class AdviceRegistry(BaseRegistry):

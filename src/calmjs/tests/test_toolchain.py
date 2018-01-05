@@ -542,8 +542,15 @@ class SpecAdviceTestCase(unittest.TestCase):
             ((1,), {'keyword': 'foo'}),
         ])
 
-    def test_spec_advice_broken(self):
+    def test_spec_advice_broken_no_traceback(self):
         spec = Spec()
+        spec.advise(CLEANUP, fake_error(Exception))
+        with pretty_logging(stream=StringIO()) as s:
+            spec.handle(CLEANUP)
+        self.assertNotIn('Traceback', s.getvalue())
+
+    def test_spec_advice_broken_debug_traceback(self):
+        spec = Spec(debug=1)
         spec.advise(CLEANUP, fake_error(Exception))
         with pretty_logging(stream=StringIO()) as s:
             spec.handle(CLEANUP)
@@ -1833,8 +1840,8 @@ class NullToolchainTestCase(unittest.TestCase):
             abort, False, executed=[SUCCESS, CLEANUP])
         self.assertIn('', s.getvalue())
 
-        self.assertIn('raised an error', s.getvalue())
-        self.assertIn('will continue', s.getvalue())
+        self.assertIn('encountered a known error', s.getvalue())
+        self.assertIn('continuing with toolchain execution', s.getvalue())
         self.assertIn('advice abort', s.getvalue())
         self.assertNotIn('showing traceback for error', s.getvalue())
         self.assertNotIn('Traceback', s.getvalue())
@@ -1842,6 +1849,27 @@ class NullToolchainTestCase(unittest.TestCase):
 
         s = self._check_toolchain_advice(
             abort, False, executed=[SUCCESS, CLEANUP], debug=1)
+        self.assertIn('showing traceback for error', s.getvalue())
+        self.assertIn('Traceback', s.getvalue())
+        self.assertIn('test_toolchain.py', s.getvalue())
+
+    def test_null_toolchain_advice_blew_up(self):
+        def die():
+            raise Exception('desu')
+
+        s = self._check_toolchain_advice(
+            die, False, executed=[SUCCESS, CLEANUP])
+        self.assertIn('', s.getvalue())
+
+        self.assertIn(
+            'terminated due to an unexpected exception', s.getvalue())
+        self.assertIn('desu', s.getvalue())
+        self.assertNotIn('showing traceback for error', s.getvalue())
+        self.assertNotIn('Traceback', s.getvalue())
+        self.assertNotIn('test_toolchain.py', s.getvalue())
+
+        s = self._check_toolchain_advice(
+            die, False, executed=[SUCCESS, CLEANUP], debug=1)
         self.assertIn('showing traceback for error', s.getvalue())
         self.assertIn('Traceback', s.getvalue())
         self.assertIn('test_toolchain.py', s.getvalue())
