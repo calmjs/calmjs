@@ -903,12 +903,22 @@ class BaseArtifactRegistryRuntime(BaseRuntime):
 
     def init_argparser(self, argparser):
         super(BaseArtifactRegistryRuntime, self).init_argparser(argparser)
+        self.init_argparser_package_names(argparser)
+
+    def init_argparser_package_names(self, argparser, help=(
+                'names of the python package to generate artifacts for; '
+                'note that the metadata directory for the specified '
+                'packages must be writable')):
+        """
+        Default helper for setting up the package_names option.
+
+        This is separate so that subclasses are not assumed for the
+        purposes of artifact creation; they should consider modifying
+        the default help message to reflect the fact.
+        """
+
         argparser.add_argument(
-            'package_names', metavar=metavar('package'), nargs='+',
-            help='names of the python package to generate artifacts for; '
-                 'note that the metadata directory for the specified '
-                 'packages must be writable',
-        )
+            'package_names', metavar=metavar('package'), nargs='+', help=help)
 
     def run(self, argparser=None, package_names=[], *a, **kwargs):
         for package_name in package_names:
