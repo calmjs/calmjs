@@ -132,6 +132,21 @@ class Version(Action):
         sys.exit(0)
 
 
+class MultiChoice(object):
+
+    def __init__(self, choices=(), sep=','):
+        self.__original = choices
+        self.__choices = set(choices)
+        self.__sep = sep
+
+    def __contains__(self, other):
+        return not (set(other.split(self.__sep)) - self.__choices)
+
+    def __iter__(self):
+        for i in self.__original:
+            yield i
+
+
 class StoreDelimitedListBase(Action):
 
     def __init__(self, option_strings, dest, sep=',', maxlen=None, **kw):
@@ -140,6 +155,8 @@ class StoreDelimitedListBase(Action):
         kw['nargs'] = 1
         kw['const'] = None
         default = kw.get('default')
+        if 'choices' in kw:
+            kw['choices'] = MultiChoice(choices=kw['choices'], sep=sep)
         if default is not None and not isinstance(default, (tuple, list)):
             raise ValueError(
                 'provided default for store delimited list must be a list or '

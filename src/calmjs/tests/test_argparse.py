@@ -9,6 +9,7 @@ from argparse import _
 from calmjs.argparse import ArgumentParser
 from calmjs.argparse import HyphenNoBreakHelpFormatter
 from calmjs.argparse import Namespace
+from calmjs.argparse import MultiChoice
 from calmjs.argparse import SortedHelpFormatter
 from calmjs.argparse import StoreCommaDelimitedList
 from calmjs.argparse import StoreDelimitedListBase
@@ -62,6 +63,29 @@ class NamespaceTestCase(unittest.TestCase):
         ns.a = {'b': '1'}
         ns.a = 'b'
         self.assertEqual(ns.a, 'b')
+
+
+class MultiChoiceTestCase(unittest.TestCase):
+
+    def test_empty(self):
+        choices = MultiChoice(choices=())
+        self.assertNotIn('', choices)
+        self.assertNotIn('something', choices)
+
+    def test_singular(self):
+        choices = MultiChoice(choices=('foo',))
+        self.assertIn('foo', choices)
+        self.assertIn('foo,foo', choices)
+        self.assertNotIn('bar', choices)
+
+    def test_multiple(self):
+        choices = MultiChoice(choices=('foo', 'bar', 'baz'))
+        self.assertIn('foo', choices)
+        self.assertIn('foo,foo', choices)
+        self.assertIn('bar', choices)
+        self.assertIn('foo,bar,baz', choices)
+        self.assertNotIn('foo,bar,bad', choices)
+        self.assertNotIn('bad', choices)
 
 
 class HelpFormatterTestCase(unittest.TestCase):
@@ -260,6 +284,41 @@ class StoreCommaDelimitedListTestCase(unittest.TestCase):
 
         parsed, extras = argparser.parse_known_args(['-p', '3,4,5'])
         self.assertEqual(parsed.params, ['3'])
+
+    def test_integration_choices_in_list(self):
+        argparser = ArgumentParser(prog='prog', add_help=False)
+
+        argparser.add_argument(
+            '-p', '--params', choices=['1', '2', '3'],
+            action=StoreDelimitedListBase)
+
+        parsed, extras = argparser.parse_known_args(['-p', '3'])
+        self.assertEqual(parsed.params, ['3'])
+        parsed, extras = argparser.parse_known_args(['-p', '3,2'])
+        self.assertEqual(parsed.params, ['3', '2'])
+        parsed, extras = argparser.parse_known_args(['-p', '3,2,1'])
+        self.assertEqual(parsed.params, ['3', '2', '1'])
+        parsed, extras = argparser.parse_known_args(['-p', '3,3,3'])
+        self.assertEqual(parsed.params, ['3', '3', '3'])
+
+        stub_stdouts(self)
+
+        with self.assertRaises(SystemExit):
+            argparser.parse_known_args(['-p', '3,2,1,0'])
+
+        self.assertIn("(choose from '1', '2', '3')", sys.stderr.getvalue())
+
+        with self.assertRaises(SystemExit):
+            argparser.parse_known_args(['-p', '0'])
+
+        argparser.add_argument(
+            '--dot', choices=['a', 'b', 'c'],
+            action=StoreDelimitedListBase, sep='.')
+        parsed, extras = argparser.parse_known_args(['--dot', 'a.b.c'])
+        self.assertEqual(parsed.dot, ['a', 'b', 'c'])
+
+        with self.assertRaises(SystemExit):
+            argparser.parse_known_args(['--dot', 'a,b,c'])
 
 
 class StorePathSepDelimitedListTestCase(unittest.TestCase):
