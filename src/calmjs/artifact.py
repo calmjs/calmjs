@@ -141,6 +141,7 @@ from calmjs.toolchain import Toolchain
 from calmjs.toolchain import Spec
 from calmjs.toolchain import TOOLCHAIN_BIN_PATH
 from calmjs.toolchain import BEFORE_PREPARE
+from calmjs.toolchain import EXPORT_TARGET
 
 ARTIFACT_BASENAME = 'calmjs_artifacts'
 
@@ -512,7 +513,16 @@ class BaseArtifactRegistry(BaseRegistry):
                 logger.error(
                     "the builder referenced by the entry point '%s' "
                     "from package '%s' failed to produce a valid "
-                    "toolchain and spec",
+                    "toolchain",
+                    entry_point, entry_point.dist,
+                )
+                continue
+
+            if spec.get(EXPORT_TARGET) != export_target:
+                logger.error(
+                    "the builder referenced by the entry point '%s' "
+                    "from package '%s' failed to produce a spec with the "
+                    "expected export_path",
                     entry_point, entry_point.dist,
                 )
                 continue

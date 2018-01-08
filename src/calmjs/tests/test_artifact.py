@@ -579,6 +579,10 @@ class ArtifactRegistryBuildFailureTestCase(unittest.TestCase):
             "does not produce an artifact"
             return NullToolchain()
 
+        def blank_spec(package_names, export_target):
+            "does not produce an artifact"
+            return NullToolchain(), Spec()
+
         # nothing dummy builder
         def nothing_builder(package_names, export_target):
             "does not produce an artifact"
@@ -589,6 +593,7 @@ class ArtifactRegistryBuildFailureTestCase(unittest.TestCase):
         mod.bad_builder = bad_builder
         mod.nothing_builder = nothing_builder
         mod.malformed_builder = malformed_builder
+        mod.blank_spec = blank_spec
         self.addCleanup(sys.modules.pop, 'calmjs_testing_dummy')
         sys.modules['calmjs_testing_dummy'] = mod
 
@@ -617,6 +622,13 @@ class ArtifactRegistryBuildFailureTestCase(unittest.TestCase):
                 'malformed.js = calmjs_testing_dummy:malformed_builder',
             ])),
         ), 'malformed', '1.0', working_dir=working_dir)
+
+        utils.make_dummy_dist(self, (
+            ('entry_points.txt', '\n'.join([
+                '[calmjs.artifacts]',
+                'blank.js = calmjs_testing_dummy:blank_spec',
+            ])),
+        ), 'blank', '1.0', working_dir=working_dir)
 
         utils.make_dummy_dist(self, (
             ('entry_points.txt', '\n'.join([
@@ -682,7 +694,15 @@ class ArtifactRegistryBuildFailureTestCase(unittest.TestCase):
             self.registry.process_package('malformed')
 
         log = stream.getvalue()
-        self.assertIn("failed to produce a valid toolchain and spec", log)
+        self.assertIn("failed to produce a valid toolchain", log)
+
+    def test_spec_missing_export_path_handling(self):
+        with pretty_logging(stream=mocks.StringIO()) as stream:
+            self.registry.process_package('blank')
+
+        log = stream.getvalue()
+        self.assertIn(
+            "failed to produce a spec with the expected export_path", log)
 
     def test_artifact_generation_failure(self):
         with pretty_logging(stream=mocks.StringIO()) as stream:
