@@ -31,6 +31,8 @@ Changelog
   Node.js inject them internally (in ``module.paths``, current working
   directory has higher order of precedence over NODE_PATH), for the
   method ``BaseDriver.find_node_modules_basedir``.
+- Framework for predefined artifact generation for packages through the
+  ``calmjs.artifacts`` registry.
 - Also split off the directory resolution from the above method to
   ``BaseDriver.which_with_node_modules``.
 - Deprecated the existing toolchain.transpiler function as a standard
