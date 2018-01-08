@@ -136,9 +136,11 @@ from calmjs.dist import is_json_compat
 from calmjs.dist import pkg_names_to_dists
 from calmjs.cli import get_bin_version_str
 from calmjs.command import BuildArtifactCommand
+from calmjs.types.exceptions import ToolchainAbort
 from calmjs.toolchain import Toolchain
 from calmjs.toolchain import Spec
 from calmjs.toolchain import TOOLCHAIN_BIN_PATH
+from calmjs.toolchain import BEFORE_PREPARE
 
 ARTIFACT_BASENAME = 'calmjs_artifacts'
 
@@ -218,7 +220,7 @@ def prepare_export_location(export_target):
                 "cannot export to '%s' as its dirname does not lead to a "
                 "directory", export_target
             )
-            return False
+            raise ToolchainAbort()
         elif isdir(export_target):
             logger.debug(
                 "removing existing export target directory at '%s'",
@@ -235,7 +237,7 @@ def prepare_export_location(export_target):
             "permission issues are corrected and/or remove the egg-info "
             "directory for this package before trying again",
             target_dir, e)
-        return False
+        raise ToolchainAbort()
 
     return True
 
@@ -466,7 +468,8 @@ class BaseArtifactRegistry(BaseRegistry):
         return verify_builder(builder)
 
     def verify_export_target(self, export_target):
-        return prepare_export_location(export_target)
+        # return a callable to defer destructive verification
+        return prepare_export_location
 
     def extract_builder_result(self, builder_result):
         return extract_builder_result(builder_result)
@@ -499,7 +502,8 @@ class BaseArtifactRegistry(BaseRegistry):
                 )
                 continue
 
-            if not self.verify_export_target(export_target):
+            verifier = self.verify_export_target(export_target)
+            if not verifier:
                 continue
 
             toolchain, spec = self.extract_builder_result(builder(
@@ -513,6 +517,8 @@ class BaseArtifactRegistry(BaseRegistry):
                 )
                 continue
 
+            if callable(verifier):
+                spec.advise(BEFORE_PREPARE, verifier, export_target)
             yield entry_point, toolchain, spec
 
     def execute_builder(self, entry_point, toolchain, spec):
