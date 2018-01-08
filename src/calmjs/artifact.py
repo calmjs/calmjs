@@ -471,19 +471,25 @@ class BaseArtifactRegistry(BaseRegistry):
     def extract_builder_result(self, builder_result):
         return extract_builder_result(builder_result)
 
-    def iter_builders_for(self, package_name):
+    def iter_export_targets_for(self, package_name):
         for entry_point in self.iter_records_for(package_name):
+            export_target = self.records[
+                (entry_point.dist.project_name, entry_point.name)]
+
+            yield entry_point, export_target
+
+    def iter_builders_for(self, package_name):
+        for entry_point, export_target in self.iter_export_targets_for(
+                package_name):
             try:
                 builder = entry_point.resolve()
             except ImportError:
                 logger.error(
                     "unable to import the target builder for the entry point "
-                    "'%s' from package '%s'", entry_point, entry_point.dist,
+                    "'%s' from package '%s' to generate artifact '%s'",
+                    entry_point, entry_point.dist, export_target,
                 )
                 continue
-
-            export_target = self.records[
-                (entry_point.dist.project_name, entry_point.name)]
 
             if not self.verify_builder(builder):
                 logger.error(
