@@ -522,7 +522,7 @@ class BaseArtifactRegistry(BaseRegistry):
                 logger.error(
                     "the builder referenced by the entry point '%s' "
                     "from package '%s' failed to produce a spec with the "
-                    "expected export_path",
+                    "expected export_target",
                     entry_point, entry_point.dist,
                 )
                 continue

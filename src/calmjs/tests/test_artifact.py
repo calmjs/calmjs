@@ -702,7 +702,7 @@ class ArtifactRegistryBuildFailureTestCase(unittest.TestCase):
 
         log = stream.getvalue()
         self.assertIn(
-            "failed to produce a spec with the expected export_path", log)
+            "failed to produce a spec with the expected export_target", log)
 
     def test_artifact_generation_failure(self):
         with pretty_logging(stream=mocks.StringIO()) as stream:
