@@ -122,8 +122,8 @@ A framework for integration with Node.js based package managers
     within the completed application stack, tailored for all the
     packages at hand.
 
-    |calmjs| includes the integration support with |npm| and |yarn| by
-    default.
+    |calmjs| includes the integration support for both |npm|_ and
+    |yarn|_ by default.
 
 Export JavaScript code out of Python packages with the same namespace
     A given Python package that included associated JavaScript source
@@ -508,7 +508,7 @@ valid name for a JavaScript module, the usage of this may create issues
 with certain JavaScript tools.  While AMD based module systems can
 generally handle ``.`` characters in imports without issues, allowing
 somewhat more Python-like feel importing using dotted names within the
-JavaScript environment, however, this may lead to incompatabilities with
+JavaScript environment, however, this may lead to incompatibilities with
 other JavaScript libraries thus the usage of this naming scheme is not
 recommended.
 
@@ -549,12 +549,13 @@ do the same through the built-in ``calmjs npm`` tool:
     $ calmjs npm --help
     usage: calmjs npm [-h] [-d] [-q] [-v] [-V] [--view] [--init] [--install]
                       [-i] [-m] [-w] [-E] [-P] [-D]
-                      package_name [package_name ...]
+                      <package> [<package> ...]
 
     npm support for the calmjs framework
 
     positional arguments:
-      package_name       names of the python package to use
+      <package>          python packages to be used for the generation of
+                         'package.json'
 
     optional arguments:
       -D, --development  explicitly specify development mode for npm install
@@ -769,10 +770,10 @@ limited number to the underlying tool.  These are the ``PATH`` and the
 ``NODE_PATH`` variables, plus platform specific variables to enable
 execution of scripts and binaries.
 
-Runtime reporting 'unrecognized arguments:' on recognized ones
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Runtime reporting 'unrecognized arguments:' on declared arguments
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For instance, if the |calmjs| binary was executed like so resulting in
+For instance, if the |calmjs| command was executed like so resulting in
 error message may look like this:
 
 .. code:: sh
@@ -785,11 +786,11 @@ This means that ``--flag`` is unrecognized by the second subcommand
 (i.e. the ``calmjs subcmd1 subcmd2`` command) as that was placed after
 ``subcmd2``, but the subparser for ``subcmd1`` flagged that as an error.
 Unfortunately there are a number of issues in the ``argparse`` module
-that makes it difficult to resolve this problem, so for the mean time
-please ensure the flag is provided at the correct subcommand level (i.e.
-in this case, ``calmjs subcmd1 --flag item subcmd2``), otherwise consult
-the help at the correct level by appending ``-h`` to each of the valid
-subcommands.
+that makes it difficult to fully resolve this problem, so for the mean
+time please ensure the flag is provided at the correct subcommand level
+(i.e.  in this case, ``calmjs subcmd1 --flag item subcmd2``), otherwise
+consult the help at the correct level by appending ``-h`` to each of the
+valid subcommands.
 
 Module registry not locating files from namespace packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -10,13 +10,23 @@ Environment :: Plugins
 Framework :: Setuptools Plugin
 Intended Audience :: Developers
 License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)
+Operating System :: MacOS :: MacOS X
+Operating System :: Microsoft :: Windows
+Operating System :: POSIX
+Operating System :: POSIX :: BSD
+Operating System :: POSIX :: Linux
 Operating System :: OS Independent
 Programming Language :: JavaScript
+Programming Language :: Python
+Programming Language :: Python :: 2
 Programming Language :: Python :: 2.7
+Programming Language :: Python :: 3
 Programming Language :: Python :: 3.3
 Programming Language :: Python :: 3.4
 Programming Language :: Python :: 3.5
 Programming Language :: Python :: 3.6
+Programming Language :: Python :: Implementation :: CPython
+Programming Language :: Python :: Implementation :: PyPy
 Topic :: Software Development :: Build Tools
 Topic :: Software Development :: Libraries
 Topic :: System :: Software Distribution
