@@ -13,6 +13,7 @@ from types import ModuleType
 from pkg_resources import Distribution
 from pkg_resources import EntryPoint
 from pkg_resources import WorkingSet
+from pkg_resources import safe_name
 
 from calmjs import artifact
 from calmjs import dist
@@ -288,6 +289,31 @@ class ArtifactRegistryTestCase(unittest.TestCase):
             "conflicting entry point registration will be ignored." % st,
             log
         )
+
+    def test_denormalized_package_names(self):
+        working_dir = utils.mkdtemp(self)
+        utils.make_dummy_dist(self, (
+            ('entry_points.txt', '\n'.join([
+                '[calmjs.artifacts]',
+                'full.js = calmjs_testbuild:full',
+            ])),
+        ), 'de_normal_name', '1.0', working_dir=working_dir)
+
+        mock_ws = WorkingSet([working_dir])
+        # stub the default working set in calmjs.dist for the resolver
+        # to work.
+        utils.stub_item_attr_value(self, dist, 'default_working_set', mock_ws)
+        # still specify the working set.
+        registry = ArtifactRegistry('calmjs.artifacts', _working_set=mock_ws)
+        self.assertEqual(
+            1, len(list(registry.iter_records_for('de_normal_name'))))
+        # also test internal consistency
+        self.assertIn('de_normal_name', registry.compat_builders['full'])
+        self.assertIn('de_normal_name', registry.packages)
+        default = registry.get_artifact_filename('de_normal_name', 'full.js')
+        normal = registry.get_artifact_filename(
+            safe_name('de_normal_name'), 'full.js')
+        self.assertEqual(default, normal)
 
     def test_normcase_registration(self):
         # create an empty working set for a clean-slate test.

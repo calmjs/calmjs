@@ -130,6 +130,7 @@ from os import unlink
 from shutil import rmtree
 
 from calmjs.base import BaseRegistry
+from calmjs.base import PackageKeyMapping
 from calmjs.dist import find_packages_requirements_dists
 from calmjs.dist import find_pkg_dist
 from calmjs.dist import is_json_compat
@@ -260,12 +261,12 @@ class BaseArtifactRegistry(BaseRegistry):
         # default (self.records) is a map of package + name to path
         # this is the reverse lookup for that
         self.reverse = {}
-        self.packages = {}
+        self.packages = PackageKeyMapping()
         # metadata file about the artifacts for the package
-        self.metadata = {}
+        self.metadata = PackageKeyMapping()
         # for storing builders that are assumed to be compatible due to
         # their identical attribute names.
-        self.compat_builders = {}
+        self.compat_builders = PackageKeyMapping()
         # TODO determine if the full import name lookup table is
         # required.
         # self.builders = {}
@@ -303,7 +304,7 @@ class BaseArtifactRegistry(BaseRegistry):
         # Python packages.
         cb_key = '.'.join(ep.attrs)
         cb = self.compat_builders[cb_key] = self.compat_builders.get(
-            cb_key, {})
+            cb_key, PackageKeyMapping())
         cb[ep.dist.project_name] = path
 
         # for looking up/storage of metadata about the built artifacts.
@@ -312,6 +313,10 @@ class BaseArtifactRegistry(BaseRegistry):
 
         # standard get_artifact_filename lookup for standalone,
         # complete artifacts at some path.
+        # TODO consider changing the storage implementation to not use
+        # tuple but rather use the PackageKeyMapping for the package
+        # name, then a secondary inner lookup for the artifact_name.
+        # This is to maintain consistency across implementation
         self.records[(ep.dist.project_name, ep.name)] = path
         # only the reverse lookup must be normalized
         self.reverse[nc_path] = ep
@@ -345,7 +350,8 @@ class BaseArtifactRegistry(BaseRegistry):
         declared, otherwise None.
         """
 
-        return self.records.get((package_name, artifact_name))
+        project_name = self.packages.normalize(package_name)
+        return self.records.get((project_name, artifact_name))
 
     def resolve_artifacts_by_builder_compat(
             self, package_names, builder_name, dependencies=False):
