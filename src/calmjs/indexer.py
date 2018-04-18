@@ -28,6 +28,23 @@ _utils = {
 }
 
 
+def resource_filename_mod_dist(module_name, dist):
+    """
+    Given a module name and a distribution, attempt to resolve the
+    actual path to the module.
+    """
+
+    try:
+        return pkg_resources.resource_filename(
+            dist.as_requirement(), join(*module_name.split('.')))
+    except pkg_resources.DistributionNotFound:
+        logger.warning(
+            "distribution '%s' not found, falling back to resolution using "
+            "module_name '%s'", dist, module_name,
+        )
+        return pkg_resources.resource_filename(module_name, '')
+
+
 def resource_filename_mod_entry_point(module_name, entry_point):
     """
     If a given package declares a namespace and also provide submodules
@@ -39,39 +56,26 @@ def resource_filename_mod_entry_point(module_name, entry_point):
     have to chain that back together manually.
     """
 
-    try:
-        namespaces = entry_point.dist.get_metadata(
-            'namespace_packages.txt').split()
-    except (OSError, IOError, AttributeError):
-        return pkg_resources.resource_filename(module_name, '')
+    if entry_point.dist is None:
+        # distribution missing is typically caused by mocked entry
+        # points from tests; silently falling back to basic lookup
+        result = pkg_resources.resource_filename(module_name, '')
+    else:
+        result = resource_filename_mod_dist(module_name, entry_point.dist)
 
-    if module_name not in namespaces:
-        return pkg_resources.resource_filename(module_name, '')
-
-    try:
-        result = pkg_resources.resource_filename(
-            entry_point.dist.as_requirement(),
-            join(*module_name.split('.')),
+    if not result:
+        logger.warning(
+            "resource path cannot be found for module '%s' and entry_point "
+            "'%s'", module_name, entry_point
         )
-        if exists(result):
-            return result
-        else:
-            logger.warning(
-                "module '%s' resolved by entry_point '%s' leads to no path; "
-                "falling back to default resolution method",
-                module_name, entry_point,
-            )
-            return pkg_resources.resource_filename(module_name, '')
-    except Exception:
-        # either not a properly registered requirement (somehow), not a
-        # proper module, or that the namespace does not exist in the
-        # provided module.
-        logger.exception(
-            "module '%s' resolved by entry_point '%s' resulted in unexpected "
-            "error when trying to resolve resources; falling back to standard "
-            "retrival", module_name, entry_point,
+        return None
+    if not exists(result):
+        logger.warning(
+            "resource path found at '%s' for module '%s' and entry_point "
+            "'%s', but it does not exist", result, module_name, entry_point,
         )
-        return pkg_resources.resource_filename(module_name, '')
+        return None
+    return result
 
 
 def modgen(
@@ -194,16 +198,17 @@ def modpath_pkg_resources(module, entry_point):
     This one accepts a module as argument.
     """
 
+    result = []
     try:
-        return [
-            resource_filename_mod_entry_point(module.__name__, entry_point)
-        ]
+        path = resource_filename_mod_entry_point(module.__name__, entry_point)
     except ImportError:
-        logger.warning("%r could not be located as a module", module)
+        logger.warning("module '%s' could not be imported", module.__name__)
     except Exception:
         logger.warning("%r does not appear to be a valid module", module)
-
-    return []
+    else:
+        if path:
+            result.append(path)
+    return result
 
 
 @register('globber')

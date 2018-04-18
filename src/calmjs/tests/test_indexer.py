@@ -94,19 +94,12 @@ class PkgResourcesIndexTestCase(unittest.TestCase):
         self.mod_dummyns = dummyns
         self.mod_dummyns_submod = dummyns_submod
 
-    def test_not_defined(self):
-        working_set = pkg_resources.WorkingSet([
-            self.ds_egg_root,
-        ])
-        stub_item_attr_value(self, pkg_resources, 'working_set', working_set)
-        p = indexer.resource_filename_mod_entry_point('dummyns', None)
-        self.assertEqual(normcase(p), normcase(self.dummyns_path))
+    def test_invalid_missing_entry_point(self):
+        with self.assertRaises(AttributeError):
+            indexer.resource_filename_mod_entry_point('dummyns', None)
 
-    def test_mismatched_ns(self):
-        # mismatch includes a package that doesn't actually have the
-        # directory created
+    def test_missing_distribution(self):
         d_egg_root = join(mkdtemp(self), 'dummyns')
-
         make_dummy_dist(self, ((
             'namespace_packages.txt',
             'not_ns\n',
@@ -114,67 +107,19 @@ class PkgResourcesIndexTestCase(unittest.TestCase):
             'entry_points.txt',
             '[dummyns]\n'
             'dummyns = dummyns:attr\n',
-        ),), 'dummyns', '1.0', working_dir=d_egg_root)
+        ),), 'dummyns', '2.0', working_dir=d_egg_root)
         working_set = pkg_resources.WorkingSet([
             d_egg_root,
             self.ds_egg_root,
         ])
-        stub_item_attr_value(self, pkg_resources, 'working_set', working_set)
-
-        dummyns_ep = next(working_set.iter_entry_points('dummyns'))
-        p = indexer.resource_filename_mod_entry_point('dummyns', dummyns_ep)
-        self.assertEqual(normcase(p), normcase(self.dummyns_path))
-
-    def test_mismatched(self):
-        # mismatch includes a package that doesn't actually have the
-        # directory created
-        d_egg_root = join(mkdtemp(self), 'dummyns')
-
-        make_dummy_dist(self, ((
-            'namespace_packages.txt',
-            'dummyns\n',
-        ), (
-            'entry_points.txt',
-            '[dummyns]\n'
-            'dummyns = dummyns:attr\n',
-        ),), 'dummyns', '1.0', working_dir=d_egg_root)
-        working_set = pkg_resources.WorkingSet([
-            d_egg_root,
-            self.ds_egg_root,
-        ])
-        stub_item_attr_value(self, pkg_resources, 'working_set', working_set)
-
         dummyns_ep = next(working_set.iter_entry_points('dummyns'))
         with pretty_logging(stream=StringIO()) as fd:
             p = indexer.resource_filename_mod_entry_point(
                 'dummyns', dummyns_ep)
-
-        self.assertIn(
-            "'dummyns' resolved by entry_point 'dummyns = dummyns:attr' leads "
-            "to no path", fd.getvalue()
-        )
+        # not stubbed working_set, so this is derived using fallback
+        # value from the sys.modules['dummyns'] location
         self.assertEqual(normcase(p), normcase(self.dummyns_path))
-
-    def test_not_namespace(self):
-        d_egg_root = join(mkdtemp(self), 'dummyns')
-
-        make_dummy_dist(self, ((
-            'entry_points.txt',
-            '[dummyns]\n'
-            'dummyns = dummyns:attr\n',
-        ),), 'dummyns', '1.0', working_dir=d_egg_root)
-        working_set = pkg_resources.WorkingSet([
-            d_egg_root,
-            self.ds_egg_root,
-        ])
-        stub_item_attr_value(self, pkg_resources, 'working_set', working_set)
-
-        moddir = join(d_egg_root, 'dummyns')
-        os.makedirs(moddir)
-
-        dummyns_ep = next(working_set.iter_entry_points('dummyns'))
-        p = indexer.resource_filename_mod_entry_point('dummyns', dummyns_ep)
-        self.assertEqual(normcase(p), normcase(self.dummyns_path))
+        self.assertIn("distribution 'dummyns 2.0' not found", fd.getvalue())
 
     def test_standard(self):
         d_egg_root = join(mkdtemp(self), 'dummyns')
@@ -191,6 +136,8 @@ class PkgResourcesIndexTestCase(unittest.TestCase):
             d_egg_root,
             self.ds_egg_root,
         ])
+        # ensure the working_set is providing the distributions being
+        # mocked here so that resource_filename will resolve correctly
         stub_item_attr_value(self, pkg_resources, 'working_set', working_set)
 
         moddir = join(d_egg_root, 'dummyns')
@@ -206,8 +153,9 @@ class PkgResourcesIndexTestCase(unittest.TestCase):
         # finally, this should work.
         self.assertEqual(normcase(p), normcase(moddir))
 
-    def test_standard_not_stubbed(self):
-        d_egg_root = join(mkdtemp(self), 'dummyns')
+    def test_relocated_distribution(self):
+        root = mkdtemp(self)
+        dummyns_path = join(root, 'dummyns')
 
         make_dummy_dist(self, ((
             'namespace_packages.txt',
@@ -216,32 +164,28 @@ class PkgResourcesIndexTestCase(unittest.TestCase):
             'entry_points.txt',
             '[dummyns]\n'
             'dummyns = dummyns:attr\n',
-        ),), 'dummyns', '1.0', working_dir=d_egg_root)
+        ),), 'dummyns', '1.0', working_dir=root)
         working_set = pkg_resources.WorkingSet([
-            d_egg_root,
+            root,
             self.ds_egg_root,
         ])
-        # not stubbing will result in the loader failing to actuall work
-
-        moddir = join(d_egg_root, 'dummyns')
-        os.makedirs(moddir)
-
-        # make this also a proper thing
-        with open(join(moddir, '__init__.py'), 'w') as fd:
-            fd.write('')
-
+        # activate this as the working set
+        stub_item_attr_value(self, pkg_resources, 'working_set', working_set)
         dummyns_ep = next(working_set.iter_entry_points('dummyns'))
-
         with pretty_logging(stream=StringIO()) as fd:
             p = indexer.resource_filename_mod_entry_point(
                 'dummyns', dummyns_ep)
+        # since the actual location is not created)
+        self.assertIsNone(p)
+        self.assertIn("does not exist", fd.getvalue())
 
-        self.assertIn(
-            "resolved by entry_point 'dummyns = dummyns:attr' resulted in "
-            "unexpected error", fd.getvalue()
-        )
-
-        self.assertEqual(normcase(p), normcase(self.dummyns_path))
+        # retry with the module directory created at the expected location
+        os.mkdir(dummyns_path)
+        with pretty_logging(stream=StringIO()) as fd:
+            p = indexer.resource_filename_mod_entry_point(
+                'dummyns', dummyns_ep)
+        self.assertEqual(normcase(p), normcase(dummyns_path))
+        self.assertEqual('', fd.getvalue())
 
     def test_nested_namespace(self):
         self.called = None
@@ -317,7 +261,7 @@ class IndexerTestCase(unittest.TestCase):
         self.assertTrue(result[0].endswith(
             to_os_sep_path('calmjs/testing/module3')))
 
-    def test_get_modpath_pkg_resources_invalid(self):
+    def test_get_modpath_pkg_resources_missing_path(self):
         with pretty_logging(stream=StringIO()) as fd:
             self.assertEqual([], indexer.modpath_pkg_resources(
                 None, calmjs_ep))
@@ -327,9 +271,35 @@ class IndexerTestCase(unittest.TestCase):
             module = ModuleType('nothing')
             self.assertEqual([], indexer.modpath_pkg_resources(
                 module, calmjs_ep))
-            # module repr differs between python versions.
-            self.assertIn("module 'nothing'", fd.getvalue())
-            self.assertIn("could not be located", fd.getvalue())
+
+        err = fd.getvalue()
+        self.assertIn(
+            "module 'nothing' and entry_point 'demo = demo'", err)
+        # the input is fetched using a working entry_point, after all
+        self.assertIn("path found at '" + calmjs_dist_dir, err)
+        self.assertIn("it does not exist", fd.getvalue())
+
+    def test_get_modpath_pkg_resources_invalid(self):
+        # fake both module and entry point, which will trigger an import
+        # error exception internally that gets logged.
+        module = ModuleType('nothing')
+        ep = pkg_resources.EntryPoint.parse('nothing = nothing')
+        with pretty_logging(stream=StringIO()) as fd:
+            self.assertEqual([], indexer.modpath_pkg_resources(module, ep))
+        self.assertIn("module 'nothing' could not be imported", fd.getvalue())
+
+    def test_get_modpath_pkg_resources_missing(self):
+        # fake just the entry point, but provide a valid module.
+        nothing = ModuleType('nothing')
+        nothing.__path__ = []
+        self.addCleanup(sys.modules.pop, 'nothing')
+        sys.modules['nothing'] = nothing
+        ep = pkg_resources.EntryPoint.parse('nothing = nothing')
+        with pretty_logging(stream=StringIO()) as fd:
+            self.assertEqual([], indexer.modpath_pkg_resources(nothing, ep))
+        self.assertIn(
+            "resource path cannot be found for module 'nothing' and "
+            "entry_point 'nothing = nothing'", fd.getvalue())
 
     def test_module1_loader_es6(self):
         from calmjs.testing import module1

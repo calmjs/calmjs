@@ -82,7 +82,7 @@ class IntegratedModuleRegistryTestCase(unittest.TestCase):
             __name__: [
                 'calmjs.module = calmjs.module:ModuleRegistry',
             ]},
-            dist=Distribution(project_name='calmjs.testing')
+            dist=Distribution(project_name='calmjs.testing', version='0.0')
         )
         utils.stub_mod_working_set(self, [calmjs.base], working_set)
 
@@ -90,8 +90,13 @@ class IntegratedModuleRegistryTestCase(unittest.TestCase):
         # reservation entry
         local_root_registry = Registry(
             __name__, 'calmjs.testing', _working_set=working_set)
-        global_registry = get('calmjs.module')
-        registry = local_root_registry.get_record('calmjs.module')
+        with pretty_logging(stream=mocks.StringIO()):
+            # silences "distribution 'calmjs.testing 0.0' not found"
+            # warnings from stdout produced by the indexer, as the
+            # provided working_set is invalid with entry points that do
+            # not have a valid distribution.
+            global_registry = get('calmjs.module')
+            registry = local_root_registry.get_record('calmjs.module')
         self.assertIsNot(registry, global_registry)
         self.assertEqual(
             sorted(k for k, v in registry.iter_records()), [
