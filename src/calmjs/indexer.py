@@ -7,7 +7,6 @@ from __future__ import absolute_import
 
 import fnmatch
 import pkg_resources
-import warnings
 
 from logging import getLogger
 from glob import iglob
@@ -39,9 +38,6 @@ def resource_filename_mod_entry_point(module_name, entry_point):
     resource_filename function does not accept an entry_point, and so we
     have to chain that back together manually.
     """
-
-    if not entry_point:
-        return pkg_resources.resource_filename(module_name, '')
 
     try:
         namespaces = entry_point.dist.get_metadata(
@@ -79,8 +75,8 @@ def resource_filename_mod_entry_point(module_name, entry_point):
 
 
 def modgen(
-        module, entry_point=None,
-        modpath='last', globber='root', fext=JS_EXT,
+        module, entry_point,
+        modpath='pkg_resources', globber='root', fext=JS_EXT,
         registry=_utils):
     """
     JavaScript styled module location listing generator.
@@ -94,8 +90,7 @@ def modgen(
 
     modpath
         The name to the registered modpath function that will fetch the
-        paths belonging to the module.  Defaults to 'last', which only
-        extracts the latest path registered to the module.
+        paths belonging to the module.  Defaults to 'pkg_resources'.
 
     globber
         The name to the registered file globbing function.  Defaults to
@@ -125,17 +120,7 @@ def modgen(
     )
 
     module_frags = module.__name__.split('.')
-    try:
-        module_base_paths = modpath_f(module, entry_point)
-    except TypeError:
-        # missing entry_point argument; legacy calling.
-        module_base_paths = modpath_f(module)
-        msg = (
-            'provided modpath %r method will need to accept entry_point '
-            'argument by calmjs-3.0.0' % modpath_f
-        )
-        warnings.warn(msg, DeprecationWarning)
-        logger.warning(msg)
+    module_base_paths = modpath_f(module, entry_point)
 
     for module_base_path in module_base_paths:
         logger.debug('searching for *%s files in %s', fext, module_base_path)
@@ -165,12 +150,12 @@ def register(util_type, registry=_utils):
 
 
 @register('modpath')
-def modpath_all(module, entry_point=None):
+def modpath_all(module, entry_point):
     """
     Provides the raw __path__.  Incompatible with PEP 302-based import
     hooks and incompatible with zip_safe packages.
 
-    Deprecated.  Will be removed by calmjs-2.0.
+    Deprecated.  Will be removed by calmjs-4.0.
     """
 
     module_paths = getattr(module, '__path__', [])
@@ -184,15 +169,15 @@ def modpath_all(module, entry_point=None):
 
 
 @register('modpath')
-def modpath_last(module, entry_point=None):
+def modpath_last(module, entry_point):
     """
     Provides the raw __path__.  Incompatible with PEP 302-based import
     hooks and incompatible with zip_safe packages.
 
-    Deprecated.  Will be removed by calmjs-2.0.
+    Deprecated.  Will be removed by calmjs-4.0.
     """
 
-    module_paths = modpath_all(module)
+    module_paths = modpath_all(module, entry_point)
     if len(module_paths) > 1:
         logger.info(
             "module '%s' has multiple paths, default selecting '%s' as base.",
@@ -202,7 +187,7 @@ def modpath_last(module, entry_point=None):
 
 
 @register('modpath')
-def modpath_pkg_resources(module, entry_point=None):
+def modpath_pkg_resources(module, entry_point):
     """
     Goes through pkg_resources for compliance with various PEPs.
 
@@ -251,8 +236,8 @@ def modname_python(fragments):
     return '.'.join(fragments)
 
 
-def mapper(module, entry_point=None,
-           modpath='last', globber='root', modname='es6',
+def mapper(module, entry_point,
+           modpath='pkg_resources', globber='root', modname='es6',
            fext=JS_EXT, registry=_utils):
     """
     General mapper
@@ -272,7 +257,7 @@ def mapper(module, entry_point=None,
 
 
 @register('mapper')
-def mapper_es6(module, entry_point=None):
+def mapper_es6(module, entry_point):
     """
     Default mapper
 
@@ -286,7 +271,7 @@ def mapper_es6(module, entry_point=None):
 
 
 @register('mapper')
-def mapper_python(module, entry_point=None):
+def mapper_python(module, entry_point):
     """
     Default mapper using python style globber
 

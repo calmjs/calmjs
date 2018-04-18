@@ -2,7 +2,6 @@
 import unittest
 import os
 import sys
-import warnings
 
 from os.path import abspath
 from os.path import exists
@@ -24,6 +23,11 @@ from calmjs.testing.utils import stub_item_attr_value
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.mocks import StringIO
 
+# default dummy entry point for calmjs.
+calmjs_ep = pkg_resources.EntryPoint.parse('demo = demo')
+calmjs_ep.dist = pkg_resources.working_set.find(
+    pkg_resources.Requirement.parse('calmjs'))
+
 
 def to_os_sep_path(p):
     # turn the given / separated path into an os specific path
@@ -44,12 +48,14 @@ class PkgResourcesIndexTestCase(unittest.TestCase):
         dummyns = ModuleType('dummyns')
         dummyns.__file__ = join(dummyns_path, '__init__.py')
         dummyns.__path__ = [dummyns_path]
+        self.addCleanup(sys.modules.pop, 'dummyns')
         sys.modules['dummyns'] = dummyns
 
         dummyns_submod_path = join(ds_egg_root, 'dummyns', 'submod')
         dummyns_submod = ModuleType('dummyns.submod')
         dummyns_submod.__file__ = join(dummyns_submod_path, '__init__.py')
         dummyns_submod.__path__ = [dummyns_submod_path]
+        self.addCleanup(sys.modules.pop, 'dummyns.submod')
         sys.modules['dummyns.submod'] = dummyns_submod
 
         os.makedirs(dummyns_submod_path)
@@ -271,7 +277,7 @@ class IndexerTestCase(unittest.TestCase):
     def test_get_modpath_last_empty(self):
         module = ModuleType('nothing')
         with pretty_logging(stream=StringIO()) as fd:
-            self.assertEqual(indexer.modpath_last(module), [])
+            self.assertEqual(indexer.modpath_last(module, None), [])
         self.assertIn(
             "module 'nothing' does not appear to be a namespace module",
             fd.getvalue())
@@ -279,12 +285,13 @@ class IndexerTestCase(unittest.TestCase):
     def test_get_modpath_last_multi(self):
         module = ModuleType('nothing')
         module.__path__ = ['/path/to/here', '/path/to/there']
-        self.assertEqual(indexer.modpath_last(module), ['/path/to/there'])
+        self.assertEqual(
+            indexer.modpath_last(module, None), ['/path/to/there'])
 
     def test_get_modpath_all_empty(self):
         module = ModuleType('nothing')
         with pretty_logging(stream=StringIO()) as fd:
-            self.assertEqual(indexer.modpath_all(module), [])
+            self.assertEqual(indexer.modpath_all(module, None), [])
         self.assertIn(
             "module 'nothing' does not appear to be a namespace module",
             fd.getvalue())
@@ -293,25 +300,27 @@ class IndexerTestCase(unittest.TestCase):
         module = ModuleType('nothing')
         module.__path__ = ['/path/to/here', '/path/to/there']
         self.assertEqual(
-            indexer.modpath_all(module),
+            indexer.modpath_all(module, None),
             ['/path/to/here', '/path/to/there'],
         )
 
     def test_get_modpath_pkg_resources_valid(self):
         from calmjs.testing import module3
-        result = indexer.modpath_pkg_resources(module3)
+        result = indexer.modpath_pkg_resources(module3, calmjs_ep)
         self.assertEqual(len(result), 1)
         self.assertTrue(result[0].endswith(
             to_os_sep_path('calmjs/testing/module3')))
 
     def test_get_modpath_pkg_resources_invalid(self):
         with pretty_logging(stream=StringIO()) as fd:
-            self.assertEqual([], indexer.modpath_pkg_resources(None))
+            self.assertEqual([], indexer.modpath_pkg_resources(
+                None, calmjs_ep))
             self.assertIn(
                 "None does not appear to be a valid module", fd.getvalue())
         with pretty_logging(stream=StringIO()) as fd:
             module = ModuleType('nothing')
-            self.assertEqual([], indexer.modpath_pkg_resources(module))
+            self.assertEqual([], indexer.modpath_pkg_resources(
+                module, calmjs_ep))
             # module repr differs between python versions.
             self.assertIn("module 'nothing'", fd.getvalue())
             self.assertIn("could not be located", fd.getvalue())
@@ -319,10 +328,10 @@ class IndexerTestCase(unittest.TestCase):
     def test_module1_loader_es6(self):
         from calmjs.testing import module1
         calmjs_base_dir = abspath(join(
-            indexer.modpath_pkg_resources(indexer)[0], pardir))
+            indexer.modpath_pkg_resources(indexer, calmjs_ep)[0], pardir))
         results = {
             k: relpath(v, calmjs_base_dir)
-            for k, v in indexer.mapper_es6(module1).items()
+            for k, v in indexer.mapper_es6(module1, calmjs_ep).items()
         }
         self.assertEqual(results, {
             'calmjs/testing/module1/hello':
@@ -332,10 +341,10 @@ class IndexerTestCase(unittest.TestCase):
     def test_module1_loader_python(self):
         from calmjs.testing import module1
         calmjs_base_dir = abspath(join(
-            indexer.modpath_pkg_resources(indexer)[0], pardir))
+            indexer.modpath_pkg_resources(indexer, calmjs_ep)[0], pardir))
         results = {
             k: relpath(v, calmjs_base_dir)
-            for k, v in indexer.mapper_python(module1).items()
+            for k, v in indexer.mapper_python(module1, calmjs_ep).items()
         }
         self.assertEqual(results, {
             'calmjs.testing.module1.hello':
@@ -345,52 +354,12 @@ class IndexerTestCase(unittest.TestCase):
     def test_module2_recursive_es6(self):
         from calmjs.testing import module2
         calmjs_base_dir = abspath(join(
-            indexer.modpath_pkg_resources(indexer)[0], pardir))
+            indexer.modpath_pkg_resources(indexer, calmjs_ep)[0], pardir))
         results = {
             k: relpath(v, calmjs_base_dir)
-            for k, v in indexer.mapper(module2, globber='recursive').items()
+            for k, v in indexer.mapper(
+                module2, calmjs_ep, globber='recursive').items()
         }
-        self.assertEqual(results, {
-            'calmjs/testing/module2/index':
-                to_os_sep_path('calmjs/testing/module2/index.js'),
-            'calmjs/testing/module2/helper':
-                to_os_sep_path('calmjs/testing/module2/helper.js'),
-            'calmjs/testing/module2/mod/helper':
-                to_os_sep_path('calmjs/testing/module2/mod/helper.js'),
-        })
-
-    def test_module2_recursive_es6_legacy(self):
-        # ensure legacy behavior is maintained, where a single argument
-        # is accepted by the modpath function.
-
-        def modpath_last(module):
-            return indexer.modpath_last(module)
-
-        from calmjs.testing import module2
-        calmjs_base_dir = abspath(join(
-            indexer.modpath_pkg_resources(indexer)[0], pardir))
-
-        with pretty_logging(stream=StringIO()) as fd:
-            with warnings.catch_warnings(record=True) as w:
-                warnings.simplefilter('always')
-                results = {
-                    k: relpath(v, calmjs_base_dir)
-                    for k, v in indexer.mapper(
-                        module2, modpath=modpath_last,
-                        globber='recursive',
-                    ).items()
-                }
-
-            self.assertIn(
-                "method will need to accept entry_point argument by calmjs-",
-                str(w[-1].message)
-            )
-
-        self.assertIn(
-            "method will need to accept entry_point argument by calmjs-",
-            fd.getvalue()
-        )
-
         self.assertEqual(results, {
             'calmjs/testing/module2/index':
                 to_os_sep_path('calmjs/testing/module2/index.js'),
@@ -411,13 +380,14 @@ class IndexerTestCase(unittest.TestCase):
 
         # See setup method for how it's built.
         calmjs_base_dir = abspath(join(
-            indexer.modpath_pkg_resources(indexer)[0], pardir))
+            indexer.modpath_pkg_resources(indexer, calmjs_ep)[0], pardir))
         module, index_js = make_multipath_module3(self)
 
         def join_mod3(*a):
             return join(calmjs_base_dir, 'calmjs', 'testing', 'module3', *a)
 
-        results = indexer.mapper(module, modpath='all', globber='recursive')
+        results = indexer.mapper(
+            module, calmjs_ep, modpath='all', globber='recursive')
         self.assertEqual(results, {
             'calmjs/testing/module3/index': index_js,
             'calmjs/testing/module3/math': join_mod3('math.js'),
@@ -427,11 +397,12 @@ class IndexerTestCase(unittest.TestCase):
     def test_module2_callables(self):
         from calmjs.testing import module2
         calmjs_base_dir = abspath(join(
-            indexer.modpath_pkg_resources(indexer)[0], pardir))
+            indexer.modpath_pkg_resources(indexer, calmjs_ep)[0], pardir))
         results = {
             k: relpath(v, calmjs_base_dir)
             for k, v in indexer.mapper(
                 module2,
+                calmjs_ep,
                 globber=indexer.globber_recursive,
                 modname=indexer.modname_python,
                 modpath=indexer.modpath_pkg_resources,
