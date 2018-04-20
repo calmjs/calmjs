@@ -515,69 +515,79 @@ class BaseArtifactRegistry(BaseRegistry):
 
             yield entry_point, export_target
 
+    def generate_builder(self, entry_point, export_target):
+        """
+        Yields exactly one builder if both the provided entry point and
+        export target satisfies the checks required.
+        """
+
+        try:
+            builder = entry_point.resolve()
+        except ImportError:
+            logger.error(
+                "unable to import the target builder for the entry point "
+                "'%s' from package '%s' to generate artifact '%s'",
+                entry_point, entry_point.dist, export_target,
+            )
+            return
+
+        if not self.verify_builder(builder):
+            logger.error(
+                "the builder referenced by the entry point '%s' "
+                "from package '%s' has an incompatible signature",
+                entry_point, entry_point.dist,
+            )
+            return
+
+        # CLEANUP see deprecation notice below
+        verifier = self.verify_export_target(export_target)
+        if not verifier:
+            logger.error(
+                "the export target '%s' has been rejected", export_target)
+            return
+
+        toolchain, spec = self.extract_builder_result(builder(
+            [entry_point.dist.project_name], export_target=export_target))
+        if not toolchain:
+            logger.error(
+                "the builder referenced by the entry point '%s' "
+                "from package '%s' failed to produce a valid "
+                "toolchain",
+                entry_point, entry_point.dist,
+            )
+            return
+
+        if spec.get(EXPORT_TARGET) != export_target:
+            logger.error(
+                "the builder referenced by the entry point '%s' "
+                "from package '%s' failed to produce a spec with the "
+                "expected export_target",
+                entry_point, entry_point.dist,
+            )
+            return
+
+        if callable(verifier):
+            warnings.warn(
+                "%s:%s.verify_export_target returned a callable, which "
+                "will no longer be passed to spec.advise by calmjs-4.0.0; "
+                "please instead override 'setup_export_location' or "
+                "'prepare_export_location' in that class" % (
+                    self.__class__.__module__, self.__class__.__name__),
+                DeprecationWarning
+            )
+            spec.advise(BEFORE_PREPARE, verifier, export_target)
+        else:
+            spec.advise(
+                BEFORE_PREPARE,
+                self.prepare_export_location, export_target)
+        yield entry_point, toolchain, spec
+
     def iter_builders_for(self, package_name):
         for entry_point, export_target in self.iter_export_targets_for(
                 package_name):
-            try:
-                builder = entry_point.resolve()
-            except ImportError:
-                logger.error(
-                    "unable to import the target builder for the entry point "
-                    "'%s' from package '%s' to generate artifact '%s'",
-                    entry_point, entry_point.dist, export_target,
-                )
-                continue
-
-            if not self.verify_builder(builder):
-                logger.error(
-                    "the builder referenced by the entry point '%s' "
-                    "from package '%s' has an incompatible signature",
-                    entry_point, entry_point.dist,
-                )
-                continue
-
-            # CLEANUP see deprecation notice below
-            verifier = self.verify_export_target(export_target)
-            if not verifier:
-                logger.error(
-                    "the export target '%s' has been rejected", export_target)
-                continue
-
-            toolchain, spec = self.extract_builder_result(builder(
-                [entry_point.dist.project_name], export_target=export_target))
-            if not toolchain:
-                logger.error(
-                    "the builder referenced by the entry point '%s' "
-                    "from package '%s' failed to produce a valid "
-                    "toolchain",
-                    entry_point, entry_point.dist,
-                )
-                continue
-
-            if spec.get(EXPORT_TARGET) != export_target:
-                logger.error(
-                    "the builder referenced by the entry point '%s' "
-                    "from package '%s' failed to produce a spec with the "
-                    "expected export_target",
-                    entry_point, entry_point.dist,
-                )
-                continue
-
-            if callable(verifier):
-                warnings.warn(
-                    "%s:%s.verify_export_target returned a callable, which "
-                    "will no longer be passed to spec.advise by calmjs-4.0.0; "
-                    "please instead override 'setup_export_location' or "
-                    "'prepare_export_location' in that class" % (
-                        self.__class__.__module__, self.__class__.__name__),
-                    DeprecationWarning
-                )
-                spec.advise(BEFORE_PREPARE, verifier, export_target)
-            else:
-                spec.advise(
-                    BEFORE_PREPARE,
-                    self.prepare_export_location, export_target)
-            yield entry_point, toolchain, spec
+            # yield from...
+            for builder in self.generate_builder(entry_point, export_target):
+                yield builder
 
     def execute_builder(self, entry_point, toolchain, spec):
         """
