@@ -921,15 +921,26 @@ class BaseArtifactRegistryRuntime(BaseRuntime):
             'package_names', metavar=metavar('package'), nargs='+', help=help)
 
     def run(self, argparser=None, package_names=[], *a, **kwargs):
+        result = True
         for package_name in package_names:
             registry = get(self.registry_name)
             metadata = {}
-            for builder in registry.iter_builders_for(package_name):
-                metadata.update(registry.execute_builder(*builder))
+            for entry_point, export_target in registry.iter_export_targets_for(
+                    package_name):
+                builder = next(registry.generate_builder(
+                    entry_point, export_target), None)
+                if not builder:
+                    # immediate failure if builder does not exist.
+                    result = False
+                    continue
+                entries = registry.execute_builder(*builder)
+                # whether the builder produced an artifact entry.
+                result = bool(entries) and result
+                metadata.update(entries)
+            # whether the package as a whole produced artifacts entries.
+            result = bool(metadata) and result
             registry.update_artifact_metadata(package_name, metadata)
-
-        if metadata:
-            return True
+        return result
 
 
 class ArtifactBuildRuntime(BaseArtifactRegistryRuntime):
