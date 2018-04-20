@@ -20,8 +20,11 @@ from os.path import realpath
 from os.path import sep
 
 from collections import OrderedDict
+from collections import MutableMapping
 from logging import getLogger
+from pkg_resources import Distribution
 from pkg_resources import working_set
+from pkg_resources import safe_name
 
 from calmjs.utils import which
 from calmjs.utils import finalize_env
@@ -66,6 +69,48 @@ def _get_exec_binary(binary, kw):
     if binary is None:
         raise_os_error(errno.ENOENT)
     return binary
+
+
+class PackageKeyMapping(MutableMapping):
+    """
+    A mapping where keys are pkg_resources.Distribution.project_names
+    mapping to some value.  As project_names are stored, lookup using
+    the de-normalized values must go through the safe_name normalization
+    such that the resolution will work as expected.
+    """
+
+    def __init__(self, *a, **kw):
+        self.__map = {}
+        # calling self.update instead to use the defined methods that
+        # will call normalize.
+        self.update(*a, **kw)
+
+    def normalize(self, key):
+        return safe_name(key)
+
+    def __getitem__(self, key):
+        return self.__map[self.normalize(key)]
+
+    def __setitem__(self, key, value):
+        if isinstance(key, Distribution):
+            self.__map[key.project_name] = value
+        else:
+            self.__map[self.normalize(key)] = value
+
+    def __delitem__(self, key):
+        self.__map.__delitem__(self.normalize(key))
+
+    def __iter__(self):
+        return iter(self.__map)
+
+    def __len__(self):
+        return len(self.__map)
+
+    def __contains__(self, key):
+        return self.normalize(key) in self.__map
+
+    def __repr__(self):
+        return repr(self.__map)
 
 
 class BaseRegistry(object):
@@ -151,7 +196,7 @@ class BasePkgRefRegistry(BaseRegistry):
 
     def __init__(self, registry_name, *a, **kw):
         super(BasePkgRefRegistry, self).__init__(registry_name, *a, **kw)
-        self.package_module_map = {}
+        self.package_module_map = PackageKeyMapping()
         self.register_entry_points(self.raw_entry_points)
 
     def register_entry_points(self, entry_points):

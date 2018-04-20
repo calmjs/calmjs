@@ -115,6 +115,7 @@ with the entry point setup, the setup call may look something like this:
 from __future__ import absolute_import
 
 import json
+import warnings
 from codecs import open
 from inspect import getcallargs
 from inspect import getmro
@@ -130,6 +131,7 @@ from os import unlink
 from shutil import rmtree
 
 from calmjs.base import BaseRegistry
+from calmjs.base import PackageKeyMapping
 from calmjs.dist import find_packages_requirements_dists
 from calmjs.dist import find_pkg_dist
 from calmjs.dist import is_json_compat
@@ -210,7 +212,7 @@ def trace_toolchain(toolchain):
     return pkgs
 
 
-def prepare_export_location(export_target):
+def setup_export_location(export_target):
     target_dir = dirname(export_target)
     try:
         if not exists(target_dir):
@@ -221,7 +223,7 @@ def prepare_export_location(export_target):
                 "cannot export to '%s' as its dirname does not lead to a "
                 "directory", export_target
             )
-            raise ToolchainAbort()
+            return False
         elif isdir(export_target):
             logger.debug(
                 "removing existing export target directory at '%s'",
@@ -238,8 +240,19 @@ def prepare_export_location(export_target):
             "permission issues are corrected and/or remove the egg-info "
             "directory for this package before trying again",
             target_dir, e)
-        raise ToolchainAbort()
+        return False
 
+    return True
+
+
+def prepare_export_location(export_target):
+    """
+    The version of setup_export_location for use with spec advice
+    before_prepare step.
+    """
+
+    if not setup_export_location(export_target):
+        raise ToolchainAbort()
     return True
 
 
@@ -260,12 +273,12 @@ class BaseArtifactRegistry(BaseRegistry):
         # default (self.records) is a map of package + name to path
         # this is the reverse lookup for that
         self.reverse = {}
-        self.packages = {}
+        self.packages = PackageKeyMapping()
         # metadata file about the artifacts for the package
-        self.metadata = {}
+        self.metadata = PackageKeyMapping()
         # for storing builders that are assumed to be compatible due to
         # their identical attribute names.
-        self.compat_builders = {}
+        self.compat_builders = PackageKeyMapping()
         # TODO determine if the full import name lookup table is
         # required.
         # self.builders = {}
@@ -303,7 +316,7 @@ class BaseArtifactRegistry(BaseRegistry):
         # Python packages.
         cb_key = '.'.join(ep.attrs)
         cb = self.compat_builders[cb_key] = self.compat_builders.get(
-            cb_key, {})
+            cb_key, PackageKeyMapping())
         cb[ep.dist.project_name] = path
 
         # for looking up/storage of metadata about the built artifacts.
@@ -312,6 +325,10 @@ class BaseArtifactRegistry(BaseRegistry):
 
         # standard get_artifact_filename lookup for standalone,
         # complete artifacts at some path.
+        # TODO consider changing the storage implementation to not use
+        # tuple but rather use the PackageKeyMapping for the package
+        # name, then a secondary inner lookup for the artifact_name.
+        # This is to maintain consistency across implementation
         self.records[(ep.dist.project_name, ep.name)] = path
         # only the reverse lookup must be normalized
         self.reverse[nc_path] = ep
@@ -345,7 +362,8 @@ class BaseArtifactRegistry(BaseRegistry):
         declared, otherwise None.
         """
 
-        return self.records.get((package_name, artifact_name))
+        project_name = self.packages.normalize(package_name)
+        return self.records.get((project_name, artifact_name))
 
     def resolve_artifacts_by_builder_compat(
             self, package_names, builder_name, dependencies=False):
@@ -469,8 +487,29 @@ class BaseArtifactRegistry(BaseRegistry):
         return verify_builder(builder)
 
     def verify_export_target(self, export_target):
-        # return a callable to defer destructive verification
-        return prepare_export_location
+        # this is the pre-flight verification, it will prevent the
+        # entry point loaded/associated with this export_target from
+        # creating a builder entry in the iter_builders_for method.
+        return True
+
+    def setup_export_location(self, export_target):
+        """
+        This will be used by prepare_export_location; it must return True
+        for the final export to proceed.
+        """
+
+        return setup_export_location(export_target)
+
+    def prepare_export_location(self, export_target):
+        """
+        The wrapped version for this class for use directly by the spec
+        in the before_prepare advice.  Must raise some kind of Toolchain
+        specific exception to halt Toolchain execution for the given
+        export target.
+        """
+
+        if not self.setup_export_location(export_target):
+            raise ToolchainAbort()
 
     def extract_builder_result(self, builder_result):
         return extract_builder_result(builder_result)
@@ -482,54 +521,79 @@ class BaseArtifactRegistry(BaseRegistry):
 
             yield entry_point, export_target
 
+    def generate_builder(self, entry_point, export_target):
+        """
+        Yields exactly one builder if both the provided entry point and
+        export target satisfies the checks required.
+        """
+
+        try:
+            builder = entry_point.resolve()
+        except ImportError:
+            logger.error(
+                "unable to import the target builder for the entry point "
+                "'%s' from package '%s' to generate artifact '%s'",
+                entry_point, entry_point.dist, export_target,
+            )
+            return
+
+        if not self.verify_builder(builder):
+            logger.error(
+                "the builder referenced by the entry point '%s' "
+                "from package '%s' has an incompatible signature",
+                entry_point, entry_point.dist,
+            )
+            return
+
+        # CLEANUP see deprecation notice below
+        verifier = self.verify_export_target(export_target)
+        if not verifier:
+            logger.error(
+                "the export target '%s' has been rejected", export_target)
+            return
+
+        toolchain, spec = self.extract_builder_result(builder(
+            [entry_point.dist.project_name], export_target=export_target))
+        if not toolchain:
+            logger.error(
+                "the builder referenced by the entry point '%s' "
+                "from package '%s' failed to produce a valid "
+                "toolchain",
+                entry_point, entry_point.dist,
+            )
+            return
+
+        if spec.get(EXPORT_TARGET) != export_target:
+            logger.error(
+                "the builder referenced by the entry point '%s' "
+                "from package '%s' failed to produce a spec with the "
+                "expected export_target",
+                entry_point, entry_point.dist,
+            )
+            return
+
+        if callable(verifier):
+            warnings.warn(
+                "%s:%s.verify_export_target returned a callable, which "
+                "will no longer be passed to spec.advise by calmjs-4.0.0; "
+                "please instead override 'setup_export_location' or "
+                "'prepare_export_location' in that class" % (
+                    self.__class__.__module__, self.__class__.__name__),
+                DeprecationWarning
+            )
+            spec.advise(BEFORE_PREPARE, verifier, export_target)
+        else:
+            spec.advise(
+                BEFORE_PREPARE,
+                self.prepare_export_location, export_target)
+        yield entry_point, toolchain, spec
+
     def iter_builders_for(self, package_name):
         for entry_point, export_target in self.iter_export_targets_for(
                 package_name):
-            try:
-                builder = entry_point.resolve()
-            except ImportError:
-                logger.error(
-                    "unable to import the target builder for the entry point "
-                    "'%s' from package '%s' to generate artifact '%s'",
-                    entry_point, entry_point.dist, export_target,
-                )
-                continue
-
-            if not self.verify_builder(builder):
-                logger.error(
-                    "the builder referenced by the entry point '%s' "
-                    "from package '%s' has an incompatible signature",
-                    entry_point, entry_point.dist,
-                )
-                continue
-
-            verifier = self.verify_export_target(export_target)
-            if not verifier:
-                continue
-
-            toolchain, spec = self.extract_builder_result(builder(
-                [entry_point.dist.project_name], export_target=export_target))
-            if not toolchain:
-                logger.error(
-                    "the builder referenced by the entry point '%s' "
-                    "from package '%s' failed to produce a valid "
-                    "toolchain",
-                    entry_point, entry_point.dist,
-                )
-                continue
-
-            if spec.get(EXPORT_TARGET) != export_target:
-                logger.error(
-                    "the builder referenced by the entry point '%s' "
-                    "from package '%s' failed to produce a spec with the "
-                    "expected export_target",
-                    entry_point, entry_point.dist,
-                )
-                continue
-
-            if callable(verifier):
-                spec.advise(BEFORE_PREPARE, verifier, export_target)
-            yield entry_point, toolchain, spec
+            # yield from...
+            for builder in self.generate_builder(entry_point, export_target):
+                yield builder
 
     def execute_builder(self, entry_point, toolchain, spec):
         """

@@ -914,6 +914,7 @@ class ArtifactRuntimeTestCase(unittest.TestCase):
         from calmjs import artifact
         from calmjs.registry import _inst as root_registry
         from calmjs.testing.artifact import generic_builder
+        from calmjs.testing.artifact import fail_builder
 
         def die():
             raise toolchain.ToolchainAbort('desu')
@@ -922,8 +923,6 @@ class ArtifactRuntimeTestCase(unittest.TestCase):
             tc, spec = generic_builder(package_names, export_target)
             spec.advise(toolchain.BEFORE_COMPILE, die)
             return tc, spec
-
-        stub_stdouts(self)
 
         make_dummy_dist(self, ((
             'entry_points.txt',
@@ -953,10 +952,44 @@ class ArtifactRuntimeTestCase(unittest.TestCase):
             'full.js = calmjs_testbuilder:explosion\n',
         ),), 'boom', '1.0')
 
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.artifacts]\n'
+            'full.js = calmjs_testbuilder:fizz\n',
+        ),), 'incomplete', '1.0')
+
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.artifacts]\n'
+            'fail.js = calmjs_testbuilder:missing\n',
+        ),), 'missing.single', '1.0')
+
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.artifacts]\n'
+            'full.js = calmjs_testbuilder:builder\n'
+            'fail.js = calmjs_testbuilder:fail\n',
+        ),), 'fizz', '1.0')
+
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.artifacts]\n'
+            'good.js = calmjs_testbuilder:builder\n'
+            'fail.js = calmjs_testbuilder:missing\n',
+        ),), 'missing.attribute', '1.0')
+
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.artifacts]\n'
+            'good.js = calmjs_testbuilder:builder\n'
+            'fail.js = no_such_module:missing\n',
+        ),), 'missing.module', '1.0')
+
         working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
 
         mod = ModuleType('calmjs_testbuilder')
         mod.builder = generic_builder
+        mod.fail = fail_builder
         mod.explosion = exploding_builder
         self.addCleanup(sys.modules.pop, 'calmjs_testbuilder')
         sys.modules['calmjs_testbuilder'] = mod
@@ -972,6 +1005,8 @@ class ArtifactRuntimeTestCase(unittest.TestCase):
 
         self.assertTrue(
             exists(artifact_registry.metadata.get('example.package')))
+
+        stub_stdouts(self)
 
         # try again through the main method
         with self.assertRaises(SystemExit) as e:
@@ -996,6 +1031,68 @@ class ArtifactRuntimeTestCase(unittest.TestCase):
         with self.assertRaises(SystemExit) as e:
             runtime.main(['artifact', 'build', 'boom'], runtime_cls=lambda: rt)
         # ensure proper exit code of 1
+        self.assertEqual(e.exception.args[0], 1)
+
+        # also when the artificat didn't actually get produced
+        with self.assertRaises(SystemExit) as e:
+            runtime.main(
+                ['artifact', 'build', 'incomplete'],
+                runtime_cls=lambda: rt,
+            )
+        self.assertEqual(e.exception.args[0], 1)
+
+        # also when entry point references missing imports, as missing
+        # dependencies for building should be flagged.
+        with self.assertRaises(SystemExit) as e:
+            runtime.main(
+                ['artifact', 'build', 'missing.single'],
+                runtime_cls=lambda: rt,
+            )
+        self.assertEqual(e.exception.args[0], 1)
+
+        # include a mix of valid entry points with ones missing actual
+        # modules.
+
+        with self.assertRaises(SystemExit) as e:
+            runtime.main(
+                ['artifact', 'build', 'fizz'],
+                runtime_cls=lambda: rt,
+            )
+        self.assertEqual(e.exception.args[0], 1)
+
+        stub_stdouts(self)
+
+        with self.assertRaises(SystemExit) as e:
+            runtime.main(
+                ['artifact', 'build', 'missing.attribute'],
+                runtime_cls=lambda: rt,
+            )
+        self.assertIn(
+            "unable to import the target builder for the entry point "
+            "'fail.js = calmjs_testbuilder:missing' from package "
+            "'missing.attribute 1.0'", sys.stderr.getvalue()
+        )
+        self.assertEqual(e.exception.args[0], 1)
+
+        with self.assertRaises(SystemExit) as e:
+            runtime.main(
+                ['artifact', 'build', 'missing.module'],
+                runtime_cls=lambda: rt,
+            )
+        self.assertEqual(e.exception.args[0], 1)
+
+        with self.assertRaises(SystemExit) as e:
+            runtime.main(
+                ['artifact', 'build', 'empty', 'example.package', '-vv'],
+                runtime_cls=lambda: rt,
+            )
+        self.assertEqual(e.exception.args[0], 1)
+
+        with self.assertRaises(SystemExit) as e:
+            runtime.main(
+                ['artifact', 'build', 'example.package', 'calmjs', '-vv'],
+                runtime_cls=lambda: rt,
+            )
         self.assertEqual(e.exception.args[0], 1)
 
     def test_artifact_build_runtime_live_integration(self):

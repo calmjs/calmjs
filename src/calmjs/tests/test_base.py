@@ -7,18 +7,75 @@ from os.path import pathsep
 
 from pkg_resources import EntryPoint
 from pkg_resources import Distribution
+from pkg_resources import WorkingSet
+from pkg_resources import safe_name
 
 from calmjs import base
 from calmjs.utils import pretty_logging
 from calmjs.testing import mocks
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import create_fake_bin
+from calmjs.testing.utils import make_dummy_dist
 
 
 class DummyModuleRegistry(base.BaseModuleRegistry):
 
     def _map_entry_point_module(self, entry_point, module):
         return {module.__name__: {module.__name__: module}}
+
+
+class PackageKeyMappingTestCase(unittest.TestCase):
+    """
+    The package key mapping test cases
+    """
+
+    def test_repr(self):
+        mapping = base.PackageKeyMapping()
+        self.assertEqual('{}', repr(mapping))
+        mapping['a'] = 1
+        self.assertEqual("{'a': 1}", repr(mapping))
+
+    def test_len(self):
+        mapping = base.PackageKeyMapping()
+        self.assertEqual(0, len(mapping))
+        mapping['foo'] = 1
+        self.assertEqual(1, len(mapping))
+
+    def test_delete(self):
+        mapping = base.PackageKeyMapping(foo=1)
+        del mapping['foo']
+        self.assertEqual(0, len(mapping))
+
+    def test_membership(self):
+        mapping = base.PackageKeyMapping(foo=1)
+        self.assertIn('foo', mapping)
+        self.assertNotIn('bar', mapping)
+
+    def test_get(self):
+        mapping = base.PackageKeyMapping(foo=1)
+        self.assertEqual(mapping['foo'], 1)
+        self.assertEqual(mapping.get('foo'), 1)
+
+    def test_iter(self):
+        mapping = base.PackageKeyMapping({'foo': 1, 'bar': 2})
+        values = {v for k, v in mapping.items()}
+        self.assertEqual({1, 2}, values)
+
+    def test_distribution_as_key(self):
+        mapping = base.PackageKeyMapping()
+        mapping[Distribution(project_name='not_normalized')] = 1
+        self.assertEqual(1, mapping['not_normalized'])
+        self.assertEqual(1, mapping[safe_name('not_normalized')])
+
+    def test_membership_normalized(self):
+        mapping = base.PackageKeyMapping(not_normalized=1)
+        self.assertIn(safe_name('not_normalized'), mapping)
+        self.assertIn('not_normalized', mapping)
+
+    def test_pop_normalized(self):
+        mapping = base.PackageKeyMapping(not_normalized=1)
+        mapping.pop('not_normalized')
+        self.assertEqual(0, len(mapping))
 
 
 class BaseRegistryTestCase(unittest.TestCase):
@@ -202,6 +259,18 @@ class BaseModuleRegistryTestCase(unittest.TestCase):
             DummyModuleRegistry(__name__, _working_set=working_set)
         self.assertIn("overwriting keys: ['calmjs.testing']", s.getvalue())
 
+    def test_record_internal_normalization(self):
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[modules]\n'
+            'record = calmjs.module:ModuleRegistry\n'
+        ),), 'unsafe_name', '1.0')
+
+        working_set = WorkingSet([self._calmjs_testing_tmpdir])
+        registry = DummyModuleRegistry('modules', _working_set=working_set)
+        self.assertEqual(
+            1, len(registry.get_records_for_package('unsafe_name')))
+
 
 class BaseExternalModuleRegistryTestCase(unittest.TestCase):
     """
@@ -239,6 +308,18 @@ class BaseExternalModuleRegistryTestCase(unittest.TestCase):
             'dummy/whatever/module.js',
             'dummy/whatever/module-slim.js',
         ])
+
+    def test_record_internal_normalization(self):
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[modules]\n'
+            'some/where/path.js = calmjs.module\n'
+        ),), 'unsafe_name', '1.0')
+
+        working_set = WorkingSet([self._calmjs_testing_tmpdir])
+        registry = DummyModuleRegistry('modules', _working_set=working_set)
+        self.assertEqual(
+            1, len(registry.get_records_for_package('unsafe_name')))
 
 
 class BaseDriverClassTestCase(unittest.TestCase):
