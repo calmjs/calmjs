@@ -2,6 +2,7 @@
 import unittest
 import sys
 import os
+import warnings
 from os.path import basename
 from os.path import dirname
 from os.path import exists
@@ -416,6 +417,58 @@ class ArtifactRegistryTestCase(unittest.TestCase):
         # should have stopped at before_prepare
         self.assertFalse(check)
 
+    def test_iter_builders_verify_export_target_legacy(self):
+        mod = ModuleType('calmjs_testing_dummy')
+        mod.complete = generic_builder
+        self.addCleanup(sys.modules.pop, 'calmjs_testing_dummy')
+        sys.modules['calmjs_testing_dummy'] = mod
+
+        working_dir = utils.mkdtemp(self)
+        utils.make_dummy_dist(self, (
+            ('entry_points.txt', '\n'.join([
+                '[calmjs.artifacts]',
+                'artifact.js = calmjs_testing_dummy:complete',
+            ])),
+        ), 'app', '1.0', working_dir=working_dir)
+        mock_ws = WorkingSet([working_dir])
+        root = join(working_dir, 'app-1.0.egg-info', 'calmjs_artifacts')
+        targets = []
+
+        def check_target(export_target):
+            # manually create the root here, to allow the completion
+            # of the build process by doing what an existing
+            # implementation that reuse existing code might have done.
+            targets.append(export_target)
+            prepare_export_location(export_target)
+
+        # ensure that the build directory exists, because the default
+
+        class FakeArtifactRegistry(ArtifactRegistry):
+            def verify_export_target(self, export_target):
+                return check_target
+
+        registry = FakeArtifactRegistry(
+            'calmjs.artifacts', _working_set=mock_ws)
+
+        # the invalid.js should be filtered out
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter('always')
+            self.assertEqual(1, len(list(registry.iter_builders_for('app'))))
+
+        self.assertIn(
+            "FakeArtifactRegistry.verify_export_target returned a callable",
+            str(w[-1].message))
+
+        # ensure no early execution of check_target
+        self.assertFalse(targets)
+        self.assertFalse(exists(root))
+        with warnings.catch_warnings(record=True):
+            with pretty_logging(stream=mocks.StringIO()):
+                registry.process_package('app')
+        # ensure no early execution of check_target
+        self.assertTrue(targets)
+        self.assertTrue(exists(root))
+
     def test_iter_builders_verify_export_target(self):
         mod = ModuleType('calmjs_testing_dummy')
         mod.complete = generic_builder
@@ -440,7 +493,9 @@ class ArtifactRegistryTestCase(unittest.TestCase):
             'calmjs.artifacts', _working_set=mock_ws)
 
         # the invalid.js should be filtered out
-        self.assertEqual(1, len(list(registry.iter_builders_for('app'))))
+        with pretty_logging(stream=mocks.StringIO()) as stream:
+            self.assertEqual(1, len(list(registry.iter_builders_for('app'))))
+        self.assertIn("invalid.js' has been rejected", stream.getvalue())
 
     def test_build_artifacts_success(self):
         # inject dummy module and add cleanup

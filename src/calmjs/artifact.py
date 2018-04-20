@@ -115,6 +115,7 @@ with the entry point setup, the setup call may look something like this:
 from __future__ import absolute_import
 
 import json
+import warnings
 from codecs import open
 from inspect import getcallargs
 from inspect import getmro
@@ -210,7 +211,7 @@ def trace_toolchain(toolchain):
     return pkgs
 
 
-def prepare_export_location(export_target):
+def setup_export_location(export_target):
     target_dir = dirname(export_target)
     try:
         if not exists(target_dir):
@@ -221,7 +222,7 @@ def prepare_export_location(export_target):
                 "cannot export to '%s' as its dirname does not lead to a "
                 "directory", export_target
             )
-            raise ToolchainAbort()
+            return False
         elif isdir(export_target):
             logger.debug(
                 "removing existing export target directory at '%s'",
@@ -238,8 +239,19 @@ def prepare_export_location(export_target):
             "permission issues are corrected and/or remove the egg-info "
             "directory for this package before trying again",
             target_dir, e)
-        raise ToolchainAbort()
+        return False
 
+    return True
+
+
+def prepare_export_location(export_target):
+    """
+    The version of setup_export_location for use with spec advice
+    before_prepare step.
+    """
+
+    if not setup_export_location(export_target):
+        raise ToolchainAbort()
     return True
 
 
@@ -469,8 +481,29 @@ class BaseArtifactRegistry(BaseRegistry):
         return verify_builder(builder)
 
     def verify_export_target(self, export_target):
-        # return a callable to defer destructive verification
-        return prepare_export_location
+        # this is the pre-flight verification, it will prevent the
+        # entry point loaded/associated with this export_target from
+        # creating a builder entry in the iter_builders_for method.
+        return True
+
+    def setup_export_location(self, export_target):
+        """
+        This will be used by prepare_export_location; it must return True
+        for the final export to proceed.
+        """
+
+        return setup_export_location(export_target)
+
+    def prepare_export_location(self, export_target):
+        """
+        The wrapped version for this class for use directly by the spec
+        in the before_prepare advice.  Must raise some kind of Toolchain
+        specific exception to halt Toolchain execution for the given
+        export target.
+        """
+
+        if not self.setup_export_location(export_target):
+            raise ToolchainAbort()
 
     def extract_builder_result(self, builder_result):
         return extract_builder_result(builder_result)
@@ -503,8 +536,11 @@ class BaseArtifactRegistry(BaseRegistry):
                 )
                 continue
 
+            # CLEANUP see deprecation notice below
             verifier = self.verify_export_target(export_target)
             if not verifier:
+                logger.error(
+                    "the export target '%s' has been rejected", export_target)
                 continue
 
             toolchain, spec = self.extract_builder_result(builder(
@@ -528,7 +564,19 @@ class BaseArtifactRegistry(BaseRegistry):
                 continue
 
             if callable(verifier):
+                warnings.warn(
+                    "%s:%s.verify_export_target returned a callable, which "
+                    "will no longer be passed to spec.advise by calmjs-4.0.0; "
+                    "please instead override 'setup_export_location' or "
+                    "'prepare_export_location' in that class" % (
+                        self.__class__.__module__, self.__class__.__name__),
+                    DeprecationWarning
+                )
                 spec.advise(BEFORE_PREPARE, verifier, export_target)
+            else:
+                spec.advise(
+                    BEFORE_PREPARE,
+                    self.prepare_export_location, export_target)
             yield entry_point, toolchain, spec
 
     def execute_builder(self, entry_point, toolchain, spec):
