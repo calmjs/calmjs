@@ -3,13 +3,12 @@ import logging
 import unittest
 import sys
 from distutils.dist import Distribution
+from distutils.errors import DistutilsModuleError
 
-from calmjs import command
 from calmjs.command import distutils_log_handler
 from calmjs.command import BuildArtifactCommand
 
 from calmjs.testing.utils import stub_stdouts
-from calmjs.testing.utils import stub_item_attr_value
 
 
 # the actual command class kind of requires integration test for most
@@ -84,13 +83,24 @@ class BuildArtifactCommandTestcase(unittest.TestCase):
         built_names = []
 
         class FakeBuilder(object):
-            def process_package(self, name):
-                built_names.append(name)
+            registry_name = 'demo.artifacts'
 
+            def __call__(self, package_names):
+                built_names.extend(package_names)
+                return 'fail.package' not in package_names
+
+        self.builder = FakeBuilder()
         self.built_names = built_names
-        stub_item_attr_value(self, command, 'get', {
-            'calmjs.artifacts': FakeBuilder(),
-        }.get)
+
+    def test_build_calmjs_artifacts_misconfigured(self):
+        dist = Distribution(attrs={
+            'name': 'some.package',
+        })
+        cmd = BuildArtifactCommand(dist=dist)
+        with self.assertRaises(DistutilsModuleError) as e:
+            cmd.run()
+
+        self.assertIn('artifact_builder is not callable for', str(e.exception))
 
     def test_build_calmjs_artifacts_dry_run(self):
         dist = Distribution(attrs={
@@ -98,13 +108,31 @@ class BuildArtifactCommandTestcase(unittest.TestCase):
             'dry_run': True,
         })
         cmd = BuildArtifactCommand(dist=dist)
+        # usually this is defined in the subclass as a class attribute
+        cmd.artifact_builder = self.builder
         cmd.run()
         self.assertEqual([], self.built_names)
 
-    def test_build_calmjs_artifacts_basic(self):
+    def test_build_calmjs_artifacts_success(self):
         dist = Distribution(attrs={
             'name': 'some.package',
         })
         cmd = BuildArtifactCommand(dist=dist)
+        cmd.artifact_builder = self.builder
         cmd.run()
         self.assertEqual(['some.package'], self.built_names)
+
+    def test_build_calmjs_artifacts_failure(self):
+        dist = Distribution(attrs={
+            'name': 'fail.package',
+        })
+        cmd = BuildArtifactCommand(dist=dist)
+        cmd.artifact_builder = self.builder
+        with self.assertRaises(DistutilsModuleError) as e:
+            cmd.run()
+        # gets appended as an attempt
+        self.assertEqual(['fail.package'], self.built_names)
+        self.assertIn(
+            "some entries in registry 'demo.artifacts' defined for package "
+            "'fail.package' failed to generate an artifact", str(e.exception),
+        )

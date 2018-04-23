@@ -1,6 +1,26 @@
 Changelog
 =========
 
+3.1.0 (Unreleased)
+------------------
+
+- Fix the modgen function in calmjs.indexer by actually not using the
+  marked as deprecated indexer functions by default, but instead use the
+  ``pkg_resources`` version as originally intended. [
+  `#30 <https://github.com/calmjs/calmjs/issues/30>`_
+  `#33 <https://github.com/calmjs/calmjs/issues/33>`_
+  ]
+- Ensure lookups on package names that have been normalized internally
+  by pkg_resources can still be resolved by their original name. [
+  `#31 <https://github.com/calmjs/calmjs/issues/31>`_
+  ]
+- Correctly return an unsuccessful exit code on various partial success
+  while running ``calmjs artifact build`` command and for the distutils
+  ``build_calmjs_artifacts`` command. [
+  `#27 <https://github.com/calmjs/calmjs/issues/27>`_
+  `#38 <https://github.com/calmjs/calmjs/issues/38>`_
+  ]
+
 3.0.0 (2018-01-10)
 ------------------
 

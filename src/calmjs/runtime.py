@@ -25,6 +25,8 @@ from calmjs.argparse import Version
 from calmjs.argparse import ATTR_INFO
 from calmjs.argparse import ATTR_ROOT_PKG
 from calmjs.argparse import metavar
+from calmjs.artifact import ArtifactBuilder
+from calmjs.artifact import ARTIFACT_REGISTRY_NAME
 from calmjs.exc import RuntimeAbort
 from calmjs.registry import get
 from calmjs.toolchain import Spec
@@ -897,8 +899,11 @@ class BaseArtifactRegistryRuntime(BaseRuntime):
     The base artifact registry runtime.
     """
 
-    def __init__(self, registry_name='calmjs.artifacts', *a, **kw):
+    # TODO rename this to the BaseArtifactBuilderRuntime
+
+    def __init__(self, registry_name=ARTIFACT_REGISTRY_NAME, *a, **kw):
         self.registry_name = registry_name
+        self.builder = ArtifactBuilder(registry_name=registry_name)
         super(BaseArtifactRegistryRuntime, self).__init__(*a, **kw)
 
     def init_argparser(self, argparser):
@@ -921,26 +926,7 @@ class BaseArtifactRegistryRuntime(BaseRuntime):
             'package_names', metavar=metavar('package'), nargs='+', help=help)
 
     def run(self, argparser=None, package_names=[], *a, **kwargs):
-        result = True
-        for package_name in package_names:
-            registry = get(self.registry_name)
-            metadata = {}
-            for entry_point, export_target in registry.iter_export_targets_for(
-                    package_name):
-                builder = next(registry.generate_builder(
-                    entry_point, export_target), None)
-                if not builder:
-                    # immediate failure if builder does not exist.
-                    result = False
-                    continue
-                entries = registry.execute_builder(*builder)
-                # whether the builder produced an artifact entry.
-                result = bool(entries) and result
-                metadata.update(entries)
-            # whether the package as a whole produced artifacts entries.
-            result = bool(metadata) and result
-            registry.update_artifact_metadata(package_name, metadata)
-        return result
+        return self.builder(package_names)
 
 
 class ArtifactBuildRuntime(BaseArtifactRegistryRuntime):

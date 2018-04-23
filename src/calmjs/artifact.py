@@ -138,6 +138,7 @@ from calmjs.dist import is_json_compat
 from calmjs.dist import pkg_names_to_dists
 from calmjs.cli import get_bin_version_str
 from calmjs.command import BuildArtifactCommand
+from calmjs.registry import get
 from calmjs.types.exceptions import ToolchainAbort
 from calmjs.toolchain import Toolchain
 from calmjs.toolchain import Spec
@@ -146,6 +147,7 @@ from calmjs.toolchain import BEFORE_PREPARE
 from calmjs.toolchain import EXPORT_TARGET
 
 ARTIFACT_BASENAME = 'calmjs_artifacts'
+ARTIFACT_REGISTRY_NAME = 'calmjs.artifacts'
 
 logger = getLogger(__name__)
 
@@ -254,12 +256,6 @@ def prepare_export_location(export_target):
     if not setup_export_location(export_target):
         raise ToolchainAbort()
     return True
-
-
-class build_calmjs_artifacts(BuildArtifactCommand):
-    """
-    The main artifact build command for calmjs
-    """
 
 
 class BaseArtifactRegistry(BaseRegistry):
@@ -631,3 +627,63 @@ class ArtifactRegistry(BaseArtifactRegistry):
         metadata = super(ArtifactRegistry, self).process_package(package_name)
         if metadata:
             self.update_artifact_metadata(package_name, metadata)
+
+
+class ArtifactBuilder(object):
+    """
+    A generic artifact builder.  Provides a callable object that will
+    accept a list of package_names to generate prebuilt artifacts for
+    based on the registry name used to construct this builder instance.
+    """
+
+    def __init__(self, registry_name=ARTIFACT_REGISTRY_NAME):
+        """
+        Arguments:
+
+        registry_name
+            the registry used to generate the artifacts for.
+        """
+
+        self.registry_name = registry_name
+
+    def __call__(self, package_names):
+        """
+        Generic artifact builder function.
+
+        Arguments:
+
+        package_names
+            List of package names to be built
+
+        Returns True if the build is successful without errors, False if
+        errors were found or if no artifacts were built.
+        """
+
+        result = True
+        registry = get(self.registry_name)
+        for package_name in package_names:
+            metadata = {}
+            for entry_point, export_target in registry.iter_export_targets_for(
+                    package_name):
+                builder = next(registry.generate_builder(
+                    entry_point, export_target), None)
+                if not builder:
+                    # immediate failure if builder does not exist.
+                    result = False
+                    continue
+                entries = registry.execute_builder(*builder)
+                # whether the builder produced an artifact entry.
+                result = bool(entries) and result
+                metadata.update(entries)
+            # whether the package as a whole produced artifacts entries.
+            result = bool(metadata) and result
+            registry.update_artifact_metadata(package_name, metadata)
+        return result
+
+
+class build_calmjs_artifacts(BuildArtifactCommand):
+    """
+    The main artifact build command for calmjs
+    """
+
+    artifact_builder = ArtifactBuilder(registry_name=ARTIFACT_REGISTRY_NAME)
