@@ -10,12 +10,11 @@ from __future__ import absolute_import
 import sys
 import logging
 
-# from distutils.errors import DistutilsOptionError
+from distutils.errors import DistutilsModuleError
 from distutils.core import Command
 from distutils import log
 
 from calmjs.ui import prompt_overwrite_json
-from calmjs.registry import get
 
 
 class DistutilsLogHandler(logging.Handler):
@@ -168,6 +167,7 @@ class BuildArtifactCommand(Command):
     """
 
     user_options = []
+    artifact_builder = None
 
     def initialize_options(self):
         """
@@ -180,10 +180,19 @@ class BuildArtifactCommand(Command):
         If finalization is needed.
         """
 
-    # TODO make use of cli_driver rather than probing for registry
-
     @use_distutils_logger()
     def run(self):
+        if not callable(self.artifact_builder):
+            raise DistutilsModuleError(
+                "artifact_builder is not callable for %s" % self)
         if self.dry_run:
             return
-        get('calmjs.artifacts').process_package(self.distribution.get_name())
+        package_name = self.distribution.get_name()
+        if not self.artifact_builder([package_name]):
+            raise DistutilsModuleError(
+                "some entries in registry '%s' defined for package '%s' "
+                "failed to generate an artifact" % (
+                    self.artifact_builder.registry_name,
+                    package_name,
+                )
+            )

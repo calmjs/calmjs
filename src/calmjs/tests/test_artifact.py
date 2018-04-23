@@ -21,6 +21,7 @@ from calmjs import dist
 from calmjs.utils import pretty_logging
 from calmjs.dist import find_pkg_dist
 from calmjs.registry import get
+from calmjs.artifact import ArtifactBuilder
 from calmjs.artifact import ArtifactRegistry
 from calmjs.artifact import extract_builder_result
 from calmjs.artifact import prepare_export_location
@@ -644,6 +645,14 @@ class ArtifactRegistryTestCase(unittest.TestCase):
         self.assertIn('extra.js', registry.get_artifact_metadata('app')[
             'calmjs_artifacts'])
 
+        # try again using the artifact builder
+        from calmjs.registry import _inst
+        _inst.records.pop('calmjs.artifacts', None)
+        self.addCleanup(_inst.records.pop, 'calmjs.artifacts')
+        _inst.records['calmjs.artifacts'] = registry
+        builder = ArtifactBuilder('calmjs.artifacts')
+        self.assertTrue(builder(['app']))
+
 
 class ArtifactRegistryBuildFailureTestCase(unittest.TestCase):
     """
@@ -738,6 +747,22 @@ class ArtifactRegistryBuildFailureTestCase(unittest.TestCase):
             "the builder referenced by the entry point "
             "'bad.js = calmjs_testing_dummy:bad_builder' from package "
             "'app 1.0' has an incompatible signature", log
+        )
+
+        # try again using the artifact builder
+        from calmjs.registry import _inst
+        _inst.records.pop('calmjs.artifacts', None)
+        self.addCleanup(_inst.records.pop, 'calmjs.artifacts')
+        _inst.records['calmjs.artifacts'] = self.registry
+        builder = ArtifactBuilder('calmjs.artifacts')
+        with pretty_logging(stream=mocks.StringIO()) as stream:
+            self.assertFalse(builder(['app']))
+
+        log = stream.getvalue()
+        self.assertIn(
+            "unable to import the target builder for the entry point "
+            "'not_exist.js = calmjs_testing_dummy:not_exist' from package "
+            "'app 1.0'", log
         )
 
     def test_existing_removed(self):
