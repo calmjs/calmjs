@@ -526,6 +526,17 @@ class Runtime(BaseRuntime):
 
         commands = argparser.add_subparsers(
             dest=self.action_key, metavar='<command>')
+        # Python 3.7 has required set to True, which is correct in most
+        # cases but this disables the manual handling for cases where a
+        # command was not provided; also this generates a useless error
+        # message that simply states "<command> is required" and forces
+        # the program to exit.  As the goal of this suite of classes is
+        # to act as a helpful CLI front end, force required to be False
+        # to keep our manual handling and management of subcommands.
+        # Setting this as a property for compatibility with Python<3.7,
+        # as only in Python>=3.7 the add_subparsers can accept required
+        # as an argument.
+        commands.required = False
 
         for entry_point in self.iter_entry_points():
             inst = self.entry_point_load_validated(entry_point)
