@@ -905,7 +905,8 @@ class ArtifactRuntimeTestCase(unittest.TestCase):
             'artifact = calmjs.runtime:artifact',
         ]})
         rt = runtime.Runtime(working_set=working_set)
-        rt(['artifact'])
+        # An underspecified command should also return False.
+        self.assertFalse(rt(['artifact']))
         # ensure the help for the command itself is printed
         self.assertIn(
             'helpers for the management of artifacts', sys.stdout.getvalue())
@@ -2361,7 +2362,7 @@ class MainIntegrationTestCase(unittest.TestCase):
         with self.assertRaises(SystemExit) as e:
             runtime.main([])
         self.assertIn('usage', sys.stdout.getvalue())
-        self.assertEqual(e.exception.args[0], 0)
+        self.assertEqual(e.exception.args[0], 1)
 
     def test_calmjs_main_console_entry_point_help(self):
         stub_stdouts(self)

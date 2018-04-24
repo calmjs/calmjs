@@ -626,7 +626,21 @@ class Runtime(BaseRuntime):
         return NotImplemented
 
 
-class CalmJSRuntime(Runtime):
+class RequiredCommandRuntime(Runtime):
+    """
+    Identical to the Runtime, except for the case when a missing command
+    is encountered, the result is defined to be False.
+    """
+
+    def run(self, argparser=None, **kwargs):
+        result = super(RequiredCommandRuntime, self).run(argparser, **kwargs)
+        if result is NotImplemented:
+            argparser.print_help()
+            return False
+        return result
+
+
+class CalmJSRuntime(RequiredCommandRuntime):
 
     def __init__(self, package_name=CALMJS, *a, **kw):
         """
@@ -870,7 +884,7 @@ class ToolchainRuntime(DriverRuntime):
         return spec
 
 
-class ArtifactRuntime(Runtime):
+class ArtifactRuntime(RequiredCommandRuntime):
     """
     helpers for the management of artifacts
     """
@@ -885,13 +899,6 @@ class ArtifactRuntime(Runtime):
             action_key=action_key,
             *a, **kw
         )
-
-    def run(self, argparser=None, **kwargs):
-        result = super(ArtifactRuntime, self).run(argparser, **kwargs)
-        if result is NotImplemented:
-            argparser.print_help()
-            return False
-        return result
 
 
 class BaseArtifactRegistryRuntime(BaseRuntime):
@@ -1165,15 +1172,9 @@ def main(args=None, runtime_cls=CalmJSRuntime):
     # None to distinguish args from unspecified or specified as [], but
     # ultimately the value must be a list.
     args = norm_args(args)
-    extras = bootstrap(args)
-
-    # Rather than forcing a "print_help" somewhere later to print out
-    # the help, trigger it through an implicit `-h` to avoid certain
-    # differences in how parsing is handled between different versions
-    # of Python and ArgumentParser, as doing it in this hacky way turns
-    # out to be most consistent.
-    if not extras:
-        args = args + ['-h']
+    # Use the bootstrap runtime to set the global runtime attributes
+    # (i.e. for logging and such).
+    bootstrap(args)
 
     # all the minimum arguments acquired, bootstrap the execution.
     with warnings.catch_warnings(record=True) as records:
