@@ -150,6 +150,18 @@ class BaseRuntimeTestCase(unittest.TestCase):
         result = rt.run(rt.argparser, runtime='dummy')
         self.assertIs(result, NotImplemented)
 
+    def test_runtime_error_deprecation(self):
+        stub_stdouts(self)
+        working_set = mocks.WorkingSet({'calmjs.runtime': [
+            'deprecated = calmjs.tests.test_runtime:deprecated',
+        ]})
+        rt = runtime.Runtime(working_set=working_set, prog='dummy')
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter('always')
+            with self.assertRaises(SystemExit):
+                rt.error(rt.argparser, 'deprecated', 'simulated')
+        self.assertIn('Runtime.error is deprecated', str(w[-1].message))
+
     def test_runtime_run_abort(self):
         class CustomRuntime(runtime.BaseRuntime):
             def run(self, export_target=None, **kwargs):
@@ -1127,7 +1139,7 @@ class PackageManagerRuntimeTestCase(unittest.TestCase):
         working_set = mocks.WorkingSet({'calmjs.runtime': [
             'npm = calmjs.npm:npm.runtime',
         ]})
-        rt = runtime.Runtime(working_set=working_set)
+        rt = runtime.Runtime(prog='dummy', working_set=working_set)
         rt.argparser  # populate the argparser
         rt.argparser_details.clear()
         with pretty_logging(
@@ -1136,7 +1148,8 @@ class PackageManagerRuntimeTestCase(unittest.TestCase):
 
         self.assertIn('CRITICAL', s.getvalue())
         self.assertIn(
-            'provided argparser not registered to this runtime.',
+            "provided argparser (prog='dummy') not associated with this "
+            "runtime (<calmjs.runtime.Runtime",
             s.getvalue())
         self.assertIn(
             'runtime cannot continue due to missing argparser details',
@@ -1646,7 +1659,7 @@ class RuntimeGoingWrongTestCase(unittest.TestCase):
         self.assertIn("CRITICAL", stderr)
         self.assertIn(
             "Runtime subclass at entry_point 'badsimple = "
-            "calmjs.testing.utils:badsimple' has overide "
+            "calmjs.testing.utils:badsimple' has override "
             "'entry_point_load_validated' without filtering out "
             "its parent classes; this can be addressed by calling "
             "super(calmjs.testing.module3.runtime.BadSimpleRuntime, self)."
@@ -1827,10 +1840,11 @@ class ArgumentHandlingTestCase(unittest.TestCase):
     def test_before_and_after_extras(self):
         rt = self.setup_runtime()
         with self.assertRaises(SystemExit):
-            rt(['-u', 'cmd', 'pkg', '-u'])
-        err = sys.stderr.getvalue().splitlines()[-1].strip()
-        # former has priority
-        self.assertEqual("calmjs: error: unrecognized arguments: -u", err)
+            rt(['--view', 'cmd', 'pkg', '-n', '-v'])
+        err = sys.stderr.getvalue()
+        # --view is recognized in calmjs cmd
+        self.assertIn("calmjs: error: unrecognized arguments: --view", err)
+        self.assertIn("calmjs cmd: error: unrecognized arguments: -n", err)
 
     def test_before_known_and_after_unknown(self):
         rt = self.setup_runtime()
@@ -1838,6 +1852,16 @@ class ArgumentHandlingTestCase(unittest.TestCase):
             rt(['-v', 'cmd', 'pkg', '-u'])
         err = sys.stderr.getvalue().splitlines()[-1].strip()
         self.assertEqual("calmjs cmd: error: unrecognized arguments: -u", err)
+
+    def test_before_known_to_after_but_not_after(self):
+        rt = self.setup_runtime()
+        with self.assertRaises(SystemExit):
+            rt(['--view', 'cmd', 'pkg'])
+        err = sys.stderr.getvalue()
+        errline = err.splitlines()[-1].strip()
+        self.assertNotIn('calmjs cmd: error:', err)
+        self.assertEqual(
+            "calmjs: error: unrecognized arguments: --view", errline)
 
     def test_before_and_after_extras_scattered(self):
         # previously test_before_and_after_extras_known_before, as
@@ -1866,6 +1890,105 @@ class ArgumentHandlingTestCase(unittest.TestCase):
         err = sys.stderr.getvalue().splitlines()[-1].strip()
         # exact message differs between py2 and py3
         self.assertIn("calmjs cmd: error: ", err)
+
+    def test_subparser_level_2_missing_argument(self):
+        stub_stdouts(self)
+        working_set = mocks.WorkingSet({
+            'calmjs.runtime': [
+                'artifact = calmjs.runtime:artifact',
+            ],
+            'calmjs.runtime.artifact': [
+                'build = calmjs.runtime:artifact_build',
+            ],
+        })
+        rt = runtime.Runtime(working_set=working_set, prog='calmjs')
+        # An underspecified command should also return False.
+        with self.assertRaises(SystemExit):
+            rt(['artifact', 'build'])
+        # ensure the help for the command itself is printed
+        self.assertIn('calmjs artifact build: error', sys.stderr.getvalue())
+
+    def test_subparser_level_2_unrecognized_argument_final(self):
+        stub_stdouts(self)
+        working_set = mocks.WorkingSet({
+            'calmjs.runtime': [
+                'artifact = calmjs.runtime:artifact',
+            ],
+            'calmjs.runtime.artifact': [
+                'build = calmjs.runtime:artifact_build',
+            ],
+        })
+        rt = runtime.Runtime(working_set=working_set, prog='calmjs')
+        # An underspecified command should also return False.
+        with self.assertRaises(SystemExit):
+            rt(['artifact', 'build', 'package', '--no-such-argument'])
+        # ensure the help for the command itself is printed
+        self.assertIn('calmjs artifact build: error', sys.stderr.getvalue())
+
+    def test_subparsers_unrecognized_argument_interspersed(self):
+        stub_stdouts(self)
+        working_set = mocks.WorkingSet({
+            'calmjs.runtime': [
+                'artifact = calmjs.runtime:artifact',
+            ],
+            'calmjs.runtime.artifact': [
+                'build = calmjs.runtime:artifact_build',
+            ],
+        })
+        rt = runtime.Runtime(working_set=working_set, prog='calmjs')
+        # An underspecified command should also return False.
+        with self.assertRaises(SystemExit):
+            rt(['--1', 'artifact', '--2', 'build', 'package', '--3'])
+        # ensure the help for the command itself is printed
+        err = sys.stderr.getvalue()
+        self.assertIn(
+            'calmjs: error: unrecognized arguments: --1', err)
+        self.assertIn(
+            'calmjs artifact: error: unrecognized arguments: --2', err)
+        self.assertIn(
+            'calmjs artifact build: error: unrecognized arguments: --3', err)
+
+    def test_subparsers_unrecognized_argument_skipped(self):
+        stub_stdouts(self)
+        working_set = mocks.WorkingSet({
+            'calmjs.runtime': [
+                'artifact = calmjs.runtime:artifact',
+            ],
+            'calmjs.runtime.artifact': [
+                'build = calmjs.runtime:artifact_build',
+            ],
+        })
+        rt = runtime.Runtime(working_set=working_set, prog='calmjs')
+        # An underspecified command should also return False.
+        with self.assertRaises(SystemExit):
+            rt(['--1', 'artifact', 'build', 'package', '--3'])
+        # ensure the help for the command itself is printed
+        err = sys.stderr.getvalue()
+        self.assertIn(
+            'calmjs: error: unrecognized arguments: --1', err)
+        self.assertNotIn('calmjs artifact: error', err)
+        self.assertIn(
+            'calmjs artifact build: error: unrecognized arguments: --3', err)
+
+    def test_subparsers_first_fail(self):
+        stub_stdouts(self)
+        working_set = mocks.WorkingSet({
+            'calmjs.runtime': [
+                'artifact = calmjs.runtime:artifact',
+            ],
+            'calmjs.runtime.artifact': [
+                'build = calmjs.runtime:artifact_build',
+            ],
+        })
+        rt = runtime.Runtime(working_set=working_set, prog='calmjs')
+        # An underspecified command should also return False.
+        with self.assertRaises(SystemExit):
+            rt(['--1', 'artifact', 'build', 'package'])
+        # ensure the help for the command itself is printed
+        err = sys.stderr.getvalue()
+        self.assertIn('calmjs: error: unrecognized arguments: --1', err)
+        self.assertNotIn('calmjs artifact: error', err)
+        self.assertNotIn('calmjs artifact build: error', err)
 
 
 class PackageManagerRuntimeAlternativeIntegrationTestCase(unittest.TestCase):

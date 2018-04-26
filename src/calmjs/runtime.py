@@ -66,6 +66,9 @@ levels = {
 valid_command_name = re.compile('^[0-9a-zA-Z]*$')
 _global_runtime_attrs = {}
 
+ArgumentParserDetails = namedtuple('ArgumentParserDetails', [
+    'subparsers', 'runtimes', 'entry_points'])
+
 
 def _global_runtime_attrs_get(key):
     result = _global_runtime_attrs.get(key)
@@ -290,30 +293,16 @@ class BaseRuntime(BootstrapRuntime):
             warnings.simplefilter("always")
             parsed, extras = self.argparser.parse_known_args(args)
 
-        kwargs = vars(parsed)
-        target = kwargs.get(self.action_key)
-
-        if extras:
-            # first step, figure out where exactly the problem is, by
-            # taking everything before the target (if any) and see where
-            # the failure happened
-            before = args[:args.index(target)] if target in args else args
-            bootfail = bootstrap(before)
-            # msg has no gettext applied as in argparser module version
-            msg = 'unrecognized arguments: %s' % ' '.join(bootfail or extras)
-            if bootfail:
-                # failed on the root parser, deal with this here now.
-                self.argparser.error(msg)
-            else:
-                # let the implementation specific handling deal with it
-                self.error(self.argparser, target, msg)
-
         with pretty_logging(
                 logger=self.logger, level=self.log_level, stream=sys.stderr):
             # now that we have a logging scope, generate the logs.
             for record in records:
                 logger.warning(record.message)
+
             try:
+                if extras:
+                    self.unrecognized_arguments_error(args, parsed, extras)
+                kwargs = vars(parsed)
                 return self.run(argparser=self.argparser, **kwargs)
             except KeyboardInterrupt:
                 logger.critical('termination requested; aborted.')
@@ -359,8 +348,8 @@ class Runtime(BaseRuntime):
 
         self.entry_point_group = entry_point_group
         self.argparser_details = {}
-        self.ArgumentParserDetails = namedtuple('ArgumentParserDetails', [
-            'subparsers', 'runtimes', 'entry_points'])
+        # BBB compatibility
+        self.ArgumentParserDetails = ArgumentParserDetails
         super(Runtime, self).__init__(*a, **kw)
 
     def log_debug_error(self, *a, **kw):
@@ -425,8 +414,8 @@ class Runtime(BaseRuntime):
         def prepare_argparser():
             if argparser in self.argparser_details:
                 return False
-            result = self.argparser_details[
-                argparser] = self.ArgumentParserDetails({}, {}, {})
+            result = self.argparser_details[argparser] = ArgumentParserDetails(
+                {}, {}, {})
             return result
 
         def to_module_attr(ep):
@@ -477,7 +466,7 @@ class Runtime(BaseRuntime):
                     # to ensure that our thing would have been called.
                     cls = type(runtime)
                     logger.critical(
-                        "Runtime subclass at entry_point '%s' has overide "
+                        "Runtime subclass at entry_point '%s' has override "
                         "'entry_point_load_validated' without filtering out "
                         "its parent classes; this can be addressed by calling "
                         "super(%s.%s, self).entry_point_load_validated("
@@ -609,16 +598,54 @@ class Runtime(BaseRuntime):
         details = self.argparser_details.get(argparser)
         if details:
             return details
-        logger.error('provided argparser not registered to this runtime.')
+        logger.error(
+            'provided argparser (prog=%r) not associated with this '
+            'runtime (%r)', argparser.prog, self
+        )
+
+    def unrecognized_arguments_error(self, args, parsed, extras):
+        """
+        This exists because argparser is dumb and naive and doesn't
+        fail unrecognized arguments early.
+        """
+
+        # loop variants
+        kwargs = vars(parsed)
+        failed = list(extras)
+        # initial values
+        runtime, subparser, idx = (self, self.argparser, 0)
+        # recursion not actually needed when it can be flattened.
+        while isinstance(runtime, Runtime):
+            cmd = kwargs.pop(runtime.action_key)
+            action_idx = args.index(cmd)
+            subargs = args[idx:action_idx]
+            subparsed, subextras = subparser.parse_known_args(subargs)
+            if subextras:
+                subparser.unrecognized_arguments_error(subextras)
+                # since the failed arguments are in order
+                failed = failed[len(subextras):]
+
+            # advance the values
+            # note that any internal consistency will almost certainly
+            # result in KeyError being raised.
+            details = runtime.get_argparser_details(subparser)
+            runtime = details.runtimes[cmd]
+            subparser = details.subparsers[cmd]
+            idx = action_idx + 1
+
+        if failed:
+            subparser.unrecognized_arguments_error(failed)
+        sys.exit(2)
 
     def error(self, argparser, target, message):
         """
-        This is needed due to how the argparser may fail at deriving the
-        correct subcommand to include.  Although this BaseRuntime does
-        not implement this functionality, this method is reserved for
-        subclasses to handle that.
+        This was used as part of the original non-recursive lookup for
+        the target parser.
         """
 
+        warnings.warn(
+            'Runtime.error is deprecated and will be removed by calmjs-4.0.0',
+            DeprecationWarning)
         details = self.get_argparser_details(argparser)
         argparser = details.subparsers[target] if details else self.argparser
         argparser.error(message)
