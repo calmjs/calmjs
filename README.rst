@@ -773,6 +773,15 @@ execution of scripts and binaries.
 Runtime reporting 'unrecognized arguments:' on declared arguments
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+This issue should be fully resolved for calmjs>=3.1.0.
+
+The default behavior in the ArgumentParser defaults to uselessly blaming
+the root parser for any unrecognized arguments caused by its subparsers.
+The original workaround prior to calmjs-3.1.0 had the failure as
+documented below as its subparser resolver implementation was
+incomplete.  Either of these misleading behaviors impede the end users
+from being able to quickly locate the misplaced argument flags.
+
 For instance, if the |calmjs| command was executed like so resulting in
 error message may look like this:
 

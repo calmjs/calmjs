@@ -258,3 +258,16 @@ class ArgumentParser(argparse.ArgumentParser):
                 deprecation=deprecation,
             )
         return action
+
+    def soft_error(self, message):
+        """
+        Same as error, without the dying in a fire part.
+        """
+
+        self.print_usage(sys.stderr)
+        args = {'prog': self.prog, 'message': message}
+        self._print_message(
+            _('%(prog)s: error: %(message)s\n') % args, sys.stderr)
+
+    def unrecognized_arguments_error(self, args):
+        self.soft_error(_('unrecognized arguments: %s') % ' '.join(args))

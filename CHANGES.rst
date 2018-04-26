@@ -20,6 +20,12 @@ Changelog
   `#27 <https://github.com/calmjs/calmjs/issues/27>`_
   `#38 <https://github.com/calmjs/calmjs/issues/38>`_
   ]
+- Correctly locate the subparser(s) that were responsible for whatever
+  arguments they cannot recognize; includes cleaning up the interactions
+  between the runtime and argparser classes and Python 3.7 compatibility
+  fixes. [
+  `#41 <https://github.com/calmjs/calmjs/issues/41>`_
+  ]
 
 3.0.0 (2018-01-10)
 ------------------

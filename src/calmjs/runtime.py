@@ -66,6 +66,9 @@ levels = {
 valid_command_name = re.compile('^[0-9a-zA-Z]*$')
 _global_runtime_attrs = {}
 
+ArgumentParserDetails = namedtuple('ArgumentParserDetails', [
+    'subparsers', 'runtimes', 'entry_points'])
+
 
 def _global_runtime_attrs_get(key):
     result = _global_runtime_attrs.get(key)
@@ -290,30 +293,16 @@ class BaseRuntime(BootstrapRuntime):
             warnings.simplefilter("always")
             parsed, extras = self.argparser.parse_known_args(args)
 
-        kwargs = vars(parsed)
-        target = kwargs.get(self.action_key)
-
-        if extras:
-            # first step, figure out where exactly the problem is, by
-            # taking everything before the target (if any) and see where
-            # the failure happened
-            before = args[:args.index(target)] if target in args else args
-            bootfail = bootstrap(before)
-            # msg has no gettext applied as in argparser module version
-            msg = 'unrecognized arguments: %s' % ' '.join(bootfail or extras)
-            if bootfail:
-                # failed on the root parser, deal with this here now.
-                self.argparser.error(msg)
-            else:
-                # let the implementation specific handling deal with it
-                self.error(self.argparser, target, msg)
-
         with pretty_logging(
                 logger=self.logger, level=self.log_level, stream=sys.stderr):
             # now that we have a logging scope, generate the logs.
             for record in records:
                 logger.warning(record.message)
+
             try:
+                if extras:
+                    self.unrecognized_arguments_error(args, parsed, extras)
+                kwargs = vars(parsed)
                 return self.run(argparser=self.argparser, **kwargs)
             except KeyboardInterrupt:
                 logger.critical('termination requested; aborted.')
@@ -359,8 +348,8 @@ class Runtime(BaseRuntime):
 
         self.entry_point_group = entry_point_group
         self.argparser_details = {}
-        self.ArgumentParserDetails = namedtuple('ArgumentParserDetails', [
-            'subparsers', 'runtimes', 'entry_points'])
+        # BBB compatibility
+        self.ArgumentParserDetails = ArgumentParserDetails
         super(Runtime, self).__init__(*a, **kw)
 
     def log_debug_error(self, *a, **kw):
@@ -425,8 +414,8 @@ class Runtime(BaseRuntime):
         def prepare_argparser():
             if argparser in self.argparser_details:
                 return False
-            result = self.argparser_details[
-                argparser] = self.ArgumentParserDetails({}, {}, {})
+            result = self.argparser_details[argparser] = ArgumentParserDetails(
+                {}, {}, {})
             return result
 
         def to_module_attr(ep):
@@ -477,7 +466,7 @@ class Runtime(BaseRuntime):
                     # to ensure that our thing would have been called.
                     cls = type(runtime)
                     logger.critical(
-                        "Runtime subclass at entry_point '%s' has overide "
+                        "Runtime subclass at entry_point '%s' has override "
                         "'entry_point_load_validated' without filtering out "
                         "its parent classes; this can be addressed by calling "
                         "super(%s.%s, self).entry_point_load_validated("
@@ -526,6 +515,17 @@ class Runtime(BaseRuntime):
 
         commands = argparser.add_subparsers(
             dest=self.action_key, metavar='<command>')
+        # Python 3.7 has required set to True, which is correct in most
+        # cases but this disables the manual handling for cases where a
+        # command was not provided; also this generates a useless error
+        # message that simply states "<command> is required" and forces
+        # the program to exit.  As the goal of this suite of classes is
+        # to act as a helpful CLI front end, force required to be False
+        # to keep our manual handling and management of subcommands.
+        # Setting this as a property for compatibility with Python<3.7,
+        # as only in Python>=3.7 the add_subparsers can accept required
+        # as an argument.
+        commands.required = False
 
         for entry_point in self.iter_entry_points():
             inst = self.entry_point_load_validated(entry_point)
@@ -598,16 +598,75 @@ class Runtime(BaseRuntime):
         details = self.argparser_details.get(argparser)
         if details:
             return details
-        logger.error('provided argparser not registered to this runtime.')
+        logger.error(
+            'provided argparser (prog=%r) not associated with this '
+            'runtime (%r)', argparser.prog, self
+        )
+
+    def unrecognized_arguments_error(self, args, parsed, extras):
+        """
+        This exists because argparser is dumb and naive and doesn't
+        fail unrecognized arguments early.
+        """
+
+        # loop variants
+        kwargs = vars(parsed)
+        failed = list(extras)
+        # initial values
+        runtime, subparser, idx = (self, self.argparser, 0)
+        # recursion not actually needed when it can be flattened.
+        while isinstance(runtime, Runtime):
+            cmd = kwargs.pop(runtime.action_key)
+            # can happen if it wasn't set, or is set but from a default
+            # value (thus not provided by args)
+            action_idx = None if cmd not in args else args.index(cmd)
+            if cmd not in args and cmd is not None:
+                # this normally shouldn't happen, and the test case
+                # showed that the parsing will not flip down to the
+                # forced default subparser - this can remain a debug
+                # message until otherwise.
+                logger.debug(
+                    "command for prog=%r is set to %r without being specified "
+                    "as part of the input arguments - the following error "
+                    "message may contain misleading references",
+                    subparser.prog, cmd
+                )
+            subargs = args[idx:action_idx]
+            subparsed, subextras = subparser.parse_known_args(subargs)
+            if subextras:
+                subparser.unrecognized_arguments_error(subextras)
+                # since the failed arguments are in order
+                failed = failed[len(subextras):]
+                if not failed:
+                    # have taken everything, quit now.
+                    # also note that if cmd was really None it would
+                    # cause KeyError below, but fortunately it also
+                    # forced action_idx to be None which took all
+                    # remaining tokens from failed, so definitely get
+                    # out of here.
+                    break
+
+            # advance the values
+            # note that any internal consistency will almost certainly
+            # result in KeyError being raised.
+            details = runtime.get_argparser_details(subparser)
+            runtime = details.runtimes[cmd]
+            subparser = details.subparsers[cmd]
+            idx = action_idx + 1
+
+        if failed:
+            subparser.unrecognized_arguments_error(failed)
+        sys.exit(2)
 
     def error(self, argparser, target, message):
         """
-        This is needed due to how the argparser may fail at deriving the
-        correct subcommand to include.  Although this BaseRuntime does
-        not implement this functionality, this method is reserved for
-        subclasses to handle that.
+        This was used as part of the original non-recursive lookup for
+        the target parser.
         """
 
+        warnings.warn(
+            'Runtime.error is deprecated and will be removed by calmjs-4.0.0',
+            DeprecationWarning)
         details = self.get_argparser_details(argparser)
         argparser = details.subparsers[target] if details else self.argparser
         argparser.error(message)
@@ -626,7 +685,21 @@ class Runtime(BaseRuntime):
         return NotImplemented
 
 
-class CalmJSRuntime(Runtime):
+class RequiredCommandRuntime(Runtime):
+    """
+    Identical to the Runtime, except for the case when a missing command
+    is encountered, the result is defined to be False.
+    """
+
+    def run(self, argparser=None, **kwargs):
+        result = super(RequiredCommandRuntime, self).run(argparser, **kwargs)
+        if result is NotImplemented:
+            argparser.print_help()
+            return False
+        return result
+
+
+class CalmJSRuntime(RequiredCommandRuntime):
 
     def __init__(self, package_name=CALMJS, *a, **kw):
         """
@@ -870,7 +943,7 @@ class ToolchainRuntime(DriverRuntime):
         return spec
 
 
-class ArtifactRuntime(Runtime):
+class ArtifactRuntime(RequiredCommandRuntime):
     """
     helpers for the management of artifacts
     """
@@ -885,13 +958,6 @@ class ArtifactRuntime(Runtime):
             action_key=action_key,
             *a, **kw
         )
-
-    def run(self, argparser=None, **kwargs):
-        result = super(ArtifactRuntime, self).run(argparser, **kwargs)
-        if result is NotImplemented:
-            argparser.print_help()
-            return False
-        return result
 
 
 class BaseArtifactRegistryRuntime(BaseRuntime):
@@ -1165,15 +1231,9 @@ def main(args=None, runtime_cls=CalmJSRuntime):
     # None to distinguish args from unspecified or specified as [], but
     # ultimately the value must be a list.
     args = norm_args(args)
-    extras = bootstrap(args)
-
-    # Rather than forcing a "print_help" somewhere later to print out
-    # the help, trigger it through an implicit `-h` to avoid certain
-    # differences in how parsing is handled between different versions
-    # of Python and ArgumentParser, as doing it in this hacky way turns
-    # out to be most consistent.
-    if not extras:
-        args = args + ['-h']
+    # Use the bootstrap runtime to set the global runtime attributes
+    # (i.e. for logging and such).
+    bootstrap(args)
 
     # all the minimum arguments acquired, bootstrap the execution.
     with warnings.catch_warnings(record=True) as records:
