@@ -58,6 +58,29 @@ class DeprecatedRuntime(runtime.DriverRuntime):
 deprecated = DeprecatedRuntime(None)
 
 
+class DefaultCommandRuntime(runtime.Runtime):
+
+    def __init__(
+            self, entry_point_group='broken.test', action_key='broken_test',
+            *a, **kw):
+        super(DefaultCommandRuntime, self).__init__(
+            entry_point_group=entry_point_group, action_key=action_key,
+            *a, **kw)
+
+    def init_argparser(self, argparser):
+        argparser.add_argument(
+            '--valid', action='store_true', required=False)
+        return super(DefaultCommandRuntime, self).init_argparser(argparser)
+
+
+dummy = runtime.DriverRuntime(None)
+default_cmd = DefaultCommandRuntime(working_set=mocks.WorkingSet({
+    'broken.test': [
+        'dummy = calmjs.tests.test_runtime:dummy',
+    ],
+}))
+
+
 class BaseRuntimeTestCase(unittest.TestCase):
 
     def tearDown(self):
@@ -1926,39 +1949,26 @@ class ArgumentHandlingTestCase(unittest.TestCase):
         self.assertIn('calmjs artifact build: error', sys.stderr.getvalue())
 
     def test_subparsers_unrecognized_argument_interspersed(self):
-        stub_stdouts(self)
         working_set = mocks.WorkingSet({
             'calmjs.runtime': [
-                'artifact = calmjs.runtime:artifact',
-            ],
-            'calmjs.runtime.artifact': [
-                'build = calmjs.runtime:artifact_build',
+                'broken = calmjs.tests.test_runtime:default_cmd',
             ],
         })
         rt = runtime.Runtime(working_set=working_set, prog='calmjs')
         # An underspecified command should also return False.
         with self.assertRaises(SystemExit):
-            rt(['--1', 'artifact', '--2', 'build', 'package', '--3'])
+            rt(['--1', 'broken', '--2', 'dummy', '--3'])
         # ensure the help for the command itself is printed
         err = sys.stderr.getvalue()
         self.assertIn(
             'calmjs: error: unrecognized arguments: --1', err)
         self.assertIn(
-            'calmjs artifact: error: unrecognized arguments: --2', err)
+            'calmjs broken: error: unrecognized arguments: --2', err)
         self.assertIn(
-            'calmjs artifact build: error: unrecognized arguments: --3', err)
+            'calmjs broken dummy: error: unrecognized arguments: --3', err)
 
     def test_subparsers_unrecognized_argument_skipped(self):
-        stub_stdouts(self)
-        working_set = mocks.WorkingSet({
-            'calmjs.runtime': [
-                'artifact = calmjs.runtime:artifact',
-            ],
-            'calmjs.runtime.artifact': [
-                'build = calmjs.runtime:artifact_build',
-            ],
-        })
-        rt = runtime.Runtime(working_set=working_set, prog='calmjs')
+        rt = runtime.Runtime(prog='calmjs')
         # An underspecified command should also return False.
         with self.assertRaises(SystemExit):
             rt(['--1', 'artifact', 'build', 'package', '--3'])
@@ -1971,16 +1981,7 @@ class ArgumentHandlingTestCase(unittest.TestCase):
             'calmjs artifact build: error: unrecognized arguments: --3', err)
 
     def test_subparsers_first_fail(self):
-        stub_stdouts(self)
-        working_set = mocks.WorkingSet({
-            'calmjs.runtime': [
-                'artifact = calmjs.runtime:artifact',
-            ],
-            'calmjs.runtime.artifact': [
-                'build = calmjs.runtime:artifact_build',
-            ],
-        })
-        rt = runtime.Runtime(working_set=working_set, prog='calmjs')
+        rt = runtime.Runtime(prog='calmjs')
         # An underspecified command should also return False.
         with self.assertRaises(SystemExit):
             rt(['--1', 'artifact', 'build', 'package'])
@@ -1989,6 +1990,44 @@ class ArgumentHandlingTestCase(unittest.TestCase):
         self.assertIn('calmjs: error: unrecognized arguments: --1', err)
         self.assertNotIn('calmjs artifact: error', err)
         self.assertNotIn('calmjs artifact build: error', err)
+
+    def test_subparsers_first_also_missing(self):
+        rt = runtime.Runtime(prog='calmjs')
+        # An underspecified command should also return False.
+        with self.assertRaises(SystemExit):
+            rt(['--1', 'artifact', '-v', '--2'])
+        # ensure the help for the command itself is printed
+        err = sys.stderr.getvalue()
+        self.assertIn('calmjs: error: unrecognized arguments: --1', err)
+        self.assertIn(
+            'calmjs artifact: error: unrecognized arguments: --2', err)
+
+    def test_subparsers_unrecognized_argument_issue(self):
+        working_set = mocks.WorkingSet({
+            'calmjs.runtime': [
+                'broken = calmjs.tests.test_runtime:default_cmd',
+            ],
+        })
+        rt = runtime.Runtime(working_set=working_set, prog='calmjs')
+        # Emulating a "default" choice for a subparser, however it seems
+        # like the default parsing behavior is to do everything on the
+        # root parser until a some bare string is encountered which will
+        # immediately be assigned to the command.  Still going to spit
+        # this warning out, just in case as this is really not a typical
+        # situation.
+        rt.argparser._subparsers._actions[-1].default = 'broken'
+        with self.assertRaises(SystemExit):
+            rt(['-vv', '--2', '--3', '--valid'])
+        # ensure the help for the command itself is printed
+        err = sys.stderr.getvalue()
+        self.assertIn(
+            "DEBUG calmjs.runtime command for prog='calmjs' is set to "
+            "'broken' without being specified as part of the input arguments "
+            "- the following error message may contain misleading references",
+            err
+        )
+        self.assertIn(
+            'calmjs: error: unrecognized arguments: --2 --3 --valid', err)
 
 
 class PackageManagerRuntimeAlternativeIntegrationTestCase(unittest.TestCase):

@@ -617,13 +617,34 @@ class Runtime(BaseRuntime):
         # recursion not actually needed when it can be flattened.
         while isinstance(runtime, Runtime):
             cmd = kwargs.pop(runtime.action_key)
-            action_idx = args.index(cmd)
+            # can happen if it wasn't set, or is set but from a default
+            # value (thus not provided by args)
+            action_idx = None if cmd not in args else args.index(cmd)
+            if cmd not in args and cmd is not None:
+                # this normally shouldn't happen, and the test case
+                # showed that the parsing will not flip down to the
+                # forced default subparser - this can remain a debug
+                # message until otherwise.
+                logger.debug(
+                    "command for prog=%r is set to %r without being specified "
+                    "as part of the input arguments - the following error "
+                    "message may contain misleading references",
+                    subparser.prog, cmd
+                )
             subargs = args[idx:action_idx]
             subparsed, subextras = subparser.parse_known_args(subargs)
             if subextras:
                 subparser.unrecognized_arguments_error(subextras)
                 # since the failed arguments are in order
                 failed = failed[len(subextras):]
+                if not failed:
+                    # have taken everything, quit now.
+                    # also note that if cmd was really None it would
+                    # cause KeyError below, but fortunately it also
+                    # forced action_idx to be None which took all
+                    # remaining tokens from failed, so definitely get
+                    # out of here.
+                    break
 
             # advance the values
             # note that any internal consistency will almost certainly
