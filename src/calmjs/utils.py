@@ -115,13 +115,14 @@ def fork_exec(args, stdin='', **kwargs):
     return (stdout.decode(locale), stderr.decode(locale))
 
 
-def raise_os_error(_errno):
+def raise_os_error(_errno, path=None):
     """
     Helper for raising the correct exception under Python 3 while still
     being able to raise the same common exception class in Python 2.7.
     """
 
-    raise OSError(_errno, strerror(_errno))
+    msg = "%s: '%s'" % (strerror(_errno), path) if path else strerror(_errno)
+    raise OSError(_errno, msg)
 
 
 def which(cmd, mode=os.F_OK | os.X_OK, path=None):

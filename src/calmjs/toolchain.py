@@ -1542,8 +1542,6 @@ class Toolchain(BaseDriver):
             mkdir(build_dir)
             spec[BUILD_DIR] = build_dir
         else:
-            if not exists(spec[BUILD_DIR]):
-                raise_os_error(errno.ENOTDIR)
             check = realpath(spec[BUILD_DIR])
             if check != spec[BUILD_DIR]:
                 spec[BUILD_DIR] = check
@@ -1551,6 +1549,9 @@ class Toolchain(BaseDriver):
                     "realpath of build_dir resolved to '%s', spec is updated",
                     check
                 )
+            if not isdir(check):
+                logger.error("build_dir '%s' is not a directory", check)
+                raise_os_error(errno.ENOTDIR, check)
 
         # Finally, handle setup which may set up the deferred advices,
         # as all the toolchain (and its runtime and/or its parent
