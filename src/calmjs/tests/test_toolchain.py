@@ -1223,7 +1223,7 @@ class ToolchainTestCase(unittest.TestCase):
             with self.assertRaises(NotImplementedError):
                 self.toolchain(spec)
 
-        self.assertIn('realpath of build_dir resolved to', s.getvalue())
+        self.assertIn("realpath of 'build_dir' resolved to", s.getvalue())
         self.assertEqual(spec['build_dir'], real)
 
     def test_toolchain_target_build_dir_inside(self):

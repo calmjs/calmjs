@@ -955,6 +955,32 @@ class Toolchain(BaseDriver):
         self.setup_prefix_suffix()
         self.setup_compile_entries()
 
+    # Helpers
+
+    def realpath(self, spec, key):
+        """
+        Resolve and update the path key in the spec with its realpath,
+        based on the working directory.
+        """
+
+        if key not in spec:
+            # do nothing for now
+            return
+
+        if not spec[key]:
+            logger.warning(
+                "cannot resolve realpath of '%s' as it is not defined", key)
+            return
+
+        check = realpath(join(spec.get(WORKING_DIR, ''), spec[key]))
+        if check != spec[key]:
+            spec[key] = check
+            logger.warning(
+                "realpath of '%s' resolved to '%s', spec is updated",
+                key, check
+            )
+        return check
+
     # Setup related methods
 
     def setup_filename_suffix(self):
@@ -1542,16 +1568,12 @@ class Toolchain(BaseDriver):
             mkdir(build_dir)
             spec[BUILD_DIR] = build_dir
         else:
-            check = realpath(spec[BUILD_DIR])
-            if check != spec[BUILD_DIR]:
-                spec[BUILD_DIR] = check
-                logger.warning(
-                    "realpath of build_dir resolved to '%s', spec is updated",
-                    check
-                )
-            if not isdir(check):
-                logger.error("build_dir '%s' is not a directory", check)
-                raise_os_error(errno.ENOTDIR, check)
+            build_dir = self.realpath(spec, BUILD_DIR)
+            if not isdir(build_dir):
+                logger.error("build_dir '%s' is not a directory", build_dir)
+                raise_os_error(errno.ENOTDIR, build_dir)
+
+        self.realpath(spec, EXPORT_TARGET)
 
         # Finally, handle setup which may set up the deferred advices,
         # as all the toolchain (and its runtime and/or its parent

@@ -365,8 +365,8 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
 
     def setUp(self):
         remember_cwd(self)
-        cwd = mkdtemp(self)
-        os.chdir(cwd)
+        self.cwd = mkdtemp(self)
+        os.chdir(self.cwd)
 
     def test_toolchain_runtime_basic_config(self):
         tc = toolchain.NullToolchain()
@@ -379,6 +379,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         self.assertTrue(isinstance(rt.create_spec(), toolchain.Spec))
 
     def test_standard_run(self):
+        stub_stdouts(self)
         tc = toolchain.NullToolchain()
         rt = runtime.ToolchainRuntime(tc)
 
@@ -483,6 +484,29 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
             "export target location '%s' already exists; it may be overwritten"
             % export_target,
             sys.stderr.getvalue()
+        )
+        self.assertNotIn('CRITICAL', sys.stderr.getvalue())
+        self.assertTrue(isinstance(result, toolchain.Spec))
+        # prove that it did at least run
+        self.assertIn('build_dir', result)
+        self.assertEqual(result['link'], 'linked')
+
+    def test_prompted_execution_with_working_dir_flag(self):
+        stub_check_interactive(self, True)
+        stub_stdouts(self)
+        stub_stdin(self, u'y\n')
+
+        target_dir = mkdtemp(self)
+        export_target = join(target_dir, 'export_file')
+        open(export_target, 'w').close()  # write an empty file
+
+        tc = toolchain.NullToolchain()
+        rt = runtime.ToolchainRuntime(tc)
+        result = rt([
+            '--export-target', 'export_file', '--working-dir', target_dir])
+        self.assertIn(
+            "export target '%s' already exists, overwrite? " % export_target,
+            sys.stdout.getvalue()
         )
         self.assertNotIn('CRITICAL', sys.stderr.getvalue())
         self.assertTrue(isinstance(result, toolchain.Spec))
@@ -632,18 +656,29 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         self.assertIn("spec missing key 'export_target';", stderr)
 
     def test_spec_nodebug(self):
+        stub_stdouts(self)
         tc = toolchain.NullToolchain()
         rt = runtime.ToolchainRuntime(tc)
-        result = rt(['--export-target', 'dummy'])
+        with pretty_logging(logger='calmjs', stream=mocks.StringIO()) as s:
+            result = rt(['--export-target', 'dummy'])
         self.assertEqual(result['debug'], 0)
+        self.assertIn(
+            "'export_target' resolved to '%s'" % join(self.cwd, 'dummy'),
+            s.getvalue())
 
     def test_spec_debugged(self):
         tc = toolchain.NullToolchain()
         rt = runtime.ToolchainRuntime(tc)
-        result = rt(['-dd', '--export-target', 'dummy'])
+        with pretty_logging(logger='calmjs', stream=mocks.StringIO()) as s:
+            result = rt(['-dd', '--export-target', join(self.cwd, 'dummy')])
         self.assertEqual(result['debug'], 2)
+        # also test for the export_target resolution
+        self.assertNotIn(
+            "'export_target' resolved to '%s'" % join(self.cwd, 'dummy'),
+            s.getvalue())
 
     def test_spec_debugged_via_cmdline(self):
+        stub_stdouts(self)
         stub_item_attr_value(
             self, mocks, 'dummy',
             runtime.ToolchainRuntime(toolchain.NullToolchain()),
@@ -654,8 +689,13 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
             ],
         })
         rt = runtime.Runtime(working_set=working_set, prog='calmjs')
-        result = rt(['tool', '--export-target', 'dummy', '-d'])
+        with pretty_logging(logger='calmjs', stream=mocks.StringIO()) as s:
+            result = rt(['tool', '--export-target', 'dummy', '-d'])
         self.assertEqual(result['debug'], 1)
+        # also test for the export_target resolution
+        self.assertIn(
+            "'export_target' resolved to '%s'" % join(self.cwd, 'dummy'),
+            s.getvalue())
 
     def test_spec_optional_advice(self):
         from calmjs.registry import _inst as root_registry
@@ -696,7 +736,8 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         self.assertIn('failure encountered while setting up advices', err)
 
         # Doing it normally should not result in that optional key.
-        result = rt(['--export-target', 'dummy'])
+        with pretty_logging(logger='calmjs', stream=mocks.StringIO()):
+            result = rt(['--export-target', 'dummy'])
         self.assertNotIn('dummy', result)
 
     def test_spec_advise_debugger(self):
@@ -802,7 +843,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         rt = runtime.ToolchainRuntime(tc)
 
         result = rt([
-            '--export-target', 'dummy',
+            '--export-target', join(mkdtemp(self), 'dummy'),
             '--optional-advice', 'example.package',
         ])
 
