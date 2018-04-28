@@ -363,6 +363,11 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
     Test cases for the toolchain runtime.
     """
 
+    def setUp(self):
+        remember_cwd(self)
+        cwd = mkdtemp(self)
+        os.chdir(cwd)
+
     def test_toolchain_runtime_basic_config(self):
         tc = toolchain.NullToolchain()
         rt = runtime.ToolchainRuntime(tc)
