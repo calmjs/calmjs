@@ -504,14 +504,62 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         rt = runtime.ToolchainRuntime(tc)
         result = rt([
             '--export-target', 'export_file', '--working-dir', target_dir])
+        self.assertTrue(isinstance(result, toolchain.Spec))
+
         self.assertIn(
             "export target '%s' already exists, overwrite? " % export_target,
             sys.stdout.getvalue()
         )
-        self.assertNotIn('CRITICAL', sys.stderr.getvalue())
-        self.assertTrue(isinstance(result, toolchain.Spec))
+
+        # also check the logs.
+        err = sys.stderr.getvalue()
+        self.assertNotIn('CRITICAL', err)
+        self.assertIn('WARNING', err)
+        self.assertIn(
+            "WARNING calmjs.toolchain realpath of 'export_target' resolved to",
+            err)
+        self.assertIn(export_target, err)
         # prove that it did at least run
-        self.assertIn('build_dir', result)
+        self.assertEqual(result['export_target'], export_target)
+        self.assertEqual(result['link'], 'linked')
+
+    def test_prompted_execution_without_export_target(self):
+        class ToolchainRuntime(runtime.ToolchainRuntime):
+            def create_spec(self, **kwargs):
+                if not kwargs.get('export_target'):
+                    kwargs['export_target'] = join(
+                        kwargs.get('working_dir') or self.cwd,
+                        'default_location'
+                    )
+                return super(ToolchainRuntime, self).create_spec(**kwargs)
+
+        stub_check_interactive(self, True)
+        stub_stdouts(self)
+        stub_stdin(self, u'y\n')
+
+        target_dir = mkdtemp(self)
+        # write an empty file at expected location
+        export_target = join(target_dir, 'default_location')
+        open(export_target, 'w').close()
+
+        tc = toolchain.NullToolchain()
+        rt = ToolchainRuntime(tc)
+        result = rt(['--working-dir', target_dir])
+        self.assertIn(
+            "export target '%s' already exists, overwrite? " % export_target,
+            sys.stdout.getvalue()
+        )
+        # also check the logs.
+        err = sys.stderr.getvalue()
+        self.assertNotIn('CRITICAL', err)
+        self.assertNotIn('WARNING', err)
+        # since it was joined with a proper working dir.
+        self.assertNotIn(
+            "WARNING calmjs.toolchain realpath of 'export_target' resolved to",
+            err)
+        self.assertNotIn(export_target, err)
+        # prove that it did at least run
+        self.assertEqual(result['export_target'], export_target)
         self.assertEqual(result['link'], 'linked')
 
     def test_prompted_execution_exists_overwrite(self):
