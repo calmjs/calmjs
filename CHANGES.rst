@@ -26,6 +26,13 @@ Changelog
   fixes. [
   `#41 <https://github.com/calmjs/calmjs/issues/41>`_
   ]
+- Fix handling of working directory flag as the validation should be
+  done in the beginning rather than later.  Also clean up various
+  logging/error messages surrounding that, plus a fix to toolchain test
+  case isolation.  Note that downstream packages that did not set up the
+  export target as an absolute part will result in a warning. [
+  `#42 <https://github.com/calmjs/calmjs/issues/42>`_
+  ]
 
 3.0.0 (2018-01-10)
 ------------------

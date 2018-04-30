@@ -159,8 +159,18 @@ class WhichTestCase(unittest.TestCase):
     def test_raise_os_error_not_dir(self):
         e = OSError if sys.version_info < (
             3, 3) else NotADirectoryError  # noqa: F821
-        with self.assertRaises(e):
+        with self.assertRaises(e) as exc:
             raise_os_error(errno.ENOTDIR)
+
+        self.assertIn('Not a directory', str(exc.exception))
+
+    def test_raise_os_error_not_dir_with_path(self):
+        e = OSError if sys.version_info < (
+            3, 3) else NotADirectoryError  # noqa: F821
+        with self.assertRaises(e) as exc:
+            raise_os_error(errno.ENOTDIR, 'some_path')
+
+        self.assertIn("Not a directory: 'some_path'", str(exc.exception))
 
 
 class LoggingTestCase(unittest.TestCase):

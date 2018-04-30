@@ -755,14 +755,14 @@ class ToolchainRuntime(DriverRuntime):
         Arguments
 
         default
-            The default value.
+            The default export target.
         help
             The help text.
         """
 
         argparser.add_argument(
             '-w', '--overwrite', dest=EXPORT_TARGET_OVERWRITE,
-            default=default, action='store_true',
+            action='store_true',
             help='overwrite the export target without any confirmation',
         )
 

@@ -1178,13 +1178,33 @@ class ToolchainTestCase(unittest.TestCase):
         not_exist = join(spec['build_dir'], 'not_exist')
 
         spec['build_dir'] = not_exist
-        with self.assertRaises(OSError):
-            # well, dir does not exist
-            self.toolchain(spec)
+        with pretty_logging(stream=StringIO()) as s:
+            with self.assertRaises(OSError):
+                # well, dir does not exist
+                self.toolchain(spec)
 
         # Manually specified build_dirs do not get modified if they just
         # simply don't exist.
         self.assertEqual(spec['build_dir'], not_exist)
+        self.assertIn(not_exist, s.getvalue())
+        self.assertIn("is not a directory", s.getvalue())
+
+    def test_toolchain_standard_build_dir_set_not_dir(self):
+        spec = Spec()
+        some_file = join(mkdtemp(self), 'some_file')
+
+        with open(some_file, 'w'):
+            pass
+
+        spec['build_dir'] = some_file
+        with pretty_logging(stream=StringIO()) as s:
+            with self.assertRaises(OSError):
+                # well, dir is not a dir.
+                self.toolchain(spec)
+
+        self.assertEqual(spec['build_dir'], some_file)
+        self.assertIn(some_file, s.getvalue())
+        self.assertIn("is not a directory", s.getvalue())
 
     def test_toolchain_standard_build_dir_remapped(self):
         """
@@ -1203,7 +1223,7 @@ class ToolchainTestCase(unittest.TestCase):
             with self.assertRaises(NotImplementedError):
                 self.toolchain(spec)
 
-        self.assertIn('realpath of build_dir resolved to', s.getvalue())
+        self.assertIn("realpath of 'build_dir' resolved to", s.getvalue())
         self.assertEqual(spec['build_dir'], real)
 
     def test_toolchain_target_build_dir_inside(self):
