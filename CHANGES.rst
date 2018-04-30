@@ -1,7 +1,7 @@
 Changelog
 =========
 
-3.1.0 (Unreleased)
+3.1.0 (2018-04-30)
 ------------------
 
 - Fix the modgen function in calmjs.indexer by actually not using the
