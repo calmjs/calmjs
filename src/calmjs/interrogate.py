@@ -7,6 +7,7 @@ from __future__ import absolute_import
 
 import logging
 import re
+import ast
 from functools import partial
 
 from calmjs.parse import asttypes
@@ -28,13 +29,9 @@ def to_identifier(node):
     # if the node is a string, assume it is used as a BracketAccessor
     if isinstance(node, asttypes.String):
         # We are leveraging the similarity of string encoding between
-        # ES5 and Python, but to achieve this is a bit of work.
-        # First, the quotes must be stripped ([1:-1]), then use the
-        # unicode-escape to encode all the things - and then strip off
-        # the doubly escaped backslashes for everything and bring it
-        # back by decoding again with unicode-escape.
-        return node.value[1:-1].encode('unicode-escape').replace(
-            b'\\\\', b'\\').decode('unicode-escape')
+        # ES5 and Python by directly using the Python ast module.  Need
+        # to apply the 'u' prefix for Python 2 compatibility.
+        return ast.parse('u' + node.value).body[0].value.s
     else:
         # assume to be an Identifier
         return node.value
