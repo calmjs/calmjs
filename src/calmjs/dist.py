@@ -24,6 +24,7 @@ from calmjs.base import BaseModuleRegistry
 logger = getLogger(__name__)
 
 # default package definition filename.
+JSON_EXTRAS_REGISTRY_KEY = 'calmjs.extras_keys'
 CALMJS_MODULE_REGISTRY_FIELD = 'calmjs_module_registry'
 CALMJS_MODULE_REGISTRY_TXT = 'calmjs_module_registry.txt'
 DEFAULT_JSON = 'default.json'
@@ -322,133 +323,170 @@ def flatten_egginfo_json(
         dists, filename=filename, dep_keys=dep_keys, working_set=working_set)
 
 
-# Default calmjs core implementation specific functions, to be used by
-# integrators intended to use this as a distribution.
-
-def get_extras_calmjs(pkg_names, working_set=None):
+def build_helpers_egginfo_json(
+        json_field, json_key_registry, json_filename=None):
     """
-    Only extract the extras_calmjs information for the given packages
-    'pkg_names'.
+    Return a tuple of functions that will provide the usage of the
+    JSON egginfo based around the provided field.
     """
 
-    working_set = working_set or default_working_set
-    dep_keys = set(get('calmjs.extras_keys').iter_records())
-    dists = pkg_names_to_dists(pkg_names, working_set=working_set)
-    return flatten_dist_egginfo_json(
-        dists, filename=EXTRAS_CALMJS_JSON,
-        dep_keys=dep_keys, working_set=working_set
+    json_filename = (
+        json_field + '.json' if json_filename is None else json_filename)
+
+    # Default calmjs core implementation specific functions, to be used by
+    # integrators intended to use this as a distribution.
+
+    def get_extras_json(pkg_names, working_set=None):
+        """
+        Only extract the extras_json information for the given packages
+        'pkg_names'.
+        """
+
+        working_set = working_set or default_working_set
+        dep_keys = set(get(json_key_registry).iter_records())
+        dists = pkg_names_to_dists(pkg_names, working_set=working_set)
+        return flatten_dist_egginfo_json(
+            dists, filename=json_filename,
+            dep_keys=dep_keys, working_set=working_set
+        )
+
+    def _flatten_extras_json(pkg_names, find_dists, working_set):
+        # registry key must be explicit here as it was designed for this.
+        dep_keys = set(get(json_key_registry).iter_records())
+        dists = find_dists(pkg_names, working_set=working_set)
+        return flatten_dist_egginfo_json(
+            dists, filename=json_filename,
+            dep_keys=dep_keys, working_set=working_set
+        )
+
+    def flatten_extras_json(pkg_names, working_set=None):
+        """
+        Traverses through the dependency graph of packages 'pkg_names'
+        and flattens all the egg_info json information
+        """
+
+        working_set = working_set or default_working_set
+        return _flatten_extras_json(
+            pkg_names, find_packages_requirements_dists, working_set)
+
+    def flatten_parents_extras_json(pkg_names, working_set=None):
+        """
+        Traverses through the dependency graph of packages 'pkg_names'
+        and flattens all the egg_info json information for parents of
+        the specified packages.
+        """
+
+        working_set = working_set or default_working_set
+        return _flatten_extras_json(
+            pkg_names, find_packages_parents_requirements_dists, working_set)
+
+    write_extras_json = partial(write_json_file, json_field)
+
+    return (
+        get_extras_json,
+        flatten_extras_json,
+        flatten_parents_extras_json,
+        write_extras_json,
     )
 
 
-def _flatten_extras_calmjs(pkg_names, find_dists, working_set):
-    # registry key must be explicit here as it was designed for this.
-    dep_keys = set(get('calmjs.extras_keys').iter_records())
-    dists = find_dists(pkg_names, working_set=working_set)
-    return flatten_dist_egginfo_json(
-        dists, filename=EXTRAS_CALMJS_JSON,
-        dep_keys=dep_keys, working_set=working_set
-    )
+(get_extras_calmjs, flatten_extras_calmjs, flatten_parents_extras_calmjs,
+    write_extras_calmjs) = build_helpers_egginfo_json(
+        EXTRAS_CALMJS_FIELD, JSON_EXTRAS_REGISTRY_KEY)
 
 
-def flatten_extras_calmjs(pkg_names, working_set=None):
+def build_helpers_module_registry_dependencies(registry_name='calmjs.module'):
     """
-    Traverses through the dependency graph of packages 'pkg_names' and
-    flattens all the egg_info calmjs registry information.
+    Return a tuple of funtions that will provide the functions that
+    return the relevant sets of module registry records based on the
+    dependencies defined for the provided packages.
     """
 
-    working_set = working_set or default_working_set
-    return _flatten_extras_calmjs(
-        pkg_names, find_packages_requirements_dists, working_set)
+    def get_module_registry_dependencies(
+            pkg_names, registry_name=registry_name, working_set=None):
+        """
+        Get dependencies for the given package names from module
+        registry identified by registry name.
 
+        For the given packages 'pkg_names' and the registry identified
+        by 'registry_name', resolve the exported location for just the
+        package.
+        """
 
-def flatten_parents_extras_calmjs(pkg_names, working_set=None):
-    """
-    Traverses through the dependency graph of packages 'pkg_names' and
-    flattens all the egg_info calmjs registry information for parents of
-    the specified packages.
-    """
-
-    working_set = working_set or default_working_set
-    return _flatten_extras_calmjs(
-        pkg_names, find_packages_parents_requirements_dists, working_set)
-
-
-write_extras_calmjs = partial(write_json_file, EXTRAS_CALMJS_FIELD)
-
-
-def get_module_registry_dependencies(
-        pkg_names, registry_name='calmjs.module', working_set=None):
-    """
-    Get dependencies for the given package names from module registry
-    identified by registry name.
-
-    For the given packages 'pkg_names' and the registry identified by
-    'registry_name', resolve the exported location for just the package.
-    """
-
-    working_set = working_set or default_working_set
-    registry = get(registry_name)
-    if not isinstance(registry, BaseModuleRegistry):
-        return {}
-    result = {}
-    for pkg_name in pkg_names:
-        result.update(registry.get_records_for_package(pkg_name))
-    return result
-
-
-def _flatten_module_registry_dependencies(
-        pkg_names, registry_name, find_dists, working_set):
-    """
-    Flatten dependencies for the given package names from module
-    registry identified by registry name using the find_dists function
-    on the given working_set.
-
-    For the given packages 'pkg_names' and the registry identified by
-    'registry_name', resolve and flatten all the exported locations.
-    """
-
-    result = {}
-    registry = get(registry_name)
-    if not isinstance(registry, BaseModuleRegistry):
+        working_set = working_set or default_working_set
+        registry = get(registry_name)
+        if not isinstance(registry, BaseModuleRegistry):
+            return {}
+        result = {}
+        for pkg_name in pkg_names:
+            result.update(registry.get_records_for_package(pkg_name))
         return result
 
-    dists = find_dists(pkg_names, working_set=working_set)
-    for dist in dists:
-        result.update(registry.get_records_for_package(dist.project_name))
+    def _flatten_module_registry_dependencies(
+            pkg_names, registry_name, find_dists, working_set):
+        """
+        Flatten dependencies for the given package names from module
+        registry identified by registry name using the find_dists
+        function on the given working_set.
 
-    return result
+        For the given packages 'pkg_names' and the registry identified
+        by 'registry_name', resolve and flatten all the exported
+        locations.
+        """
+
+        result = {}
+        registry = get(registry_name)
+        if not isinstance(registry, BaseModuleRegistry):
+            return result
+
+        dists = find_dists(pkg_names, working_set=working_set)
+        for dist in dists:
+            result.update(registry.get_records_for_package(dist.project_name))
+
+        return result
+
+    def flatten_module_registry_dependencies(
+            pkg_names, registry_name=registry_name, working_set=None):
+        """
+        Flatten dependencies for the specified packages from the module
+        registry identified by registry name.
+
+        For the given packages 'pkg_names' and the registry identified
+        by 'registry_name', resolve and flatten all the exported
+        locations.
+        """
+
+        working_set = working_set or default_working_set
+        return _flatten_module_registry_dependencies(
+            pkg_names, registry_name, find_packages_requirements_dists,
+            working_set)
+
+    def flatten_parents_module_registry_dependencies(
+            pkg_names, registry_name=registry_name, working_set=None):
+        """
+        Flatten dependencies for the parents of the specified packages
+        from the module registry identified by registry name.
+
+        For the given packages 'pkg_names' and the registry identified
+        by 'registry_name', resolve and flatten all the exported
+        locations.
+        """
+
+        working_set = working_set or default_working_set
+        return _flatten_module_registry_dependencies(
+            pkg_names, registry_name, find_packages_parents_requirements_dists,
+            working_set)
+
+    return (
+        get_module_registry_dependencies,
+        flatten_module_registry_dependencies,
+        flatten_parents_module_registry_dependencies,
+    )
 
 
-def flatten_module_registry_dependencies(
-        pkg_names, registry_name='calmjs.module', working_set=None):
-    """
-    Flatten dependencies for the specified packages from the module
-    registry identified by registry name.
-
-    For the given packages 'pkg_names' and the registry identified by
-    'registry_name', resolve and flatten all the exported locations.
-    """
-
-    working_set = working_set or default_working_set
-    return _flatten_module_registry_dependencies(
-        pkg_names, registry_name, find_packages_requirements_dists,
-        working_set)
-
-
-def flatten_parents_module_registry_dependencies(
-        pkg_names, registry_name='calmjs.module', working_set=None):
-    """
-    Flatten dependencies for the parents of the specified packages from
-    the module registry identified by registry name.
-
-    For the given packages 'pkg_names' and the registry identified by
-    'registry_name', resolve and flatten all the exported locations.
-    """
-
-    working_set = working_set or default_working_set
-    return _flatten_module_registry_dependencies(
-        pkg_names, registry_name, find_packages_parents_requirements_dists,
-        working_set)
+(get_module_registry_dependencies, flatten_module_registry_dependencies,
+    flatten_parents_module_registry_dependencies) = (
+        build_helpers_module_registry_dependencies())
 
 
 def _uniq(items):
@@ -456,38 +494,55 @@ def _uniq(items):
     return [i for i in items if not (i in check or check.add(i))]
 
 
-def get_module_registry_names(pkg_names, working_set=None):
-    """
-    Get names of module registries registered for package names.
+def build_helpers_module_registry_name(
+        registry_field, registry_field_txt=None):
 
-    For the given packages 'pkg_names', retrieve the list of module
-    registries explicitly declared for usage.
-    """
+    registry_field_txt = (
+        registry_field + '.txt' if registry_field_txt is None else
+        registry_field_txt
+    )
 
-    ws = working_set or default_working_set
-    result = []
-    for dist in pkg_names_to_dists(pkg_names, working_set=ws):
-        result.extend(read_dist_line_list(dist, CALMJS_MODULE_REGISTRY_TXT))
-    return _uniq(result)
+    def get_module_registry_names(pkg_names, working_set=None):
+        """
+        Get names of module registries registered for package names.
+
+        For the given packages 'pkg_names', retrieve the list of module
+        registries explicitly declared for usage.
+        """
+
+        ws = working_set or default_working_set
+        result = []
+        for dist in pkg_names_to_dists(pkg_names, working_set=ws):
+            result.extend(read_dist_line_list(dist, registry_field_txt))
+        return _uniq(result)
+
+    def flatten_module_registry_names(pkg_names, working_set=None):
+        """
+        Flatten all names of module registries registered for package names.
+
+        For the given packages 'pkg_names' and its dependencies, retrieve
+        the list of module registries explicitly declared for usage.
+        """
+
+        ws = working_set or default_working_set
+        result = []
+        for dist in find_packages_requirements_dists(
+                pkg_names, working_set=ws):
+            result.extend(read_dist_line_list(dist, registry_field_txt))
+        return _uniq(result)
+
+    write_module_registry_names = partial(write_line_list, registry_field)
+
+    return (
+        get_module_registry_names,
+        flatten_module_registry_names,
+        write_module_registry_names,
+    )
 
 
-def flatten_module_registry_names(pkg_names, working_set=None):
-    """
-    Flatten all names of module registries registered for package names.
-
-    For the given packages 'pkg_names' and its dependencies, retrieve
-    the list of module registries explicitly declared for usage.
-    """
-
-    ws = working_set or default_working_set
-    result = []
-    for dist in find_packages_requirements_dists(pkg_names, working_set=ws):
-        result.extend(read_dist_line_list(dist, CALMJS_MODULE_REGISTRY_TXT))
-    return _uniq(result)
-
-
-write_module_registry_names = partial(
-    write_line_list, CALMJS_MODULE_REGISTRY_FIELD)
+(get_module_registry_names, flatten_module_registry_names,
+    write_module_registry_names) = build_helpers_module_registry_name(
+        CALMJS_MODULE_REGISTRY_FIELD)
 
 
 # These depend on the artifact registry that is defined in the artifact
