@@ -1,6 +1,20 @@
 Changelog
 =========
 
+3.2.0 (Unreleased)
+------------------
+
+- Pack related helpers for specific sets of package metadata files into
+  functions that return them.  Naturally existing ones are provided,
+  with the keys/filenames parameterized for reuse by dependants. [
+  `#43 <https://github.com/calmjs/calmjs/issues/43>`_
+  ]
+- Use the ``ast`` module for parsing the es5 String Node value instead
+  of the unicode-escape method as it encompasses more cases, including
+  the line continuation escape sequence which can show up. [
+  `#44 <https://github.com/calmjs/calmjs/issues/44>`_
+  ]
+
 3.1.0 (2018-04-30)
 ------------------
 
