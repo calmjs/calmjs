@@ -1,6 +1,15 @@
 Changelog
 =========
 
+3.2.0 (Unreleased)
+------------------
+
+- Use the ``ast`` module for parsing the es5 String Node value instead
+  of the unicode-escape method as it encompasses more cases, including
+  the line continuation escape sequence which can show up. [
+  `#44 <https://github.com/calmjs/calmjs/issues/44>`_
+  ]
+
 3.1.0 (2018-04-30)
 ------------------
 
