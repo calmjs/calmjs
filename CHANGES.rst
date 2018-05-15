@@ -1,6 +1,15 @@
 Changelog
 =========
 
+3.2.0 (Unreleased)
+------------------
+
+- Pack related helpers for specific sets of package metadata files into
+  functions that return them.  Naturally existing ones are provided,
+  with the keys/filenames parameterized for reuse by dependants. [
+  `#43 <https://github.com/calmjs/calmjs/issues/43>`_
+  ]
+
 3.1.0 (2018-04-30)
 ------------------
 
