@@ -31,7 +31,7 @@ def to_identifier(node):
         # We are leveraging the similarity of string encoding between
         # ES5 and Python by directly using the Python ast module.  Need
         # to apply the 'u' prefix for Python 2 compatibility.
-        return ast.parse('u' + node.value).body[0].value.s
+        return ast.literal_eval('u' + node.value)
     else:
         # assume to be an Identifier
         return node.value
