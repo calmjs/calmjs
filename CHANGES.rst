@@ -1,7 +1,7 @@
 Changelog
 =========
 
-3.2.0 (Unreleased)
+3.2.0 (2018-05-16)
 ------------------
 
 - Pack related helpers for specific sets of package metadata files into
