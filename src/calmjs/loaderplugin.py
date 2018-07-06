@@ -16,6 +16,7 @@ from os.path import join
 from calmjs.npm import locate_package_entry_file
 from calmjs.base import BaseLoaderPluginRegistry
 from calmjs.base import BaseLoaderPluginHandler
+from calmjs.module import ModuleRegistry
 from calmjs.toolchain import WORKING_DIR
 from calmjs.toolchain import CALMJS_LOADERPLUGIN_REGISTRY
 from calmjs.toolchain import spec_update_sourcepath_filter_loaderplugins
@@ -173,3 +174,14 @@ class NPMLoaderPluginHandler(LoaderPluginHandler):
             )
 
         return {}
+
+
+class ModuleLoaderRegistry(ModuleRegistry):
+    """
+    This registry works in tandem with the prefix it is defined for, to
+    ease the declaration of resource files that are also to be exported
+    alongside with the modules declared for export.  For example,
+    declaring an instance of this registry under the calmjs.registry
+    entry point group with the name `calmjs.module.loader` will make
+    this work in tandem with `calmjs.module`.
+    """
