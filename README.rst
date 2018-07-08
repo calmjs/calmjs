@@ -434,6 +434,15 @@ so in the ``setup.py`` file:
         ...
     )
 
+Note that the name of the entry point is not relevant; that entry point
+name is ignored, as the intention of the default module registry is to
+provide a module name that maps directly to the same import namespace
+as the source Python module, but with the ES5 namespace separator
+``/``, instead of the ``.`` character as in Python.  If an explicit
+mapping is required, a new module registry class may be defined that
+uses the provided name as the CommonJS import name from the JavaScript
+code.
+
 The default method will expose the two source files with the following
 names::
 
