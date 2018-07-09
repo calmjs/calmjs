@@ -5,17 +5,24 @@ from os.path import join
 from os import chdir
 from os import makedirs
 from pkg_resources import Distribution
+from pkg_resources import resource_filename
 
+import calmjs.base
+from calmjs.registry import Registry
+from calmjs.registry import get as root_registry_get
+from calmjs.registry import _inst as root_registry
 from calmjs.base import BaseLoaderPluginHandler
 from calmjs.loaderplugin import LoaderPluginRegistry
 from calmjs.loaderplugin import LoaderPluginHandler
 from calmjs.loaderplugin import NPMLoaderPluginHandler
+from calmjs.loaderplugin import ModuleLoaderRegistry
 from calmjs.toolchain import NullToolchain
 from calmjs.toolchain import Spec
 from calmjs.utils import pretty_logging
 
 from calmjs.testing.utils import remember_cwd
 from calmjs.testing.utils import mkdtemp
+from calmjs.testing.utils import stub_mod_working_set
 from calmjs.testing.mocks import StringIO
 from calmjs.testing.mocks import WorkingSet
 
@@ -524,3 +531,87 @@ class NPMPluginTestCase(unittest.TestCase):
             toolchain, spec, 'base!base!base!fun.file',
             '/some/path/fun.file'))
         # a mismatched test
+
+
+class ModuleLoaderRegistryTestCase(unittest.TestCase):
+    """
+    Test the module loader registry with a mocked working set with
+    actual data to see resolution through the system.
+    """
+
+    def test_manual_construction_invalid_suffix_fail(self):
+        with self.assertRaises(ValueError) as e:
+            ModuleLoaderRegistry('some.module', _working_set=WorkingSet({}))
+        self.assertEqual(
+            "module loader registry name defined with invalid suffix "
+            "('some.module' does not end with '.loader')", str(e.exception))
+
+    def test_manual_construction_parent_interactions(self):
+        self.assertTrue(ModuleLoaderRegistry(
+            'calmjs.module.loader', _working_set=WorkingSet({})))
+
+        # forcibly stub out the real calmjs.module
+        self.addCleanup(root_registry.records.pop, 'calmjs.module')
+        root_registry.records['calmjs.module'] = None
+
+        with self.assertRaises(ValueError) as e:
+            ModuleLoaderRegistry(
+                'calmjs.module.loader', _working_set=WorkingSet({}))
+        self.assertEqual(
+            "parent registry 'calmjs.module' of module loader registry "
+            "'calmjs.module.loader' not found", str(e.exception))
+
+    def test_module_loader_registry_integration(self):
+        working_set = WorkingSet({
+            'calmjs.module': [
+                'module4 = calmjs.testing.module4',
+            ],
+            'calmjs.module.loader': [
+                'css = css[style]',
+            ],
+            __name__: [
+                'calmjs.module = calmjs.module:ModuleRegistry',
+                'calmjs.module.loader = '
+                'calmjs.loaderplugin:ModuleLoaderRegistry',
+            ]},
+            dist=Distribution(project_name='calmjs.testing', version='0.0')
+        )
+        stub_mod_working_set(self, [calmjs.base], working_set)
+
+        # Not going to use the global registry, and using our custom
+        # reservation entry
+        local_root_registry = Registry(
+            __name__, 'calmjs.testing', _working_set=working_set)
+
+        with pretty_logging(stream=StringIO()):
+            # silences "distribution 'calmjs.testing 0.0' not found"
+            # warnings from stdout produced by the indexer, as the
+            # provided working_set is invalid with entry points that do
+            # not have a valid distribution.
+            module_registry = root_registry_get('calmjs.module')
+            module_loader_registry = root_registry_get('calmjs.module.loader')
+            registry = local_root_registry.get_record('calmjs.module')
+            loader_registry = local_root_registry.get_record(
+                'calmjs.module.loader')
+
+        self.assertIsNot(registry, module_registry)
+        self.assertIsNot(loader_registry, module_loader_registry)
+        self.assertEqual(
+            sorted(k for k, v in registry.iter_records()), [
+                'calmjs.testing.module4',
+            ]
+        )
+
+        # test the basic items.
+        results = registry.get_records_for_package('calmjs.testing')
+        self.assertEqual(sorted(results.keys()), [
+           'calmjs/testing/module4/widget',
+        ])
+
+        module4 = registry.get_record('calmjs.testing.module4')
+        self.assertIn('calmjs/testing/module4/widget', module4)
+
+        self.assertEqual({
+            'css!calmjs/testing/module4/widget.style': resource_filename(
+                'calmjs.testing', join('module4', 'widget.style')),
+        }, loader_registry.get_records_for_package('calmjs.testing'))

@@ -13,10 +13,12 @@ import logging
 from os.path import exists
 from os.path import join
 
+from calmjs import base as calmjs_base
 from calmjs.npm import locate_package_entry_file
 from calmjs.base import BaseLoaderPluginRegistry
 from calmjs.base import BaseLoaderPluginHandler
 from calmjs.module import ModuleRegistry
+from calmjs.registry import get
 from calmjs.toolchain import WORKING_DIR
 from calmjs.toolchain import CALMJS_LOADERPLUGIN_REGISTRY
 from calmjs.toolchain import spec_update_sourcepath_filter_loaderplugins
@@ -186,3 +188,51 @@ class ModuleLoaderRegistry(ModuleRegistry):
     entry point group with the name `calmjs.module.loader` will make
     this work in tandem with `calmjs.module`.
     """
+
+    def __init__(self, registry_name, *a, **kw):
+        if not registry_name.endswith(MODULE_LOADER_SUFFIX):
+            raise ValueError(
+                "module loader registry name defined with invalid suffix "
+                "('%s' does not end with '%s')" % (
+                    registry_name, MODULE_LOADER_SUFFIX
+                ))
+
+        _parent = kw.pop('_parent', NotImplemented)
+        if _parent is NotImplemented:
+            parent_name = registry_name[:-len(MODULE_LOADER_SUFFIX)]
+            self.parent = get(parent_name)
+        else:
+            self.parent = _parent
+
+        if not self.parent:
+            raise ValueError(
+                "parent registry '%s' of module loader registry '%s' "
+                "not found" % (parent_name, registry_name)
+            )
+        super(ModuleLoaderRegistry, self).__init__(registry_name, *a, **kw)
+
+    def register_entry_point(self, entry_point):
+        # use the module names registered on the parent registry, but
+        # apply the entry points defined for this registry name.
+        module_names = self.parent.package_module_map[
+            entry_point.dist.project_name]
+        for module_name in module_names:
+            module = calmjs_base._import_module(module_name)
+            self._register_entry_point_module(entry_point, module)
+
+    def _map_entry_point_module(self, entry_point, module):
+        mapping = {}
+        result = {module.__name__: mapping}
+        for extra in entry_point.extras:
+            # since extras cannot contain leading '.', the full filename
+            # extension must be built.
+            fext = '.' + extra
+            mapping.update({
+                # reapply the filename extension, assuming the parent
+                # mapper function strip that out for the ES5 name, as
+                # loaders generally need the full path.
+                '%s!%s%s' % (entry_point.name, k, fext): v
+                for k, v in self.parent.mapper(
+                    module, entry_point, fext=fext).items()
+            })
+        return result

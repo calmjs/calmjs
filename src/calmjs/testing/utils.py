@@ -371,6 +371,7 @@ def generate_integration_environment(
         loader_registry = ModuleLoaderRegistry(
             registry_id + MODULE_LOADER_SUFFIX,
             _working_set=mock_working_set,
+            _parent=registry,
         )
         test_registry = ModuleRegistry(
             registry_id + tests_suffix,
