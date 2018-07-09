@@ -90,6 +90,11 @@ def modgen(
     module
         The Python module to start fetching from.
 
+    entry_point
+        This is the original entry point that has a distribution
+        reference such that the resource_filename API call may be used
+        to locate the actual resources.
+
     Optional Arguments:
 
     modpath
@@ -262,7 +267,7 @@ def mapper(module, entry_point,
 
 
 @register('mapper')
-def mapper_es6(module, entry_point):
+def mapper_es6(module, entry_point, globber='root', fext=JS_EXT):
     """
     Default mapper
 
@@ -272,11 +277,11 @@ def mapper_es6(module, entry_point):
 
     return mapper(
         module, entry_point=entry_point, modpath='pkg_resources',
-        globber='root', modname='es6')
+        globber=globber, modname='es6', fext=fext)
 
 
 @register('mapper')
-def mapper_python(module, entry_point):
+def mapper_python(module, entry_point, globber='root', fext=JS_EXT):
     """
     Default mapper using python style globber
 
@@ -286,4 +291,4 @@ def mapper_python(module, entry_point):
 
     return mapper(
         module, entry_point=entry_point, modpath='pkg_resources',
-        globber='root', modname='python')
+        globber=globber, modname='python', fext=fext)

@@ -1,6 +1,20 @@
 Changelog
 =========
 
+3.3.0 (Unreleased)
+------------------
+
+- Implement the features required to simplify the process of exposing
+  auxiliary resource files provided by Python packages to the Node.js
+  build tools. [
+  `#46 <https://github.com/calmjs/calmjs/issues/46>`_
+  ]
+
+  - This also necessitated exposing the mapper of the parent registry
+    in a way that is reusable for other filename extensions, so that
+    the default mapper will also accept the globber and the filename
+    extension arguments.
+
 3.2.1 (2018-05-16)
 ------------------
 
