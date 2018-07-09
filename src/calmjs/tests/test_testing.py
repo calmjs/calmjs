@@ -364,8 +364,17 @@ class IntegrationGeneratorTestCase(unittest.TestCase):
         utils.tempfile = self.old_tempfile
 
     def test_integration_generator(self):
+        from calmjs import base
+
         tmpdir = mkdtemp(self)
+        # acquire some module from the internal API for subsequent
+        # validation of proper cleanup.
+        module = base._import_module('calmjs')
         results = utils.generate_integration_environment(working_dir=tmpdir)
+
+        # ensure the original method is done.
+        self.assertIs(base._import_module('calmjs'), module)
+
         working_set, registry, loader_registry, test_registry = results
         # validate the underlying information
         self.assertEqual(sorted(registry.records.keys()), [

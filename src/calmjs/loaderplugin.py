@@ -22,6 +22,7 @@ from calmjs.toolchain import CALMJS_LOADERPLUGIN_REGISTRY
 from calmjs.toolchain import spec_update_sourcepath_filter_loaderplugins
 
 logger = logging.getLogger(__name__)
+MODULE_LOADER_SUFFIX = '.loader'
 
 
 class LoaderPluginRegistry(BaseLoaderPluginRegistry):

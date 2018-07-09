@@ -41,6 +41,10 @@ logger = getLogger(__name__)
 _marker = object()
 
 
+def _import_module(module_name):
+    return __import__(module_name, fromlist=['__name__'], level=0)
+
+
 def _check_isdir_assign_key(d, key, value, error_msg=None):
     if isdir(value):
         d[key] = value
@@ -262,9 +266,7 @@ class BaseModuleRegistry(BasePkgRefRegistry):
         import.
         """
 
-        module = __import__(
-            entry_point.module_name, fromlist=['__name__'], level=0)
-
+        module = _import_module(entry_point.module_name)
         self._register_entry_point_module(entry_point, module)
 
     def _register_entry_point_module(self, entry_point, module):
