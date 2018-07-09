@@ -401,10 +401,14 @@ class IntegrationGeneratorTestCase(unittest.TestCase):
         self.assertTrue(exists(service_records['service/rpc/lib']))
         self.assertTrue(service_records['service/rpc/lib'].endswith(
             join('service', 'rpc', 'lib.js')))
-        self.assertTrue(service_records['service/rpc/lib'].startswith(tmpdir))
+        self.assertTrue(
+            normcase(service_records['service/rpc/lib']).startswith(
+                normcase(tmpdir)))
         self.assertTrue(service_records['service/endpoint'].endswith(
             join('service', 'endpoint.js')))
-        self.assertTrue(service_records['service/endpoint'].startswith(tmpdir))
+        self.assertTrue(
+            normcase(service_records['service/endpoint']).startswith(
+                normcase(tmpdir)))
 
         # Test out the working set
         framework_dist = working_set.find(Requirement.parse('framework'))
