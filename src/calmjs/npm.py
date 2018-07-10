@@ -68,17 +68,21 @@ def locate_package_entry_file(working_dir, package_name):
     with open(package_json) as fd:
         package_info = json.load(fd)
 
-    if not ('browser' in package_info or 'main' in package_info):
-        logger.debug(
-            "package.json for the npm package '%s' does not contain a main "
-            "entry point", package_name,
+    if ('browser' in package_info or 'main' in package_info):
+        # assume the target file exists because configuration files
+        # never lie /s
+        return join(
+            basedir,
+            *(package_info.get('browser') or package_info['main']).split('/')
         )
-        return
 
-    # assume the target file exists...
-    return join(
-        basedir,
-        *(package_info.get('browser') or package_info['main']).split('/')
+    index_js = join(basedir, 'index.js')
+    if exists(index_js):
+        return index_js
+
+    logger.debug(
+        "package.json for the npm package '%s' does not contain a main "
+        "entry point", package_name,
     )
 
 

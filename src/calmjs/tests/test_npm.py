@@ -99,6 +99,24 @@ class LocatePackageTestCase(unittest.TestCase):
             )
         self.assertEqual("", stream.getvalue())
 
+    def test_plugin_package_success_implied_index_js(self):
+        working_dir = mkdtemp(self)
+        pkg_name = 'demo'
+        pkg_dir = join(working_dir, 'node_modules', pkg_name)
+        makedirs(pkg_dir)
+        with open(join(pkg_dir, 'package.json'), 'w') as fd:
+            fd.write('{}')
+
+        with open(join(pkg_dir, 'index.js'), 'w') as fd:
+            fd.write('(function () { return {} })();')
+
+        with pretty_logging(stream=StringIO(), level=DEBUG) as stream:
+            self.assertEqual(
+                join(pkg_dir, 'index.js'),
+                npm.locate_package_entry_file(working_dir, pkg_name),
+            )
+        self.assertEqual("", stream.getvalue())
+
 
 class NpmTestCase(unittest.TestCase):
 
