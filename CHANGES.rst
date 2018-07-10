@@ -8,8 +8,11 @@ Changelog
   auxiliary resource files provided by Python packages to the Node.js
   build tools. [
   `#46 <https://github.com/calmjs/calmjs/issues/46>`_
+  `#48 <https://github.com/calmjs/calmjs/issues/48>`_
   ]
 
+  - Provide a loader module registry with a restrictive naming scheme
+    that directly references a single parent module registry.
   - This also necessitated exposing the mapper of the parent registry
     in a way that is reusable for other filename extensions, so that
     the default mapper will also accept the globber and the filename
