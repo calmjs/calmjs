@@ -364,9 +364,18 @@ class IntegrationGeneratorTestCase(unittest.TestCase):
         utils.tempfile = self.old_tempfile
 
     def test_integration_generator(self):
+        from calmjs import base
+
         tmpdir = mkdtemp(self)
+        # acquire some module from the internal API for subsequent
+        # validation of proper cleanup.
+        module = base._import_module('calmjs')
         results = utils.generate_integration_environment(working_dir=tmpdir)
-        working_set, registry, test_registry = results
+
+        # ensure the original method is done.
+        self.assertIs(base._import_module('calmjs'), module)
+
+        working_set, registry, loader_registry, test_registry = results
         # validate the underlying information
         self.assertEqual(sorted(registry.records.keys()), [
             'forms', 'framework', 'service', 'service.rpc', 'widget',
@@ -377,6 +386,8 @@ class IntegrationGeneratorTestCase(unittest.TestCase):
         self.assertEqual(sorted(registry.package_module_map['service']), [
             'service', 'service.rpc',
         ])
+
+        # TODO do some assertion on loader_registry
 
         # test registry will be empty until there is a standardized way
         # of doing testing in JavaScript, since the tests supplied may
@@ -390,10 +401,14 @@ class IntegrationGeneratorTestCase(unittest.TestCase):
         self.assertTrue(exists(service_records['service/rpc/lib']))
         self.assertTrue(service_records['service/rpc/lib'].endswith(
             join('service', 'rpc', 'lib.js')))
-        self.assertTrue(service_records['service/rpc/lib'].startswith(tmpdir))
+        self.assertTrue(
+            normcase(service_records['service/rpc/lib']).startswith(
+                normcase(tmpdir)))
         self.assertTrue(service_records['service/endpoint'].endswith(
             join('service', 'endpoint.js')))
-        self.assertTrue(service_records['service/endpoint'].startswith(tmpdir))
+        self.assertTrue(
+            normcase(service_records['service/endpoint']).startswith(
+                normcase(tmpdir)))
 
         # Test out the working set
         framework_dist = working_set.find(Requirement.parse('framework'))

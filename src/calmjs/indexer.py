@@ -45,6 +45,41 @@ def resource_filename_mod_dist(module_name, dist):
         return pkg_resources.resource_filename(module_name, '')
 
 
+# An attempt was made to use the provided distribution argument directly
+# implemented as following:
+#
+# def resource_filename_mod_dist(module_name, dist):
+#     """
+#     Given a module name and a distribution, with the assumption that the
+#     distribution is part of the default working set, resolve the actual
+#     path to the module.
+#     """
+#
+#     return dist.get_resource_filename(
+#         pkg_resources.working_set, join(*module_name.split('.')))
+#
+
+# However, we cannot necessary access the underlying resource manager as
+# that is "hidden" as an implementation detail, and that this duplicates
+# code provided by that class.  Also due to the inconsistency with how
+# values are handled, namely that the provided manager is generally
+# irrelvant unless the provided distribution belongs to/references a
+# zipped-egg, which IProvider.get_resource_filename implementation will
+# actually make use of the manager to acquire relevant information.
+#
+# That said, just for clarity (and not waste some hours that was spent
+# investigating whether we can bypass certain things to save some time
+# on other test setup), it was discovered that the resolution of the
+# path is done during the construction of the working_set, such that it
+# ultimately will result in a path if the dist.as_requirement is not
+# called and that the get_resource_filename is invoked directly.  The
+# points of interests in the pkg_resources module:
+# - find_on_path (resolves below via dist_factory)
+# - distributions_from_metadata (which uses PathMetadata)
+# The relevant path for the Distribution is ultimately found in
+# `Distribution._provider.module_path`.
+
+
 def resource_filename_mod_entry_point(module_name, entry_point):
     """
     If a given package declares a namespace and also provide submodules
@@ -89,6 +124,11 @@ def modgen(
 
     module
         The Python module to start fetching from.
+
+    entry_point
+        This is the original entry point that has a distribution
+        reference such that the resource_filename API call may be used
+        to locate the actual resources.
 
     Optional Arguments:
 
@@ -262,7 +302,7 @@ def mapper(module, entry_point,
 
 
 @register('mapper')
-def mapper_es6(module, entry_point):
+def mapper_es6(module, entry_point, globber='root', fext=JS_EXT):
     """
     Default mapper
 
@@ -272,11 +312,11 @@ def mapper_es6(module, entry_point):
 
     return mapper(
         module, entry_point=entry_point, modpath='pkg_resources',
-        globber='root', modname='es6')
+        globber=globber, modname='es6', fext=fext)
 
 
 @register('mapper')
-def mapper_python(module, entry_point):
+def mapper_python(module, entry_point, globber='root', fext=JS_EXT):
     """
     Default mapper using python style globber
 
@@ -286,4 +326,4 @@ def mapper_python(module, entry_point):
 
     return mapper(
         module, entry_point=entry_point, modpath='pkg_resources',
-        globber='root', modname='python')
+        globber=globber, modname='python', fext=fext)

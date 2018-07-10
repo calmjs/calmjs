@@ -16,9 +16,11 @@ from types import ModuleType
 from unittest import TestCase
 from unittest import SkipTest
 
+import pkg_resources
 from pkg_resources import PathMetadata
 from pkg_resources import Distribution
 from pkg_resources import WorkingSet
+from pkg_resources import working_set as root_working_set
 
 # Do not invoke/import the root calmjs namespace here.  If modules from
 # there are needed, the import must be done from within the scope that
@@ -27,6 +29,7 @@ from . import module3
 from .mocks import StringIO
 
 TMPDIR_ID = '_calmjs_testing_tmpdir'
+tests_suffix = '.tests'
 
 
 def rmtree(path):
@@ -109,6 +112,8 @@ def generate_integration_environment(
     """
 
     from calmjs.module import ModuleRegistry
+    from calmjs.loaderplugin import ModuleLoaderRegistry
+    from calmjs.loaderplugin import MODULE_LOADER_SUFFIX
     from calmjs.dist import EXTRAS_CALMJS_JSON
 
     def make_entry_points(registry_id, *raw):
@@ -167,10 +172,16 @@ def generate_integration_environment(
                 'jquery': 'jquery/dist/jquery.min.js',
             },
         })),
-        ('entry_points.txt', make_entry_points(
-            registry_id,
-            'widget = widget',
-        )),
+        ('entry_points.txt', '\n'.join([
+            make_entry_points(
+                registry_id,
+                'widget = widget',
+            ),
+            make_entry_points(
+                registry_id + MODULE_LOADER_SUFFIX,
+                'css = css[css]',
+            )
+        ])),
     ), 'widget', '1.1', working_dir=working_dir)
 
     make_dummy_dist(None, (
@@ -281,6 +292,25 @@ def generate_integration_environment(
         '''),
     )
 
+    extras_sources = [
+        'jquery/dist/jquery.js',
+        'jquery/dist/jquery.min.js',
+        'underscore/underscore.js',
+        'underscore/underscore-min.js',
+    ]
+
+    # Generate the extras, too
+    for source in extras_sources:
+        fn = source.split('/')
+        target = join(working_dir, extras_calmjs_key, *fn)
+        base = dirname(target)
+        if not isdir(base):
+            makedirs(base)
+        with open(target, 'w') as fd:
+            # return a module that returns the name of the file.
+            fd.write("define([], function () { return '%s'; });" % source)
+
+    # These attributes are directly
     records = {}
     package_module_map = {}
 
@@ -307,37 +337,52 @@ def generate_integration_environment(
         with open(target, 'w') as fd:
             fd.write(textwrap.dedent(content).lstrip())
 
-    extras_sources = [
-        'jquery/dist/jquery.js',
-        'jquery/dist/jquery.min.js',
-        'underscore/underscore.js',
-        'underscore/underscore-min.js',
-    ]
-
-    # Generate the extras, too
-    for source in extras_sources:
-        fn = source.split('/')
-        target = join(working_dir, extras_calmjs_key, *fn)
-        base = dirname(target)
-        if not isdir(base):
-            makedirs(base)
-        with open(target, 'w') as fd:
-            # return a module that returns the name of the file.
-            fd.write("define([], function () { return '%s'; });" % source)
-
     makedirs(join(working_dir, '_bad_dir_'))
     with open(join(working_dir, '_bad_dir_', 'unsupported'), 'w') as fd:
         pass
 
-    # Now create and assign the registry with our things
-    registry = ModuleRegistry(registry_id)
-    registry.records = records
-    registry.package_module_map = package_module_map
+    # In order for the registries to become instantiated with all the
+    # intended data through the system, the "modules" defined above will
+    # need to be available in the Python import system with the paths
+    # set correctly.  Fortunately, the actual import is done through a
+    # function provided by the calmjs.base module, such that the root
+    # Python module/import system do not need to be polluted.  That
+    # said, this function must not effect any other permanent changes to
+    # the runtime environment.
 
-    test_registry = ModuleRegistry(registry_id + '.tests')
+    from types import ModuleType
+    from calmjs import base as calmjs_base
 
-    # Return dummy working set (for dist resolution) and the registry
-    return mock_working_set, registry, test_registry
+    def _import_module(module_name):
+        # pretend all modules are real by providing stubs without going
+        # through imports/sys.modules
+        module = ModuleType(module_name)
+        module._fake = True
+        return module
+
+    try:
+        (original_import_module, calmjs_base._import_module) = (
+            calmjs_base._import_module, _import_module)
+        pkg_resources.working_set = mock_working_set
+        registry = ModuleRegistry(
+            registry_id,
+            _working_set=mock_working_set
+        )
+        loader_registry = ModuleLoaderRegistry(
+            registry_id + MODULE_LOADER_SUFFIX,
+            _working_set=mock_working_set,
+            _parent=registry,
+        )
+        test_registry = ModuleRegistry(
+            registry_id + tests_suffix,
+            _working_set=mock_working_set,
+        )
+    finally:
+        pkg_resources.working_set = root_working_set
+        calmjs_base._import_module = original_import_module
+
+    # Return dummy working set (for dist resolution) and the registries
+    return mock_working_set, registry, loader_registry, test_registry
 
 
 def setup_class_integration_environment(cls, **kw):
@@ -346,12 +391,14 @@ def setup_class_integration_environment(cls, **kw):
     from calmjs.registry import _inst as root_registry
     cls.dist_dir = mkdtemp_realpath()
     results = generate_integration_environment(cls.dist_dir, **kw)
-    working_set, registry, test_registry = results
+    working_set, registry, loader_registry, test_registry = results
     cls.registry_name = registry.registry_name
     cls.test_registry_name = test_registry.registry_name
+    cls.loader_registry_name = loader_registry.registry_name
     # reset that to force creation from stubbed working_set
     root_registry.records.pop('calmjs.extras_keys', None)
     root_registry.records[cls.registry_name] = registry
+    root_registry.records[cls.loader_registry_name] = loader_registry
     root_registry.records[cls.test_registry_name] = test_registry
     cls.root_working_set, calmjs_dist.default_working_set = (
         calmjs_dist.default_working_set, working_set)
@@ -365,6 +412,7 @@ def teardown_class_integration_environment(cls):
     rmtree(cls.dist_dir)
     # reset the manually added registries.
     root_registry.records.pop(cls.registry_name)
+    root_registry.records.pop(cls.loader_registry_name)
     root_registry.records.pop(cls.test_registry_name)
     root_registry.records.pop('calmjs.extras_keys', None)
     calmjs_dist.default_working_set = cls.root_working_set
