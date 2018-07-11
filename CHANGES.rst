@@ -18,6 +18,12 @@ Changelog
     the default mapper will also accept the globber and the filename
     extension arguments.
 
+- For Node.js packages that didn't have a ``main`` or ``browser``
+  section defined in their ``package.json``, make use of the default
+  entry file ``index.js`` if it exists.  [
+  `#49 <https://github.com/calmjs/calmjs/issues/49>`_
+  ]
+
 3.2.1 (2018-05-16)
 ------------------
 
