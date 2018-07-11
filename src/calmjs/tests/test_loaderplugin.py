@@ -5,7 +5,9 @@ from os.path import join
 from os import chdir
 from os import makedirs
 from pkg_resources import Distribution
+from pkg_resources import Requirement
 from pkg_resources import resource_filename
+from pkg_resources import working_set as root_working_set
 
 import calmjs.base
 from calmjs.registry import Registry
@@ -16,6 +18,7 @@ from calmjs.loaderplugin import LoaderPluginRegistry
 from calmjs.loaderplugin import LoaderPluginHandler
 from calmjs.loaderplugin import NPMLoaderPluginHandler
 from calmjs.loaderplugin import ModuleLoaderRegistry
+from calmjs.module import ModuleRegistry
 from calmjs.toolchain import NullToolchain
 from calmjs.toolchain import Spec
 from calmjs.utils import pretty_logging
@@ -615,3 +618,28 @@ class ModuleLoaderRegistryTestCase(unittest.TestCase):
             'css!calmjs/testing/module4/widget.style': resource_filename(
                 'calmjs.testing', join('module4', 'widget.style')),
         }, loader_registry.get_records_for_package('calmjs.testing'))
+
+    def test_module_loader_registry_multiple_loaders(self):
+        working_set = WorkingSet({
+            'calmjs.module': [
+                'module4 = calmjs.testing.module4',
+            ],
+            'calmjs.module.loader': [
+                'css = css[style]',
+                'json = json[json]',
+            ],
+            __name__: [
+                'calmjs.module = calmjs.module:ModuleRegistry',
+                'calmjs.module.loader = '
+                'calmjs.loaderplugin:ModuleLoaderRegistry',
+            ]},
+            # use a real distribution instead for this case
+            dist=root_working_set.find(Requirement.parse('calmjs')),
+        )
+
+        registry = ModuleRegistry('calmjs.module', _working_set=working_set)
+        loader_registry = ModuleLoaderRegistry(
+            'calmjs.module.loader', _working_set=working_set, _parent=registry)
+        self.assertEqual({
+            'calmjs': ['calmjs.testing.module4'],
+        }, loader_registry.package_module_map)

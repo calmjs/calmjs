@@ -220,6 +220,17 @@ class ModuleLoaderRegistry(ModuleRegistry):
             module = calmjs_base._import_module(module_name)
             self._register_entry_point_module(entry_point, module)
 
+    def store_records_for_package(self, entry_point, records):
+        """
+        Given that records are based on the parent, and the same entry
+        point(s) will reference those same records multiple times, the
+        actual stored records must be limited.
+        """
+
+        pkg_module_records = self._dist_to_package_module_map(entry_point)
+        pkg_module_records.extend(
+            [rec for rec in records if rec not in pkg_module_records])
+
     def _map_entry_point_module(self, entry_point, module):
         mapping = {}
         result = {module.__name__: mapping}
