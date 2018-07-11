@@ -14,6 +14,7 @@ from os.path import exists
 from os.path import join
 
 from calmjs import base as calmjs_base
+from calmjs.base import PackageKeyMapping
 from calmjs.npm import locate_package_entry_file
 from calmjs.base import BaseLoaderPluginRegistry
 from calmjs.base import BaseLoaderPluginHandler
@@ -209,6 +210,9 @@ class ModuleLoaderRegistry(ModuleRegistry):
                 "parent registry '%s' of module loader registry '%s' "
                 "not found" % (parent_name, registry_name)
             )
+        # have to make this available as the construction through the
+        # parent __init__ will make use of the following also.
+        self.package_loader_map = PackageKeyMapping()
         super(ModuleLoaderRegistry, self).__init__(registry_name, *a, **kw)
 
     def register_entry_point(self, entry_point):
@@ -227,9 +231,19 @@ class ModuleLoaderRegistry(ModuleRegistry):
         actual stored records must be limited.
         """
 
-        pkg_module_records = self._dist_to_package_module_map(entry_point)
-        pkg_module_records.extend(
-            [rec for rec in records if rec not in pkg_module_records])
+        pkg_records_entry = self._dist_to_package_module_map(entry_point)
+        pkg_records_entry.extend(
+            rec for rec in records if rec not in pkg_records_entry)
+        # TODO figure out a more efficient way to do this with a bit
+        # more reuse.
+        if entry_point.dist is not None:
+            if entry_point.dist.project_name not in self.package_loader_map:
+                self.package_loader_map[entry_point.dist.project_name] = []
+            self.package_loader_map[entry_point.dist.project_name].append(
+                entry_point.name)
+
+    def get_loaders_for_package(self, package_name):
+        return self.package_loader_map.get(package_name, [])
 
     def _map_entry_point_module(self, entry_point, module):
         mapping = {}

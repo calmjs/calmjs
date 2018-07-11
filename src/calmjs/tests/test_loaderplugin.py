@@ -619,14 +619,20 @@ class ModuleLoaderRegistryTestCase(unittest.TestCase):
                 'calmjs.testing', join('module4', 'widget.style')),
         }, loader_registry.get_records_for_package('calmjs.testing'))
 
+        self.assertEqual(
+            ['css'],
+            loader_registry.get_loaders_for_package('calmjs.testing')
+        )
+
     def test_module_loader_registry_multiple_loaders(self):
         working_set = WorkingSet({
             'calmjs.module': [
                 'module4 = calmjs.testing.module4',
             ],
             'calmjs.module.loader': [
-                'css = css[style]',
+                'css = css[style,css]',
                 'json = json[json]',
+                'empty = empty[]',
             ],
             __name__: [
                 'calmjs.module = calmjs.module:ModuleRegistry',
@@ -643,3 +649,20 @@ class ModuleLoaderRegistryTestCase(unittest.TestCase):
         self.assertEqual({
             'calmjs': ['calmjs.testing.module4'],
         }, loader_registry.package_module_map)
+
+        self.assertEqual(
+            ['css', 'empty', 'json'],
+            sorted(loader_registry.get_loaders_for_package('calmjs'))
+        )
+
+        self.assertEqual([
+            'css!calmjs/testing/module4/other.css',
+            'css!calmjs/testing/module4/widget.style',
+            'json!calmjs/testing/module4/data.json',
+        ], sorted(loader_registry.get_records_for_package('calmjs').keys()))
+
+        # was not registered to calmjs.testing
+        self.assertEqual([], loader_registry.get_loaders_for_package(
+            'calmjs.testing'))
+        self.assertEqual({}, loader_registry.get_records_for_package(
+            'calmjs.testing'))
