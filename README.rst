@@ -600,6 +600,9 @@ registry itself requires manual integration); please consult the
 documentation for the specific integration package with regards to this
 specific registry type.
 
+One final note: due to the limitations of the Python entry point system,
+file name extensions are assumed to be all lower-case.
+
 Integration with |npm| through ``calmjs npm``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
