@@ -191,16 +191,9 @@ class ModuleLoaderRegistry(ModuleRegistry):
     """
 
     def __init__(self, registry_name, *a, **kw):
-        if not registry_name.endswith(MODULE_LOADER_SUFFIX):
-            raise ValueError(
-                "module loader registry name defined with invalid suffix "
-                "('%s' does not end with '%s')" % (
-                    registry_name, MODULE_LOADER_SUFFIX
-                ))
-
+        parent_name = self.get_parent_registry_name(registry_name)
         _parent = kw.pop('_parent', NotImplemented)
         if _parent is NotImplemented:
-            parent_name = registry_name[:-len(MODULE_LOADER_SUFFIX)]
             self.parent = get(parent_name)
         else:
             self.parent = _parent
@@ -214,6 +207,14 @@ class ModuleLoaderRegistry(ModuleRegistry):
         # parent __init__ will make use of the following also.
         self.package_loader_map = PackageKeyMapping()
         super(ModuleLoaderRegistry, self).__init__(registry_name, *a, **kw)
+
+    def get_parent_registry_name(
+            self, registry_name, suffix=MODULE_LOADER_SUFFIX):
+        if not registry_name.endswith(suffix):
+            raise ValueError(
+                "module loader registry name defined with invalid suffix "
+                "('%s' does not end with '%s')" % (registry_name, suffix))
+        return registry_name[:-len(suffix)]
 
     def register_entry_point(self, entry_point):
         # use the module names registered on the parent registry, but
