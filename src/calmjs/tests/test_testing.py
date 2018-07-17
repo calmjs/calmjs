@@ -434,13 +434,18 @@ class IntegrationGeneratorTestCase(unittest.TestCase):
         registry = get('calmjs.registry')
         self.assertEqual(TestCase.registry_name, 'calmjs.module.simulated')
         self.assertTrue(registry.get('calmjs.module.simulated'))
+        # works using the global function
+        self.assertTrue(get('calmjs.module.simulated'))
 
         # See that the registry fake_modules actually got registered
         extra_keys = list(get('calmjs.extras_keys').iter_records())
-        self.assertEqual(extra_keys, ['fake_modules'])
+        self.assertIn('fake_modules', extra_keys)
 
         utils.teardown_class_integration_environment(TestCase)
-        self.assertIsNone(registry.get('calmjs.module.simulated'))
+        # the mock registry is unchanged
+        self.assertTrue(registry.get('calmjs.module.simulated'))
+        # global changes should no longer be in effect.
+        self.assertIsNone(get('calmjs.module.simulated'))
         self.assertFalse(exists(TestCase.dist_dir))
 
         # See that the registry fake_modules actually got registered

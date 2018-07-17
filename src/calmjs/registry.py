@@ -121,4 +121,7 @@ class Registry(BaseRegistry):
 # Initialize the root registry instance
 _inst = Registry(__name__)  # __name__ == calmjs.registry
 _inst.records[__name__] = _inst  # tie the knot, self-hosting.
-get = _inst.get
+
+
+def get(registry_name):
+    return _inst.get(registry_name)

@@ -83,9 +83,10 @@ def create_fake_bin(path, name):
     return target
 
 
-def generate_integration_environment(
+def generate_integration_working_set(
         working_dir, registry_id='calmjs.module.simulated',
-        pkgman_filename='package.json', extras_calmjs_key='fake_modules'):
+        pkgman_filename='package.json', extras_calmjs_key='fake_modules',
+        extra_working_sets=sys.path):
     """
     Generate a comprehensive integration testing environment for test
     cases in other packages that integrates with calmjs.
@@ -111,8 +112,6 @@ def generate_integration_environment(
     Returns a tuple of the mock working set and the registry.
     """
 
-    from calmjs.module import ModuleRegistry
-    from calmjs.loaderplugin import ModuleLoaderRegistry
     from calmjs.loaderplugin import MODULE_LOADER_SUFFIX
     from calmjs.dist import EXTRAS_CALMJS_JSON
 
@@ -120,10 +119,19 @@ def generate_integration_environment(
         return '\n'.join(['[%s]' % registry_id] + list(raw))
 
     make_dummy_dist(None, (
-        ('entry_points.txt', make_entry_points(
-            'calmjs.extras_keys',
-            '%s = enabled' % extras_calmjs_key,
-        )),
+        ('entry_points.txt', '\n'.join([
+            make_entry_points(
+                'calmjs.registry',
+                registry_id + ' = calmjs.module:ModuleRegistry',
+                registry_id + '.tests = calmjs.module:ModuleRegistry',
+                registry_id + MODULE_LOADER_SUFFIX +
+                ' = calmjs.loaderplugin:ModuleLoaderRegistry',
+            ),
+            make_entry_points(
+                'calmjs.extras_keys',
+                '%s = enabled' % extras_calmjs_key,
+            ),
+        ])),
         ('calmjs_module_registry.txt', registry_id),
     ), 'calmjs.simulated', '420', working_dir=working_dir)
 
@@ -250,7 +258,7 @@ def generate_integration_environment(
     ), 'site', '2.0', working_dir=working_dir)
 
     # The mocked mock_working_set
-    mock_working_set = WorkingSet([working_dir])
+    mock_working_set = WorkingSet([working_dir] + extra_working_sets)
 
     contents = (
         (('framework', 'lib.js'), '''
@@ -341,6 +349,16 @@ def generate_integration_environment(
     with open(join(working_dir, '_bad_dir_', 'unsupported'), 'w') as fd:
         pass
 
+    return mock_working_set
+
+
+def instantiate_integration_registries(
+        mock_working_set, inst, *registry_names):
+    """
+    Provide a root registry instance, and the remaining arguments being
+    the identifiers that should be instantiated.
+    """
+
     # In order for the registries to become instantiated with all the
     # intended data through the system, the "modules" defined above will
     # need to be available in the Python import system with the paths
@@ -352,54 +370,106 @@ def generate_integration_environment(
 
     from types import ModuleType
     from calmjs import base as calmjs_base
+    import calmjs.registry
 
     def _import_module(module_name):
-        # pretend all modules are real by providing stubs without going
-        # through imports/sys.modules
-        module = ModuleType(module_name)
-        module._fake = True
-        return module
+        try:
+            return original_import_module(module_name)
+        except ImportError:
+            # pretend all modules are real by providing stubs
+            module = ModuleType(module_name)
+            module._fake = True
+            return module
 
     try:
         (original_import_module, calmjs_base._import_module) = (
             calmjs_base._import_module, _import_module)
         pkg_resources.working_set = mock_working_set
-        registry = ModuleRegistry(
-            registry_id,
-            _working_set=mock_working_set
-        )
-        loader_registry = ModuleLoaderRegistry(
-            registry_id + MODULE_LOADER_SUFFIX,
-            _working_set=mock_working_set,
-            _parent=registry,
-        )
-        test_registry = ModuleRegistry(
-            registry_id + tests_suffix,
-            _working_set=mock_working_set,
-        )
+        calmjs_base.working_set = mock_working_set
+        original_inst, calmjs.registry._inst = calmjs.registry._inst, inst
+        for name in registry_names:
+            # drop the old one
+            inst.records.pop(name, None)
+            inst.get(name)
     finally:
         pkg_resources.working_set = root_working_set
+        calmjs_base.working_set = root_working_set
         calmjs_base._import_module = original_import_module
+        calmjs.registry._inst = original_inst
 
-    # Return dummy working set (for dist resolution) and the registries
-    return mock_working_set, registry, loader_registry, test_registry
+
+def generate_root_integration_environment(
+        working_dir, registry_id='calmjs.module.simulated',
+        pkgman_filename='package.json', extras_calmjs_key='fake_modules',
+        extra_working_sets=sys.path):
+    from calmjs.registry import Registry
+    from calmjs.loaderplugin import MODULE_LOADER_SUFFIX
+
+    mock_working_set = generate_integration_working_set(
+        working_dir,
+        registry_id=registry_id,
+        pkgman_filename=pkgman_filename,
+        extras_calmjs_key=extras_calmjs_key,
+        extra_working_sets=extra_working_sets,
+    )
+    root_registry = Registry(
+        'calmjs.registry', _working_set=mock_working_set,
+        reserved='calmjs.testing.reserved',
+    )
+    # also tie the knot
+    root_registry.records['calmjs.registry'] = root_registry
+    instantiate_integration_registries(
+        mock_working_set,
+        root_registry,
+        registry_id,
+        registry_id + MODULE_LOADER_SUFFIX,
+        registry_id + tests_suffix,
+    )
+    return mock_working_set, root_registry,
+
+
+def generate_integration_environment(
+        working_dir, registry_id='calmjs.module.simulated',
+        pkgman_filename='package.json', extras_calmjs_key='fake_modules',
+        extra_working_sets=sys.path):
+    """
+    Compatibility with calmjs<3.3.0
+    """
+
+    from calmjs.loaderplugin import MODULE_LOADER_SUFFIX
+
+    mock_working_set, root_registry = generate_root_integration_environment(
+        working_dir,
+        registry_id=registry_id,
+        pkgman_filename=pkgman_filename,
+        extras_calmjs_key=extras_calmjs_key,
+        extra_working_sets=extra_working_sets,
+    )
+    return (
+        mock_working_set,
+        root_registry.get(registry_id),
+        root_registry.get(registry_id + MODULE_LOADER_SUFFIX),
+        root_registry.get(registry_id + tests_suffix),
+    )
 
 
 def setup_class_integration_environment(cls, **kw):
+    import calmjs.registry
     from calmjs import dist as calmjs_dist
     from calmjs import base
-    from calmjs.registry import _inst as root_registry
+    from calmjs.loaderplugin import MODULE_LOADER_SUFFIX
     cls.dist_dir = mkdtemp_realpath()
-    results = generate_integration_environment(cls.dist_dir, **kw)
-    working_set, registry, loader_registry, test_registry = results
-    cls.registry_name = registry.registry_name
-    cls.test_registry_name = test_registry.registry_name
-    cls.loader_registry_name = loader_registry.registry_name
-    # reset that to force creation from stubbed working_set
-    root_registry.records.pop('calmjs.extras_keys', None)
-    root_registry.records[cls.registry_name] = registry
-    root_registry.records[cls.loader_registry_name] = loader_registry
-    root_registry.records[cls.test_registry_name] = test_registry
+    working_set, inst = generate_root_integration_environment(
+        cls.dist_dir, **kw)
+
+    cls.root_registry = inst
+    cls.registry_name = kw.get('registry_id', 'calmjs.module.simulated')
+    cls.test_registry_name = cls.registry_name + tests_suffix
+    cls.loader_registry_name = cls.registry_name + MODULE_LOADER_SUFFIX
+    cls.working_set = working_set
+
+    # stubs
+    cls._old_root_registry, calmjs.registry._inst = calmjs.registry._inst, inst
     cls.root_working_set, calmjs_dist.default_working_set = (
         calmjs_dist.default_working_set, working_set)
     base.working_set = working_set
@@ -408,15 +478,11 @@ def setup_class_integration_environment(cls, **kw):
 def teardown_class_integration_environment(cls):
     from calmjs import dist as calmjs_dist
     from calmjs import base
-    from calmjs.registry import _inst as root_registry
+    import calmjs.registry
     rmtree(cls.dist_dir)
-    # reset the manually added registries.
-    root_registry.records.pop(cls.registry_name)
-    root_registry.records.pop(cls.loader_registry_name)
-    root_registry.records.pop(cls.test_registry_name)
-    root_registry.records.pop('calmjs.extras_keys', None)
     calmjs_dist.default_working_set = cls.root_working_set
     base.working_set = cls.root_working_set
+    calmjs.registry._inst = cls._old_root_registry
 
 
 def setup_class_install_environment(cls, driver_cls, pkg_names, **kws):
