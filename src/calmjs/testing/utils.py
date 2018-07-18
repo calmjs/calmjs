@@ -20,7 +20,6 @@ import pkg_resources
 from pkg_resources import PathMetadata
 from pkg_resources import Distribution
 from pkg_resources import WorkingSet
-from pkg_resources import working_set as root_working_set
 
 # Do not invoke/import the root calmjs namespace here.  If modules from
 # there are needed, the import must be done from within the scope that
@@ -384,18 +383,20 @@ def instantiate_integration_registries(
     try:
         (original_import_module, calmjs_base._import_module) = (
             calmjs_base._import_module, _import_module)
-        pkg_resources.working_set = mock_working_set
-        calmjs_base.working_set = mock_working_set
+        pkg_resources.working_set, _pkg_resources_ws = (
+            mock_working_set, pkg_resources.working_set)
+        calmjs_base.working_set, _calmjs_base_ws = (
+            mock_working_set, calmjs_base.working_set)
         original_inst, calmjs.registry._inst = calmjs.registry._inst, inst
         for name in registry_names:
             # drop the old one
             inst.records.pop(name, None)
             inst.get(name)
     finally:
-        pkg_resources.working_set = root_working_set
-        calmjs_base.working_set = root_working_set
-        calmjs_base._import_module = original_import_module
         calmjs.registry._inst = original_inst
+        pkg_resources.working_set = _pkg_resources_ws
+        calmjs_base.working_set = _calmjs_base_ws
+        calmjs_base._import_module = original_import_module
 
 
 def generate_root_integration_environment(
