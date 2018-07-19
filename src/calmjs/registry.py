@@ -45,10 +45,22 @@ class Registry(BaseRegistry):
         """
 
         working_set_ = kw.get('_working_set') or working_set
-        dist = working_set_.find(Requirement.parse(package_name))
-        # module_name is the package_name in our context.
-        self.reserved = {
-            k: v.module_name for k, v in dist.get_entry_map(reserved).items()}
+        self.reserved = {}
+        if reserved:
+            dist = working_set_.find(Requirement.parse(package_name))
+            if dist is None:
+                logger.error(
+                    "failed to set up registry_name reservations for "
+                    "registry '%s', as the specified package '%s' could "
+                    "not found in the current working_set; maybe it is not "
+                    "correctly installed?", registry_name, package_name,
+                )
+            else:
+                # module_name is the package_name in our context.
+                self.reserved = {
+                    k: v.module_name for k, v in dist.get_entry_map(
+                        reserved).items()
+                }
         super(Registry, self).__init__(registry_name, *a, **kw)
 
     def _init(self):

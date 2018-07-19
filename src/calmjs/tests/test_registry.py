@@ -11,6 +11,53 @@ from calmjs.testing import mocks
 from calmjs.testing.utils import make_dummy_dist
 
 
+class RegistryTestCase(unittest.TestCase):
+    """
+    Tests for the basic construction of the registry class by itself.
+    """
+
+    def test_missing_package_warning(self):
+        # without a distribution provided by the working set, the
+        # provided package name will not be resolved.
+        working_set = mocks.WorkingSet({}, dist=None)
+        with pretty_logging(stream=mocks.StringIO()) as stream:
+            registry = calmjs.registry.Registry(
+                'some.registry',
+                package_name='some.package',
+                _working_set=working_set,
+            )
+        self.assertEqual('some.registry', registry.registry_name)
+        self.assertIn(
+            "ERROR calmjs.registry failed to set up registry_name "
+            "reservations for registry 'some.registry', as the specified "
+            "package 'some.package' could not found in the current "
+            "working_set; maybe it is not correctly installed?",
+            stream.getvalue()
+        )
+
+    def test_reservation_free(self):
+        working_set = mocks.WorkingSet({}, dist=None)
+        with pretty_logging(stream=mocks.StringIO()) as stream:
+            registry = calmjs.registry.Registry(
+                'calmjs.testing.registry',
+                reserved=None,
+                _working_set=working_set,
+            )
+        self.assertEqual('calmjs.testing.registry', registry.registry_name)
+        self.assertEqual('', stream.getvalue())
+
+    def test_standard_construction(self):
+        # this mock WorkingSet.find will always return a distribution
+        working_set = mocks.WorkingSet({})
+        with pretty_logging(stream=mocks.StringIO()) as stream:
+            registry = calmjs.registry.Registry(
+                'calmjs.registry',
+                _working_set=working_set
+            )
+        self.assertEqual('calmjs.registry', registry.registry_name)
+        self.assertEqual('', stream.getvalue())
+
+
 class RegistryIntegrationTestCase(unittest.TestCase):
     """
     Test that the default entry points declared for this module against
