@@ -231,6 +231,56 @@ class TestingUtilsTestCase(unittest.TestCase):
         self.assertEqual(distributions[1].requires(), [
             Requirement.parse('parentpkg>=0.7')])
 
+    def tests_instantiate_integration_registries(self):
+        """
+        Ensure that the integration registries, specifically the root
+        registry, be instantiated (or re-instantiated) in a way that
+        satisfies expectations of integration test creators.
+        """
+
+        make_dummy_dist(self, (
+            ('entry_points.txt', '\n'.join([
+                '[calmjs.registry]',
+                'dummy.module = calmjs.module:ModuleRegistry',
+                'other.module = calmjs.module:ModuleRegistry',
+            ])),
+        ), 'somepkg', '1.0')
+
+        working_set = WorkingSet([self._calmjs_testing_tmpdir])
+        registry = utils.instantiate_integration_registries(
+            working_set, None,
+            'dummy.module',
+        )
+        dummy_module = registry.get('dummy.module')
+        other_module = registry.get('other.module')
+        self.assertEqual('dummy.module', dummy_module.registry_name)
+        self.assertIsNone(registry.get('dummy.module.tests'))
+
+        make_dummy_dist(self, (
+            ('entry_points.txt', '\n'.join([
+                '[calmjs.registry]',
+                'dummy.module.tests = calmjs.module:ModuleRegistry',
+            ])),
+        ), 'somepkg.testing', '1.0')
+        # re-add the tmpdir to reinitialize the working set with the
+        # newly added entry points
+        working_set.add_entry(self._calmjs_testing_tmpdir)
+
+        reinstantiated_registry = utils.instantiate_integration_registries(
+            working_set, registry,
+            'dummy.module',
+            'dummy.module.tests',
+        )
+        # ensure that it is the same instance, as this could be used to
+        # reinstantiate the registry with the additional entries.
+        self.assertIs(registry, reinstantiated_registry)
+        # the inner registries should be renewed.
+        self.assertIsNot(dummy_module, registry.get('dummy.module'))
+        # the not reinstantiated version is not renewed
+        self.assertIs(other_module, registry.get('other.module'))
+        # the newly added entry points should resolve now.
+        self.assertIsNotNone(registry.get('dummy.module.tests'))
+
     # both of these incidentally will test mkdtemp's behavior with chdir
     # inside windows, too.
 

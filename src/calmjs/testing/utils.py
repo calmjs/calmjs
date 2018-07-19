@@ -352,7 +352,7 @@ def generate_integration_working_set(
 
 
 def instantiate_integration_registries(
-        mock_working_set, inst, *registry_names):
+        mock_working_set, root_registry, *registry_names):
     """
     Provide a root registry instance, and the remaining arguments being
     the identifiers that should be instantiated.
@@ -380,6 +380,20 @@ def instantiate_integration_registries(
             module._fake = True
             return module
 
+    if root_registry is None:
+        root_registry = calmjs.registry.Registry(
+            'calmjs.registry', _working_set=mock_working_set,
+            reserved=None,
+        )
+    else:
+        # refresh the _entry_points by transplanting one from a fresh
+        # instance, to ensure that any new entry points added to the
+        # working set is also recorded.
+        root_registry._entry_points = calmjs.registry.Registry(
+            root_registry.registry_name, _working_set=mock_working_set,
+            reserved=None,
+        )._entry_points
+
     try:
         (original_import_module, calmjs_base._import_module) = (
             calmjs_base._import_module, _import_module)
@@ -387,23 +401,27 @@ def instantiate_integration_registries(
             mock_working_set, pkg_resources.working_set)
         calmjs_base.working_set, _calmjs_base_ws = (
             mock_working_set, calmjs_base.working_set)
-        original_inst, calmjs.registry._inst = calmjs.registry._inst, inst
+        original_inst, calmjs.registry._inst = (
+            calmjs.registry._inst, root_registry)
         for name in registry_names:
             # drop the old one
-            inst.records.pop(name, None)
-            inst.get(name)
+            root_registry.records.pop(name, None)
+            root_registry.get(name)
     finally:
         calmjs.registry._inst = original_inst
         pkg_resources.working_set = _pkg_resources_ws
         calmjs_base.working_set = _calmjs_base_ws
         calmjs_base._import_module = original_import_module
 
+    # also tie the knot before returning the registry.
+    root_registry.records[root_registry.registry_name] = root_registry
+    return root_registry
+
 
 def generate_root_integration_environment(
         working_dir, registry_id='calmjs.module.simulated',
         pkgman_filename='package.json', extras_calmjs_key='fake_modules',
         extra_working_sets=sys.path):
-    from calmjs.registry import Registry
     from calmjs.loaderplugin import MODULE_LOADER_SUFFIX
 
     mock_working_set = generate_integration_working_set(
@@ -413,15 +431,9 @@ def generate_root_integration_environment(
         extras_calmjs_key=extras_calmjs_key,
         extra_working_sets=extra_working_sets,
     )
-    root_registry = Registry(
-        'calmjs.registry', _working_set=mock_working_set,
-        reserved='calmjs.testing.reserved',
-    )
-    # also tie the knot
-    root_registry.records['calmjs.registry'] = root_registry
-    instantiate_integration_registries(
+    root_registry = instantiate_integration_registries(
         mock_working_set,
-        root_registry,
+        None,
         registry_id,
         registry_id + MODULE_LOADER_SUFFIX,
         registry_id + tests_suffix,
