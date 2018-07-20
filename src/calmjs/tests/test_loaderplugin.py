@@ -593,7 +593,7 @@ class ModuleLoaderRegistryTestCase(unittest.TestCase):
         with self.assertRaises(ValueError) as e:
             ModuleLoaderRegistry('some.module', _working_set=WorkingSet({}))
         self.assertEqual(
-            "module loader registry name defined with invalid suffix "
+            "child module registry name defined with invalid suffix "
             "('some.module' does not end with '.loader')", str(e.exception))
 
     def test_manual_construction_parent_interactions(self):
@@ -608,8 +608,10 @@ class ModuleLoaderRegistryTestCase(unittest.TestCase):
             ModuleLoaderRegistry(
                 'calmjs.module.loader', _working_set=WorkingSet({}))
         self.assertEqual(
-            "parent registry 'calmjs.module' of module loader registry "
-            "'calmjs.module.loader' not found", str(e.exception))
+            "could not construct child module registry 'calmjs.module.loader' "
+            "as its parent registry 'calmjs.module' could not be found",
+            str(e.exception)
+        )
 
     def test_module_loader_registry_integration(self):
         working_set = WorkingSet({

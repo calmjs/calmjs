@@ -18,8 +18,7 @@ from calmjs.base import PackageKeyMapping
 from calmjs.npm import locate_package_entry_file
 from calmjs.base import BaseLoaderPluginRegistry
 from calmjs.base import BaseLoaderPluginHandler
-from calmjs.module import ModuleRegistry
-from calmjs.registry import get
+from calmjs.base import BaseChildModuleRegistry
 from calmjs.toolchain import WORKING_DIR
 from calmjs.toolchain import CALMJS_LOADERPLUGIN_REGISTRY
 from calmjs.toolchain import spec_update_sourcepath_filter_loaderplugins
@@ -206,7 +205,7 @@ class NPMLoaderPluginHandler(LoaderPluginHandler):
         return {}
 
 
-class ModuleLoaderRegistry(ModuleRegistry):
+class ModuleLoaderRegistry(BaseChildModuleRegistry):
     """
     This registry works in tandem with the prefix it is defined for, to
     ease the declaration of resource files that are also to be exported
@@ -217,30 +216,13 @@ class ModuleLoaderRegistry(ModuleRegistry):
     """
 
     def __init__(self, registry_name, *a, **kw):
-        parent_name = self.get_parent_registry_name(registry_name)
-        _parent = kw.pop('_parent', NotImplemented)
-        if _parent is NotImplemented:
-            self.parent = get(parent_name)
-        else:
-            self.parent = _parent
-
-        if not self.parent:
-            raise ValueError(
-                "parent registry '%s' of module loader registry '%s' "
-                "not found" % (parent_name, registry_name)
-            )
-        # have to make this available as the construction through the
-        # parent __init__ will make use of the following also.
         self.package_loader_map = PackageKeyMapping()
         super(ModuleLoaderRegistry, self).__init__(registry_name, *a, **kw)
 
-    def get_parent_registry_name(
+    def resolve_parent_registry_name(
             self, registry_name, suffix=MODULE_LOADER_SUFFIX):
-        if not registry_name.endswith(suffix):
-            raise ValueError(
-                "module loader registry name defined with invalid suffix "
-                "('%s' does not end with '%s')" % (registry_name, suffix))
-        return registry_name[:-len(suffix)]
+        return super(ModuleLoaderRegistry, self).resolve_parent_registry_name(
+            registry_name, suffix)
 
     def register_entry_point(self, entry_point):
         # use the module names registered on the parent registry, but

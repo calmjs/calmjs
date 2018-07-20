@@ -344,6 +344,51 @@ class BaseModuleRegistry(BasePkgRefRegistry):
         return result
 
 
+class BaseChildModuleRegistry(BaseModuleRegistry):
+    """
+    To enable more generic support of child module registries, where the
+    records depend on a parent registry, this class provides the basic
+    framework to do so.
+    """
+
+    def __init__(self, registry_name, *a, **kw):
+        # TODO whenever there is time to move the BaseRegistry to a
+        # bootstrap module of some sort (that will break tests that
+        # override calmjs.base.working_set if done naively), and have
+        # the calmjs.registry.Registry inherit from that (and this
+        # module also to maintain the BaseRegistry import location,
+        # this import should be moved to the top
+        from calmjs.registry import get
+        # resolve parent before the parent class, as the construction
+        # should be able to reference this parent.
+        parent_name = self.resolve_parent_registry_name(registry_name)
+        _parent = kw.pop('_parent', NotImplemented)
+        if _parent is NotImplemented:
+            self.parent = get(parent_name)
+        else:
+            self.parent = _parent
+
+        if not self.parent:
+            raise ValueError(
+                "could not construct child module registry '%s' as its "
+                "parent registry '%s' could not be found" % (
+                    registry_name, parent_name)
+            )
+        super(BaseChildModuleRegistry, self).__init__(registry_name, *a, **kw)
+
+    def resolve_parent_registry_name(self, registry_name, suffix):
+        """
+        Subclasses should override to specify the default suffix, as the
+        invocation is done without a suffix.
+        """
+
+        if not registry_name.endswith(suffix):
+            raise ValueError(
+                "child module registry name defined with invalid suffix "
+                "('%s' does not end with '%s')" % (registry_name, suffix))
+        return registry_name[:-len(suffix)]
+
+
 class BaseExternalModuleRegistry(BasePkgRefRegistry):
     """
     A registry for storing references to scripts sourced from JavaScript
