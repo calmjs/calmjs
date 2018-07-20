@@ -1,15 +1,15 @@
 environment:
   matrix:
     - PYTHON: "C:\\Python27"
-      nodejs_version: "4.8"
-    - PYTHON: "C:\\Python33"
       nodejs_version: "4"
     - PYTHON: "C:\\Python34"
-      nodejs_version: "6.11"
+      nodejs_version: "6"
     - PYTHON: "C:\\Python35"
       nodejs_version: "6"
     - PYTHON: "C:\\Python36"
       nodejs_version: "8"
+    - PYTHON: "C:\\Python37"
+      nodejs_version: "10"
 
 install:
   - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
