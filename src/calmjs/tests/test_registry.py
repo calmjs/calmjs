@@ -3,12 +3,14 @@ import unittest
 
 import pkg_resources
 
+import calmjs.base
 import calmjs.registry
 from calmjs.base import BaseRegistry
 from calmjs.utils import pretty_logging
 
 from calmjs.testing import mocks
 from calmjs.testing.utils import make_dummy_dist
+from calmjs.testing.utils import stub_item_attr_value
 
 
 class RegistryTestCase(unittest.TestCase):
@@ -56,6 +58,53 @@ class RegistryTestCase(unittest.TestCase):
             )
         self.assertEqual('calmjs.registry', registry.registry_name)
         self.assertEqual('', stream.getvalue())
+
+    def test_auto_self_reference(self):
+        # ensure that the identity is returned
+        working_set = mocks.WorkingSet({
+            'calmjs.registry': [
+                # correct self-referential definition
+                'calmjs.registry = calmjs.registry:Registry',
+                'calmjsregistry = calmjs.registry:Registry',
+            ],
+            'calmjsregistry': [
+                # unrelated self-referential definition
+                'calmjs.registry = calmjs.registry:Registry',
+                # incorrect self-referential type
+                'calmjsregistry = calmjs.module:ModuleRegistry',
+            ],
+        })
+
+        # stub out real working sets because usage of standard APIs
+        stub_item_attr_value(self, calmjs.registry, 'working_set', working_set)
+        stub_item_attr_value(self, calmjs.base, 'working_set', working_set)
+
+        with pretty_logging(stream=mocks.StringIO()) as stream:
+            registry = calmjs.registry.Registry('calmjs.registry')
+            self.assertFalse(registry.records)
+            mismatched = registry.get('calmjsregistry')
+            # not the same name
+            self.assertTrue(isinstance(mismatched, calmjs.registry.Registry))
+            self.assertIsNot(mismatched, registry)
+            # correct identity
+            self.assertIs(registry, registry.get('calmjs.registry'))
+            self.assertIn('calmjs.registry', registry.records)
+
+            # unrelated registry also
+            unrelated = mismatched.get('calmjs.registry')
+            self.assertTrue(isinstance(unrelated, calmjs.registry.Registry))
+            self.assertIsNot(unrelated, registry)
+            mistyped = mismatched.get('calmjsregistry')
+            # not a None
+            self.assertTrue(mistyped)
+            # also not identity, as they are not the same type.
+            self.assertIsNot(mistyped, mismatched)
+
+        self.assertIn(
+            "registry 'calmjs.registry' has entry point 'calmjs.registry = "
+            "calmjs.registry:Registry' which is the identity registration",
+            stream.getvalue(),
+        )
 
 
 class RegistryIntegrationTestCase(unittest.TestCase):

@@ -117,6 +117,14 @@ class Registry(BaseRegistry):
                 entry_point, entry_point.dist)
             return
 
+        if cls is type(self) and entry_point.name == self.registry_name:
+            logger.debug(
+                "registry '%s' has entry point '%s' which is the identity "
+                "registration", name, entry_point,
+            )
+            self.records[name] = self
+            return self
+
         logger.debug(
             "registering '%s' from '%s'", entry_point, entry_point.dist)
         try:
@@ -132,7 +140,6 @@ class Registry(BaseRegistry):
 
 # Initialize the root registry instance
 _inst = Registry(__name__)  # __name__ == calmjs.registry
-_inst.records[__name__] = _inst  # tie the knot, self-hosting.
 
 
 def get(registry_name):
