@@ -293,8 +293,15 @@ class NPMPluginTestCase(unittest.TestCase):
         base = NPMLoaderPluginHandler(None, 'base')
         toolchain = NullToolchain()
         spec = Spec(working_dir=mkdtemp(self))
-        self.assertEqual(
-            base.generate_handler_sourcepath(toolchain, spec, {}), {})
+        with pretty_logging(stream=StringIO()) as stream:
+            self.assertEqual(
+                base.generate_handler_sourcepath(toolchain, spec, {}), {})
+        self.assertIn(
+            "no npm package name specified or could be resolved for "
+            "loaderplugin 'base' of registry '<invalid_registry/handler>'; "
+            "please subclass calmjs.loaderplugin:NPMLoaderPluginHandler such "
+            "that the npm package name become specified", stream.getvalue(),
+        )
 
     def test_plugin_package_missing_dir(self):
         base = NPMLoaderPluginHandler(None, 'base')
@@ -389,6 +396,46 @@ class NPMPluginTestCase(unittest.TestCase):
             )
         self.assertIn("for loader plugin 'base'", stream.getvalue())
         self.assertIn("missing working_dir", stream.getvalue())
+
+    def test_plugin_package_dynamic_selection(self):
+
+        class CustomHandler(NPMLoaderPluginHandler):
+            def find_node_module_pkg_name(self, toolchain, spec):
+                return spec.get('loaderplugin')
+
+        reg = LoaderPluginRegistry('lp.reg', _working_set=WorkingSet({}))
+        base = CustomHandler(reg, 'base')
+        toolchain = NullToolchain()
+        spec = Spec(working_dir=mkdtemp(self))
+        pkg_dir = join(spec['working_dir'], 'node_modules', 'dummy_pkg')
+        makedirs(pkg_dir)
+        with open(join(pkg_dir, 'package.json'), 'w') as fd:
+            fd.write('{"main": "base.js"}')
+
+        with pretty_logging(stream=StringIO()) as stream:
+            self.assertEqual(
+                {}, base.generate_handler_sourcepath(toolchain, spec, {}))
+        self.assertIn(
+            "no npm package name specified or could be resolved for "
+            "loaderplugin 'base' of registry 'lp.reg'",
+            stream.getvalue()
+        )
+        self.assertIn(
+            "test_loaderplugin:CustomHandler may be at fault",
+            stream.getvalue()
+        )
+        self.assertNotIn("for loader plugin 'base'", stream.getvalue())
+
+        # plug the value into the spec to satisfy the condition for this
+        # particular loader
+
+        spec['loaderplugin'] = 'dummy_pkg'
+        with pretty_logging(stream=StringIO()) as stream:
+            self.assertEqual(
+                join(pkg_dir, 'base.js'),
+                base.generate_handler_sourcepath(toolchain, spec, {})['base'],
+            )
+        self.assertIn("base.js' for loader plugin 'base'", stream.getvalue())
 
     def create_base_extra_plugins(self, working_dir):
         # manually create a registry

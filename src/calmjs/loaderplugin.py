@@ -121,6 +121,9 @@ class NPMLoaderPluginHandler(LoaderPluginHandler):
 
     node_module_pkg_name = None
 
+    def find_node_module_pkg_name(self, toolchain, spec):
+        return None
+
     def generate_handler_sourcepath(
             self, toolchain, spec, loaderplugin_sourcepath):
         """
@@ -128,7 +131,31 @@ class NPMLoaderPluginHandler(LoaderPluginHandler):
         modnames to the absolute path of the located sources.
         """
 
-        if not self.node_module_pkg_name:
+        # TODO calmjs-4.0.0 consider formalizing to the method instead
+        npm_pkg_name = (
+            self.node_module_pkg_name
+            if self.node_module_pkg_name else
+            self.find_node_module_pkg_name(toolchain, spec)
+        )
+
+        if not npm_pkg_name:
+            cls = type(self)
+            registry_name = getattr(
+                self.registry, 'registry_name', '<invalid_registry/handler>')
+            if cls is NPMLoaderPluginHandler:
+                logger.error(
+                    "no npm package name specified or could be resolved for "
+                    "loaderplugin '%s' of registry '%s'; please subclass "
+                    "%s:%s such that the npm package name become specified",
+                    self.name, registry_name, cls.__module__, cls.__name__,
+                )
+            else:
+                logger.error(
+                    "no npm package name specified or could be resolved for "
+                    "loaderplugin '%s' of registry '%s'; implementation of "
+                    "%s:%s may be at fault",
+                    self.name, registry_name, cls.__module__, cls.__name__,
+                )
             return {}
 
         working_dir = spec.get(WORKING_DIR, None)
@@ -141,8 +168,7 @@ class NPMLoaderPluginHandler(LoaderPluginHandler):
 
         logger.debug("deriving npm loader plugin from '%s'", working_dir)
 
-        target = locate_package_entry_file(
-            working_dir, self.node_module_pkg_name)
+        target = locate_package_entry_file(working_dir, npm_pkg_name)
         if target:
             logger.debug('picked %r for loader plugin %r', target, self.name)
             # use the parent recursive lookup.
@@ -156,13 +182,13 @@ class NPMLoaderPluginHandler(LoaderPluginHandler):
         # why.
         # Also note that any inner/chained loaders will be dropped.
         if exists(join(
-                working_dir, 'node_modules', self.node_module_pkg_name,
+                working_dir, 'node_modules', npm_pkg_name,
                 'package.json')):
             logger.warning(
                 "'package.json' for the npm package '%s' does not contain a "
                 "valid entry point: sources required for loader plugin '%s' "
                 "cannot be included automatically; the build process may fail",
-                self.node_module_pkg_name, self.name,
+                npm_pkg_name, self.name,
             )
         else:
             logger.warning(
@@ -173,8 +199,8 @@ class NPMLoaderPluginHandler(LoaderPluginHandler):
                 "as a workaround, though the package that owns that source "
                 "file that has this requirement should declare an explicit "
                 "dependency; the build process may fail",
-                self.node_module_pkg_name, self.name, working_dir,
-                self.node_module_pkg_name,
+                npm_pkg_name, self.name, working_dir,
+                npm_pkg_name,
             )
 
         return {}
