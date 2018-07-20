@@ -9,14 +9,20 @@ Changelog
   build tools. [
   `#46 <https://github.com/calmjs/calmjs/issues/46>`_
   `#48 <https://github.com/calmjs/calmjs/issues/48>`_
+  `#50 <https://github.com/calmjs/calmjs/issues/50>`_
   ]
 
+  - Provide a standardised child module registry mixin.
   - Provide a loader module registry with a restrictive naming scheme
     that directly references a single parent module registry.
   - This also necessitated exposing the mapper of the parent registry
     in a way that is reusable for other filename extensions, so that
     the default mapper will also accept the globber and the filename
     extension arguments.
+  - Refactor a number of registry classes so that they may be more
+    easily extended.
+  - The self-referential property of the root registry is now properly
+    implemented.
 
 - For Node.js packages that didn't have a ``main`` or ``browser``
   section defined in their ``package.json``, make use of the default
