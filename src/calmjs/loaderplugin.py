@@ -254,19 +254,23 @@ class ModuleLoaderRegistry(BaseChildModuleRegistry):
     def get_loaders_for_package(self, package_name):
         return self.package_loader_map.get(package_name, [])
 
+    def generate_complete_modname(self, prefix, modname, extension):
+        # typically the filename extension should be reapplied, assuming
+        # the parent mapper function strip that out for the ES5 name, as
+        # loaders typically need the full path.
+        return '%s!%s%s' % (prefix, modname, extension)
+
     def _map_entry_point_module(self, entry_point, module):
         mapping = {}
         result = {module.__name__: mapping}
         for extra in entry_point.extras:
             # since extras cannot contain leading '.', the full filename
             # extension must be built.
-            fext = '.' + extra
+            extension = '.' + extra
             mapping.update({
-                # reapply the filename extension, assuming the parent
-                # mapper function strip that out for the ES5 name, as
-                # loaders generally need the full path.
-                '%s!%s%s' % (entry_point.name, k, fext): v
-                for k, v in self.parent.mapper(
-                    module, entry_point, fext=fext).items()
+                self.generate_complete_modname(
+                    entry_point.name, modname, extension): targetpath
+                for modname, targetpath in self.parent.mapper(
+                    module, entry_point, fext=extension).items()
             })
         return result
