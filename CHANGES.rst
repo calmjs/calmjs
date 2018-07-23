@@ -12,7 +12,8 @@ Changelog
   `#50 <https://github.com/calmjs/calmjs/issues/50>`_
   ]
 
-  - Provide a standardised child module registry mixin.
+  - Provide a standardised base child module registry and some helper
+    functions for their usage.
   - Provide a loader module registry with a restrictive naming scheme
     that directly references a single parent module registry.
   - This also necessitated exposing the mapper of the parent registry
