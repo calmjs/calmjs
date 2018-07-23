@@ -14,11 +14,11 @@ from os.path import exists
 from os.path import join
 
 from calmjs import base as calmjs_base
+from calmjs.base import PackageKeyMapping
 from calmjs.npm import locate_package_entry_file
 from calmjs.base import BaseLoaderPluginRegistry
 from calmjs.base import BaseLoaderPluginHandler
-from calmjs.module import ModuleRegistry
-from calmjs.registry import get
+from calmjs.base import BaseChildModuleRegistry
 from calmjs.toolchain import WORKING_DIR
 from calmjs.toolchain import CALMJS_LOADERPLUGIN_REGISTRY
 from calmjs.toolchain import spec_update_sourcepath_filter_loaderplugins
@@ -120,6 +120,9 @@ class NPMLoaderPluginHandler(LoaderPluginHandler):
 
     node_module_pkg_name = None
 
+    def find_node_module_pkg_name(self, toolchain, spec):
+        return None
+
     def generate_handler_sourcepath(
             self, toolchain, spec, loaderplugin_sourcepath):
         """
@@ -127,7 +130,31 @@ class NPMLoaderPluginHandler(LoaderPluginHandler):
         modnames to the absolute path of the located sources.
         """
 
-        if not self.node_module_pkg_name:
+        # TODO calmjs-4.0.0 consider formalizing to the method instead
+        npm_pkg_name = (
+            self.node_module_pkg_name
+            if self.node_module_pkg_name else
+            self.find_node_module_pkg_name(toolchain, spec)
+        )
+
+        if not npm_pkg_name:
+            cls = type(self)
+            registry_name = getattr(
+                self.registry, 'registry_name', '<invalid_registry/handler>')
+            if cls is NPMLoaderPluginHandler:
+                logger.error(
+                    "no npm package name specified or could be resolved for "
+                    "loaderplugin '%s' of registry '%s'; please subclass "
+                    "%s:%s such that the npm package name become specified",
+                    self.name, registry_name, cls.__module__, cls.__name__,
+                )
+            else:
+                logger.error(
+                    "no npm package name specified or could be resolved for "
+                    "loaderplugin '%s' of registry '%s'; implementation of "
+                    "%s:%s may be at fault",
+                    self.name, registry_name, cls.__module__, cls.__name__,
+                )
             return {}
 
         working_dir = spec.get(WORKING_DIR, None)
@@ -140,8 +167,7 @@ class NPMLoaderPluginHandler(LoaderPluginHandler):
 
         logger.debug("deriving npm loader plugin from '%s'", working_dir)
 
-        target = locate_package_entry_file(
-            working_dir, self.node_module_pkg_name)
+        target = locate_package_entry_file(working_dir, npm_pkg_name)
         if target:
             logger.debug('picked %r for loader plugin %r', target, self.name)
             # use the parent recursive lookup.
@@ -155,13 +181,13 @@ class NPMLoaderPluginHandler(LoaderPluginHandler):
         # why.
         # Also note that any inner/chained loaders will be dropped.
         if exists(join(
-                working_dir, 'node_modules', self.node_module_pkg_name,
+                working_dir, 'node_modules', npm_pkg_name,
                 'package.json')):
             logger.warning(
                 "'package.json' for the npm package '%s' does not contain a "
                 "valid entry point: sources required for loader plugin '%s' "
                 "cannot be included automatically; the build process may fail",
-                self.node_module_pkg_name, self.name,
+                npm_pkg_name, self.name,
             )
         else:
             logger.warning(
@@ -172,14 +198,14 @@ class NPMLoaderPluginHandler(LoaderPluginHandler):
                 "as a workaround, though the package that owns that source "
                 "file that has this requirement should declare an explicit "
                 "dependency; the build process may fail",
-                self.node_module_pkg_name, self.name, working_dir,
-                self.node_module_pkg_name,
+                npm_pkg_name, self.name, working_dir,
+                npm_pkg_name,
             )
 
         return {}
 
 
-class ModuleLoaderRegistry(ModuleRegistry):
+class ModuleLoaderRegistry(BaseChildModuleRegistry):
     """
     This registry works in tandem with the prefix it is defined for, to
     ease the declaration of resource files that are also to be exported
@@ -190,26 +216,13 @@ class ModuleLoaderRegistry(ModuleRegistry):
     """
 
     def __init__(self, registry_name, *a, **kw):
-        if not registry_name.endswith(MODULE_LOADER_SUFFIX):
-            raise ValueError(
-                "module loader registry name defined with invalid suffix "
-                "('%s' does not end with '%s')" % (
-                    registry_name, MODULE_LOADER_SUFFIX
-                ))
-
-        _parent = kw.pop('_parent', NotImplemented)
-        if _parent is NotImplemented:
-            parent_name = registry_name[:-len(MODULE_LOADER_SUFFIX)]
-            self.parent = get(parent_name)
-        else:
-            self.parent = _parent
-
-        if not self.parent:
-            raise ValueError(
-                "parent registry '%s' of module loader registry '%s' "
-                "not found" % (parent_name, registry_name)
-            )
+        self.package_loader_map = PackageKeyMapping()
         super(ModuleLoaderRegistry, self).__init__(registry_name, *a, **kw)
+
+    def resolve_parent_registry_name(
+            self, registry_name, suffix=MODULE_LOADER_SUFFIX):
+        return super(ModuleLoaderRegistry, self).resolve_parent_registry_name(
+            registry_name, suffix)
 
     def register_entry_point(self, entry_point):
         # use the module names registered on the parent registry, but
@@ -220,19 +233,44 @@ class ModuleLoaderRegistry(ModuleRegistry):
             module = calmjs_base._import_module(module_name)
             self._register_entry_point_module(entry_point, module)
 
+    def store_records_for_package(self, entry_point, records):
+        """
+        Given that records are based on the parent, and the same entry
+        point(s) will reference those same records multiple times, the
+        actual stored records must be limited.
+        """
+
+        pkg_records_entry = self._dist_to_package_module_map(entry_point)
+        pkg_records_entry.extend(
+            rec for rec in records if rec not in pkg_records_entry)
+        # TODO figure out a more efficient way to do this with a bit
+        # more reuse.
+        if entry_point.dist is not None:
+            if entry_point.dist.project_name not in self.package_loader_map:
+                self.package_loader_map[entry_point.dist.project_name] = []
+            self.package_loader_map[entry_point.dist.project_name].append(
+                entry_point.name)
+
+    def get_loaders_for_package(self, package_name):
+        return self.package_loader_map.get(package_name, [])
+
+    def generate_complete_modname(self, prefix, modname, extension):
+        # typically the filename extension should be reapplied, assuming
+        # the parent mapper function strip that out for the ES5 name, as
+        # loaders typically need the full path.
+        return '%s!%s%s' % (prefix, modname, extension)
+
     def _map_entry_point_module(self, entry_point, module):
         mapping = {}
         result = {module.__name__: mapping}
         for extra in entry_point.extras:
             # since extras cannot contain leading '.', the full filename
             # extension must be built.
-            fext = '.' + extra
+            extension = '.' + extra
             mapping.update({
-                # reapply the filename extension, assuming the parent
-                # mapper function strip that out for the ES5 name, as
-                # loaders generally need the full path.
-                '%s!%s%s' % (entry_point.name, k, fext): v
-                for k, v in self.parent.mapper(
-                    module, entry_point, fext=fext).items()
+                self.generate_complete_modname(
+                    entry_point.name, modname, extension): targetpath
+                for modname, targetpath in self.parent.mapper(
+                    module, entry_point, fext=extension).items()
             })
         return result

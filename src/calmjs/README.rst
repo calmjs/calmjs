@@ -108,12 +108,15 @@ yarn
 
 loaderplugin
     While loader plugin handlers of this package can be considered as
-    part of the lower level infrastructure, the actual items being
-    encapsulated is actually JavaScript code that interfaces with the
-    JavaScript/Node.js ecosystem in a rather tightly coupled manner,
-    and that it needs the helpers in the npm module to locate the
-    target source files.  Given that, these objects should only be
-    accessed through the registry system.
+    part of the lower level infrastructure (just under toolchain), the
+    actual items being encapsulated is actually JavaScript code that
+    interfaces with the JavaScript/Node.js ecosystem in a rather tightly
+    coupled manner, and that it needs the helpers in the npm module to
+    locate the target source files.  Given that, these objects should
+    only be accessed through the registry system.  For dependent
+    packages, especially packages that implement toolchains, this
+    particular constraint will likely be inapplicable and thus it may
+    sit lower than their respective toolchain/cli packages.
 
 calmjs
     Provide an alternative execution method of the runtime, which may be

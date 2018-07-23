@@ -5,7 +5,9 @@ from os.path import join
 from os import chdir
 from os import makedirs
 from pkg_resources import Distribution
+from pkg_resources import Requirement
 from pkg_resources import resource_filename
+from pkg_resources import working_set as root_working_set
 
 import calmjs.base
 from calmjs.registry import Registry
@@ -16,6 +18,7 @@ from calmjs.loaderplugin import LoaderPluginRegistry
 from calmjs.loaderplugin import LoaderPluginHandler
 from calmjs.loaderplugin import NPMLoaderPluginHandler
 from calmjs.loaderplugin import ModuleLoaderRegistry
+from calmjs.module import ModuleRegistry
 from calmjs.toolchain import NullToolchain
 from calmjs.toolchain import Spec
 from calmjs.utils import pretty_logging
@@ -290,8 +293,15 @@ class NPMPluginTestCase(unittest.TestCase):
         base = NPMLoaderPluginHandler(None, 'base')
         toolchain = NullToolchain()
         spec = Spec(working_dir=mkdtemp(self))
-        self.assertEqual(
-            base.generate_handler_sourcepath(toolchain, spec, {}), {})
+        with pretty_logging(stream=StringIO()) as stream:
+            self.assertEqual(
+                base.generate_handler_sourcepath(toolchain, spec, {}), {})
+        self.assertIn(
+            "no npm package name specified or could be resolved for "
+            "loaderplugin 'base' of registry '<invalid_registry/handler>'; "
+            "please subclass calmjs.loaderplugin:NPMLoaderPluginHandler such "
+            "that the npm package name become specified", stream.getvalue(),
+        )
 
     def test_plugin_package_missing_dir(self):
         base = NPMLoaderPluginHandler(None, 'base')
@@ -386,6 +396,46 @@ class NPMPluginTestCase(unittest.TestCase):
             )
         self.assertIn("for loader plugin 'base'", stream.getvalue())
         self.assertIn("missing working_dir", stream.getvalue())
+
+    def test_plugin_package_dynamic_selection(self):
+
+        class CustomHandler(NPMLoaderPluginHandler):
+            def find_node_module_pkg_name(self, toolchain, spec):
+                return spec.get('loaderplugin')
+
+        reg = LoaderPluginRegistry('lp.reg', _working_set=WorkingSet({}))
+        base = CustomHandler(reg, 'base')
+        toolchain = NullToolchain()
+        spec = Spec(working_dir=mkdtemp(self))
+        pkg_dir = join(spec['working_dir'], 'node_modules', 'dummy_pkg')
+        makedirs(pkg_dir)
+        with open(join(pkg_dir, 'package.json'), 'w') as fd:
+            fd.write('{"main": "base.js"}')
+
+        with pretty_logging(stream=StringIO()) as stream:
+            self.assertEqual(
+                {}, base.generate_handler_sourcepath(toolchain, spec, {}))
+        self.assertIn(
+            "no npm package name specified or could be resolved for "
+            "loaderplugin 'base' of registry 'lp.reg'",
+            stream.getvalue()
+        )
+        self.assertIn(
+            "test_loaderplugin:CustomHandler may be at fault",
+            stream.getvalue()
+        )
+        self.assertNotIn("for loader plugin 'base'", stream.getvalue())
+
+        # plug the value into the spec to satisfy the condition for this
+        # particular loader
+
+        spec['loaderplugin'] = 'dummy_pkg'
+        with pretty_logging(stream=StringIO()) as stream:
+            self.assertEqual(
+                join(pkg_dir, 'base.js'),
+                base.generate_handler_sourcepath(toolchain, spec, {})['base'],
+            )
+        self.assertIn("base.js' for loader plugin 'base'", stream.getvalue())
 
     def create_base_extra_plugins(self, working_dir):
         # manually create a registry
@@ -543,7 +593,7 @@ class ModuleLoaderRegistryTestCase(unittest.TestCase):
         with self.assertRaises(ValueError) as e:
             ModuleLoaderRegistry('some.module', _working_set=WorkingSet({}))
         self.assertEqual(
-            "module loader registry name defined with invalid suffix "
+            "child module registry name defined with invalid suffix "
             "('some.module' does not end with '.loader')", str(e.exception))
 
     def test_manual_construction_parent_interactions(self):
@@ -558,8 +608,10 @@ class ModuleLoaderRegistryTestCase(unittest.TestCase):
             ModuleLoaderRegistry(
                 'calmjs.module.loader', _working_set=WorkingSet({}))
         self.assertEqual(
-            "parent registry 'calmjs.module' of module loader registry "
-            "'calmjs.module.loader' not found", str(e.exception))
+            "could not construct child module registry 'calmjs.module.loader' "
+            "as its parent registry 'calmjs.module' could not be found",
+            str(e.exception)
+        )
 
     def test_module_loader_registry_integration(self):
         working_set = WorkingSet({
@@ -615,3 +667,51 @@ class ModuleLoaderRegistryTestCase(unittest.TestCase):
             'css!calmjs/testing/module4/widget.style': resource_filename(
                 'calmjs.testing', join('module4', 'widget.style')),
         }, loader_registry.get_records_for_package('calmjs.testing'))
+
+        self.assertEqual(
+            ['css'],
+            loader_registry.get_loaders_for_package('calmjs.testing')
+        )
+
+    def test_module_loader_registry_multiple_loaders(self):
+        working_set = WorkingSet({
+            'calmjs.module': [
+                'module4 = calmjs.testing.module4',
+            ],
+            'calmjs.module.loader': [
+                'css = css[style,css]',
+                'json = json[json]',
+                'empty = empty[]',
+            ],
+            __name__: [
+                'calmjs.module = calmjs.module:ModuleRegistry',
+                'calmjs.module.loader = '
+                'calmjs.loaderplugin:ModuleLoaderRegistry',
+            ]},
+            # use a real distribution instead for this case
+            dist=root_working_set.find(Requirement.parse('calmjs')),
+        )
+
+        registry = ModuleRegistry('calmjs.module', _working_set=working_set)
+        loader_registry = ModuleLoaderRegistry(
+            'calmjs.module.loader', _working_set=working_set, _parent=registry)
+        self.assertEqual({
+            'calmjs': ['calmjs.testing.module4'],
+        }, loader_registry.package_module_map)
+
+        self.assertEqual(
+            ['css', 'empty', 'json'],
+            sorted(loader_registry.get_loaders_for_package('calmjs'))
+        )
+
+        self.assertEqual([
+            'css!calmjs/testing/module4/other.css',
+            'css!calmjs/testing/module4/widget.style',
+            'json!calmjs/testing/module4/data.json',
+        ], sorted(loader_registry.get_records_for_package('calmjs').keys()))
+
+        # was not registered to calmjs.testing
+        self.assertEqual([], loader_registry.get_loaders_for_package(
+            'calmjs.testing'))
+        self.assertEqual({}, loader_registry.get_records_for_package(
+            'calmjs.testing'))

@@ -224,6 +224,9 @@ class BasePkgRefRegistry(BaseRegistry):
         raise NotImplementedError
 
     def _dist_to_package_module_map(self, entry_point):
+        # TODO fix the two following logging statement, likely indicates
+        # that a proper cleanup/refactoring is needed for records in
+        # this registry type.
         if entry_point.dist is None:
             # it's probably manually added not through the standard
             # setuptools procedures.
@@ -241,6 +244,19 @@ class BasePkgRefRegistry(BaseRegistry):
             if entry_point.dist.project_name not in self.package_module_map:
                 self.package_module_map[entry_point.dist.project_name] = []
             return self.package_module_map[entry_point.dist.project_name]
+
+    def store_records_for_package(self, entry_point, records):
+        """
+        Store the records in a way that permit lookup by package
+        """
+
+        # If provided records already exist in the module mapping list,
+        # it likely means that a package declared multiple keys for the
+        # same package namespace; while normally this does not happen,
+        # this default implementation make no assumptions as to whether
+        # or not this is permitted.
+        pkg_module_records = self._dist_to_package_module_map(entry_point)
+        pkg_module_records.extend(records)
 
     def iter_records(self):
         """
@@ -276,12 +292,7 @@ class BaseModuleRegistry(BasePkgRefRegistry):
         """
 
         records_map = self._map_entry_point_module(entry_point, module)
-
-        # if duplicates exist, it means a package declared multiple
-        # keys for the same namespace and they really shouldn't do
-        # that.
-        self._dist_to_package_module_map(entry_point).extend(
-            list(records_map.keys()))
+        self.store_records_for_package(entry_point, list(records_map.keys()))
 
         for module_name, records in records_map.items():
             if module_name in self.records:
@@ -333,6 +344,51 @@ class BaseModuleRegistry(BasePkgRefRegistry):
         return result
 
 
+class BaseChildModuleRegistry(BaseModuleRegistry):
+    """
+    To enable more generic support of child module registries, where the
+    records depend on a parent registry, this class provides the basic
+    framework to do so.
+    """
+
+    def __init__(self, registry_name, *a, **kw):
+        # TODO whenever there is time to move the BaseRegistry to a
+        # bootstrap module of some sort (that will break tests that
+        # override calmjs.base.working_set if done naively), and have
+        # the calmjs.registry.Registry inherit from that (and this
+        # module also to maintain the BaseRegistry import location,
+        # this import should be moved to the top
+        from calmjs.registry import get
+        # resolve parent before the parent class, as the construction
+        # should be able to reference this parent.
+        parent_name = self.resolve_parent_registry_name(registry_name)
+        _parent = kw.pop('_parent', NotImplemented)
+        if _parent is NotImplemented:
+            self.parent = get(parent_name)
+        else:
+            self.parent = _parent
+
+        if not self.parent:
+            raise ValueError(
+                "could not construct child module registry '%s' as its "
+                "parent registry '%s' could not be found" % (
+                    registry_name, parent_name)
+            )
+        super(BaseChildModuleRegistry, self).__init__(registry_name, *a, **kw)
+
+    def resolve_parent_registry_name(self, registry_name, suffix):
+        """
+        Subclasses should override to specify the default suffix, as the
+        invocation is done without a suffix.
+        """
+
+        if not registry_name.endswith(suffix):
+            raise ValueError(
+                "child module registry name defined with invalid suffix "
+                "('%s' does not end with '%s')" % (registry_name, suffix))
+        return registry_name[:-len(suffix)]
+
+
 class BaseExternalModuleRegistry(BasePkgRefRegistry):
     """
     A registry for storing references to scripts sourced from JavaScript
@@ -370,14 +426,6 @@ class BaseExternalModuleRegistry(BasePkgRefRegistry):
         # paths that called on that module_name.
         self.records[entry_point.module_name] = self.records.get(
             entry_point.module_name, set()).union(paths)
-
-    def store_records_for_package(self, entry_point, paths):
-        """
-        Store the paths in a way that permit lookup by package
-        """
-
-        pkg_module_map = self._dist_to_package_module_map(entry_point)
-        pkg_module_map.extend(paths)
 
     def process_entry_point(self, entry_point):
         """

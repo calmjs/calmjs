@@ -45,10 +45,22 @@ class Registry(BaseRegistry):
         """
 
         working_set_ = kw.get('_working_set') or working_set
-        dist = working_set_.find(Requirement.parse(package_name))
-        # module_name is the package_name in our context.
-        self.reserved = {
-            k: v.module_name for k, v in dist.get_entry_map(reserved).items()}
+        self.reserved = {}
+        if reserved:
+            dist = working_set_.find(Requirement.parse(package_name))
+            if dist is None:
+                logger.error(
+                    "failed to set up registry_name reservations for "
+                    "registry '%s', as the specified package '%s' could "
+                    "not found in the current working_set; maybe it is not "
+                    "correctly installed?", registry_name, package_name,
+                )
+            else:
+                # module_name is the package_name in our context.
+                self.reserved = {
+                    k: v.module_name for k, v in dist.get_entry_map(
+                        reserved).items()
+                }
         super(Registry, self).__init__(registry_name, *a, **kw)
 
     def _init(self):
@@ -105,6 +117,14 @@ class Registry(BaseRegistry):
                 entry_point, entry_point.dist)
             return
 
+        if cls is type(self) and entry_point.name == self.registry_name:
+            logger.debug(
+                "registry '%s' has entry point '%s' which is the identity "
+                "registration", name, entry_point,
+            )
+            self.records[name] = self
+            return self
+
         logger.debug(
             "registering '%s' from '%s'", entry_point, entry_point.dist)
         try:
@@ -120,5 +140,7 @@ class Registry(BaseRegistry):
 
 # Initialize the root registry instance
 _inst = Registry(__name__)  # __name__ == calmjs.registry
-_inst.records[__name__] = _inst  # tie the knot, self-hosting.
-get = _inst.get
+
+
+def get(registry_name):
+    return _inst.get(registry_name)
