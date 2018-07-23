@@ -1,7 +1,7 @@
 Changelog
 =========
 
-3.3.0 (Unreleased)
+3.3.0 (2018-07-23)
 ------------------
 
 - Implement the features required to simplify the process of exposing
