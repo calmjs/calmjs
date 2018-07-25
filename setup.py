@@ -48,7 +48,7 @@ setup(
     keywords='',
     author='Tommy Yu',
     author_email='tommy.yu@auckland.ac.nz',
-    url='https://github.com/calmjs/',
+    url='https://github.com/calmjs/calmjs/',
     license='GPL',
     packages=find_packages('src', exclude=['ez_setup']),
     package_dir={'': 'src'},
