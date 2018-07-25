@@ -14,6 +14,7 @@ with the Node.js ecosystem from within a Python environment.
 .. |AMD| replace:: AMD (Asynchronous Module Definition)
 .. |calmjs.bower| replace:: ``calmjs.bower``
 .. |calmjs| replace:: ``calmjs``
+.. |calmjs_npm| replace:: ``calmjs npm``
 .. |calmjs.rjs| replace:: ``calmjs.rjs``
 .. |calmjs.webpack| replace:: ``calmjs.webpack``
 .. |npm| replace:: ``npm``
@@ -200,10 +201,10 @@ command can be executed to install directly from PyPI:
 
     $ pip install calmjs
 
+.. _development installation method:
+
 Alternative installation methods (for developers, advanced users)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. _development installation method:
 
 Development is still ongoing with |calmjs|, for the latest features and
 bug fixes, the development version can be installed through git like so:
@@ -279,8 +280,8 @@ subcommands are available (which will be provided by other |calmjs|
 integration packages) they will be listed as a ``<command>`` and their
 specific help messages will be accessible in the same manner.
 
-Declare and use a ``package.json`` for a given Python package
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Declare a ``package.json`` for a given Python package
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. _using package_json:
 
@@ -300,13 +301,13 @@ it may do something like this in its ``setup.py``:
 
     setup(
         name='example.package',
-        ...
+        # ...
         setup_requires=[
             'calmjs',
-            ...
+            # plus other setup_requires ...
         ],
         package_json=package_json,
-        ...
+        # ...
     )
 
 Note that ``setup_requires`` section must specify |calmjs| in order to
@@ -318,28 +319,97 @@ environment, it will be acquired from PyPI and be included as part of
 the |setuptools| setup process, and without being a direct dependency of
 the given package.  The ``package.json`` will be generated if the
 provided data is either a valid JSON string or a dictionary without
-incompatible data types.
+incompatible data types.  For example:
 
-All packages that ultimately depending on this ``example.package`` will
-have the option to inherit this ``package.json`` metadata file.  One
-method to do this is through that package's ``setup.py``.  By invoking
-``setup.py npm --init`` from there, a new ``package.json`` will be
-written to the current directory.  This is akin to running ``npm init``,
-with the difference being that the dependencies are being declared
-through the Python package dependency tree for the given Python package.
-Do note that ``example.package`` (and its dependent package, if that is
-the one being developed) must already be installed and be importable
-in the given Python environment first.
+.. code:: sh
 
-Alternatively, invoking ``calmjs npm --init example.package`` from the
-command line will achieve the same thing, provided that both |calmjs|
-and ``example.package`` are installed and available through the current
-Python environment's import system.
+    $ python setup.py egg_info
+    running egg_info
+    writing package_json to example.package.egg-info/package.json
+    ...
+    $ cat example.package.egg-info/package.json
+    {
+        "dependencies": {
+            "jquery": "~3.0.0",
+            "underscore": "~1.8.0"
+        }
+    }
+
+The key reason for using ``setup_requires`` is to not force a given
+package's dependents to have |calmjs| as part of their dependencies, as
+typically this is a requirement only for developers but not for
+end-users.  This also mean that for developers that want to use |calmjs|
+and utilities they must install that separately (i.e. ``pip install
+calmjs``), or declare |calmjs| as a development dependency through the
+usage of ``extras_require`` flag, for example:
+
+.. code:: python
+
+    setup(
+        name='example.package',
+        # ...
+        setup_requires=[
+            'calmjs',
+            # ...
+        ],
+        extras_require={
+            'dev': [
+                'calmjs',
+                # ... plus other development dependencies
+            ],
+        },
+        # ...
+    )
+
+Then to fully install the package as an editable package with the
+dependencies listed under the ``dev`` extras:
+
+.. code:: shell
+
+    $ pip install -e .[dev]
+    Obtaining file://example/package
+    ...
+    Installing collected packages: ..., calmjs, ...
+      Running setup.py develop for example.package
+    Successfully installed ...
+
+Note that now the |calmjs| package remains installed in the Python
+environment, and the utilities they provide may now be used, covered by
+the following sections.
+
+Using the ``package.json`` across Python package dependencies
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. |integrate_with_calmjs_npm| replace:: integration with ``npm``
+    through ``calmjs npm``
+
+With the ``package.json`` file written to the package metadata
+directory, utilities such as |calmjs| make make use of it.  One method
+to do this is through that package's ``setup.py``.  By invoking
+``setup.py npm --init`` from there, a new ``package.json``, combined
+with all the ``dependencies`` and ``devDependencies`` declared by the
+Python package dependencies of the given package, will be written to the
+current directory.  This is akin to running ``npm init``, with the
+difference being that the dependencies are also being resolved through
+the Python package dependency tree for the given Python package.
+
+Do note that this requires the ``package.json`` creation and handling
+capability be available for the given package (refer to previous section
+on how to achieve this) and all dependencies must be correctly installed
+and be importable from the current Python environment.
+
+Alternatively, the |calmjs_npm| utility may be used.  Invoking ``calmjs
+npm --init example.package`` from the command line will achieve the same
+thing, anywhere on the file system, provided that both |calmjs| and
+``example.package`` are installed and available through the current
+Python environment's import system.  For more details and information
+about this utility, please refer to the |integrate_with_calmjs_npm|_
+section.
 
 Dealing with |npm| dependencies with Python package dependencies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Remember, flat is better than nested.  So all ``dependencies`` (and
+Flat is better than nested.  So all ``dependencies`` (and
 ``devDependencies``) declared by any upstream Python package will be
 automatically inherited by all its downstream packages, but they have
 the option to override it with whatever they want through the mechanism
@@ -347,20 +417,23 @@ as described above.  They can set a JavaScript or Node.js package to
 whatever versions desired, or even simply remove that dependency
 completely by setting the version to ``None``.
 
-Through this inheritance mechanism whenever an actual ``package.json``
-is needed, the dependencies are flattened for consumption by the
-respective JavaScript package managers, or by the desired toolchain to
-make use of the declared information to generate the desired artifacts
-to achieve whatever desired task at hand.
+Whenever an actual ``package.json`` is needed by |calmjs|, the
+|calmjs_npm| utility flattens all Node.js dependencies needed by the
+Python packages into a single file, which is then passed into the
+respective JavaScript package manager for consumption.  This process is
+also done when a |calmjs| toolchain or utility make use of these
+declared information to to generate the desired artifacts to achieve
+whatever desired task at hand.
 
 Of course, if the nested style of packages and dependency in the same
 style as |npm| is desired, no one is forced to use this, they are free
-to split their packages up to Python and JavaScript bits and have them
-be deployed and hosted on both PyPI (for ``pip``) and |npm| respectively
-and then figure out how to bring them back together in a coherent
-manner.  Don't ask (or debate with) the author on how the latter option
-is better or easier for everyone (developers, system integrators and
-end-users) involved.
+to use whatever tools to interpret or make use of whatever data files
+and dependencies available, and/or to split their packages up to Python
+and JavaScript bits and have them be deployed and hosted on both PyPI
+(for ``pip``) and |npm| respectively and then figure out how to bring
+them back together in a coherent manner.  Don't ask (or debate with) the
+author on how the latter option is better or easier for everyone
+(developers, system integrators and end-users) involved.
 
 Declare explicit dependencies on paths inside ``node_modules``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -603,8 +676,10 @@ specific registry type.
 One final note: due to the limitations of the Python entry point system,
 file name extensions are assumed to be all lower-case.
 
-Integration with |npm| through ``calmjs npm``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. _integrate_with_calmjs_npm:
+
+Integration with |npm| through |calmjs_npm|
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 As mentioned, it is possible to make use of the ``package.json``
 generation capabilities from outside of |setuptools|.  Users can easily
@@ -661,6 +736,11 @@ required packages installed.  For instance, if the Node.js packages for
         "devDependencies": {},
         "name": "example.package"
     }
+
+If there is an existing ``package.json`` file already in the current
+directory, using the ``-i`` flag with ``--init`` or ``--install`` will
+show what differences there may be between the generated version and the
+existing version, and prompt for an action.
 
 Toolchain
 ~~~~~~~~~
@@ -776,10 +856,10 @@ bad entry point
     of the package triggering this error will be noted in the log; the
     error may be reported to its developer.
 
+.. _symptoms of namespace import failures:
+
 Random ``ImportError`` when trying to import from the |calmjs| namespace
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. _symptoms of namespace import failures:
 
 As |calmjs| is declared as both namespace and package, there are certain
 low-level setup that is required on the working Python environment to
