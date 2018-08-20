@@ -48,7 +48,7 @@ setup(
     keywords='',
     author='Tommy Yu',
     author_email='tommy.yu@auckland.ac.nz',
-    url='https://github.com/calmjs/',
+    url='https://github.com/calmjs/calmjs/',
     license='GPL',
     packages=find_packages('src', exclude=['ez_setup']),
     package_dir={'': 'src'},
@@ -57,7 +57,7 @@ setup(
     install_requires=[
         'setuptools>=12',
         'calmjs.types',
-        'calmjs.parse>=1.0.0,<2',
+        'calmjs.parse>=1.0.0,!=1.1.0,!=1.1.1,<2',
     ],
     include_package_data=True,
     python_requires='>=2.7,!=3.0.*,!=3.1.*,!=3.2.*',

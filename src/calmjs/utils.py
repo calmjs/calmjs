@@ -132,6 +132,10 @@ def which(cmd, mode=os.F_OK | os.X_OK, path=None):
     Loosely based on the version in python 3.3.
     """
 
+    if os.path.dirname(cmd):
+        if os.path.isfile(cmd) and os.access(cmd, mode):
+            return cmd
+
     if path is None:
         path = os.environ.get('PATH', defpath)
     if not path:
