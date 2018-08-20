@@ -1,6 +1,14 @@
 Changelog
 =========
 
+3.3.1 (2018-08-??)
+------------------
+
+- Correct the implementation of the helper function ``which`` such that
+  path arguments to valid executables are accepted and returned.  [
+  `#52 <https://github.com/calmjs/calmjs/issues/52>`_
+  ]
+
 3.3.0 (2018-07-23)
 ------------------
 
