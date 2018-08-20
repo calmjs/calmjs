@@ -21,6 +21,7 @@ from calmjs.utils import raise_os_error
 from calmjs.testing.mocks import StringIO
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import stub_os_environ
+from calmjs.testing.utils import remember_cwd
 
 
 class JsonDumpTestCase(unittest.TestCase):
@@ -89,8 +90,22 @@ class WhichTestCase(unittest.TestCase):
             pass
         os.chmod(f, 0o777)
         self.assertEqual(which('binary'), f)
+        self.assertEqual(which(f), f)
         os.environ['PATH'] = ''
         self.assertEqual(which('binary', path=tempdir), f)
+        self.assertEqual(which(f, path=tempdir), f)
+
+    def test_found_posix_relpath(self):
+        remember_cwd(self)
+        sys.platform = 'posix'
+        os.chdir(mkdtemp(self))
+        os.mkdir('bin')
+        bin_dir = os.environ['PATH'] = join(os.path.curdir, 'bin')
+        f = join(bin_dir, 'binary')
+        with open(f, 'w'):
+            pass
+        os.chmod(f, 0o777)
+        self.assertEqual(which(f), f)
 
     def test_found_win32(self):
         sys.platform = 'win32'
@@ -102,11 +117,13 @@ class WhichTestCase(unittest.TestCase):
         os.chmod(f, 0o777)
         self.assertEqual(which('binary'), f)
         self.assertEqual(which('binary.exe'), f)
+        self.assertEqual(which(f), f)
         self.assertIsNone(which('binary.com'))
 
         os.environ['PATH'] = ''
         self.assertEqual(which('binary', path=tempdir), f)
         self.assertEqual(which('binary.exe', path=tempdir), f)
+        self.assertEqual(which(f, path=tempdir), f)
         self.assertIsNone(which('binary.com', path=tempdir))
 
     def test_finalize_env_others(self):
