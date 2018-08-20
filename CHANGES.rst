@@ -1,7 +1,7 @@
 Changelog
 =========
 
-3.3.1 (2018-08-??)
+3.3.1 (2018-08-20)
 ------------------
 
 - Correct the implementation of the helper function ``which`` such that
