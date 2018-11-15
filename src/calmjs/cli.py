@@ -40,7 +40,7 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-version_expr = re.compile('((?:\d+)(?:\.\d+)*)')
+version_expr = re.compile(r'((?:\d+)(?:\.\d+)*)')
 
 
 def get_bin_version_str(bin_path, version_flag='-v', kw={}):
