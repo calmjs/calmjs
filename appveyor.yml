@@ -11,11 +11,16 @@ environment:
     - PYTHON: "C:\\Python37"
       nodejs_version: "10"
 
+# adding an uppercase element in the path to test #54
+clone_folder: c:\projects\SomeLONGPath\calmjs
+
 install:
   - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
   - ps: Install-Product node $env:nodejs_version
-  - "%PYTHON%\\python.exe -m pip install coverage"
-  - "%PYTHON%\\python.exe setup.py install"
+  - "%PYTHON%\\python.exe -m pip install virtualenv"
+  - "%PYTHON%\\python.exe -m virtualenv Venv"
+  - "Venv\\Scripts\\activate"
+  - "pip install coverage ."
 
 test_script:
   # piping empty echo to disable the tty test which is reported as
