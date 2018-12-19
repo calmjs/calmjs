@@ -20,7 +20,8 @@ install:
   - "%PYTHON%\\python.exe -m pip install virtualenv"
   - "%PYTHON%\\python.exe -m virtualenv Venv"
   - "Venv\\Scripts\\activate"
-  - "pip install coverage ."
+  - "pip install coverage"
+  - "pip install -e ."
 
 test_script:
   # piping empty echo to disable the tty test which is reported as

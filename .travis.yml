@@ -3,7 +3,7 @@ matrix:
   allow_failures:
     - os: osx
     - python: 3.8-dev
-    - env: TRAVIS_NODE_VERSION=7.4
+    - env: TRAVIS_NODE_VERSION=11
   include:
     - language: python
       python: 2.7
@@ -29,7 +29,7 @@ matrix:
             - yarn
     - language: python
       python: 3.5
-      env: TRAVIS_NODE_VERSION=8.11
+      env: TRAVIS_NODE_VERSION=8.14
       dist: trusty
       addons:
         apt:
@@ -40,7 +40,7 @@ matrix:
             - yarn
     - language: python
       python: 3.6
-      env: TRAVIS_NODE_VERSION=8.11
+      env: TRAVIS_NODE_VERSION=8.14
       dist: trusty
       addons:
         apt:
@@ -65,7 +65,7 @@ matrix:
       python: 3.8-dev
       sudo: true
       dist: xenial
-      env: TRAVIS_NODE_VERSION=10
+      env: TRAVIS_NODE_VERSION=11
       addons:
         apt:
           sources:
@@ -78,24 +78,24 @@ matrix:
       env: TRAVIS_NODE_VERSION=6.14
     - language: python
       python: pypy3
-      env: TRAVIS_NODE_VERSION=8.11
+      env: TRAVIS_NODE_VERSION=8.14
     # test different versions of Node.js on osx
     - language: node_js
       node_js: 4.9
       os: osx
-      env: TRAVIS_PYTHON_VERSION=3.4.5
+      env: TRAVIS_PYTHON_VERSION=3.4.9
     - language: node_js
       node_js: 6.14
       os: osx
       env: TRAVIS_PYTHON_VERSION=3.5.3
     - language: node_js
-      node_js: 8.11
+      node_js: 8.14
       os: osx
-      env: TRAVIS_PYTHON_VERSION=3.6.5
+      env: TRAVIS_PYTHON_VERSION=3.6.7
     - language: node_js
       node_js: 10
       os: osx
-      env: TRAVIS_PYTHON_VERSION=3.7.0
+      env: TRAVIS_PYTHON_VERSION=3.7.1
 
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
@@ -121,7 +121,7 @@ before_install:
 
 install:
   - pip install coverage flake8
-  - python setup.py develop
+  - pip install -e .
 script: 
   - flake8 setup.py src
   - coverage run --include=src/* -m unittest calmjs.tests.make_suite
