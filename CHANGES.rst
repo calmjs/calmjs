@@ -1,6 +1,16 @@
 Changelog
 =========
 
+3.3.2 (20??-??-??)
+------------------
+
+- Clean up a failing test case on Windows due to failure to use normcase
+  to normalize the path for comparison between test result and expected
+  answers.  [
+  `#53 <https://github.com/calmjs/calmjs/issues/53>`_
+  `#54 <https://github.com/calmjs/calmjs/issues/54>`_
+  ]
+
 3.3.1 (2018-08-20)
 ------------------
 

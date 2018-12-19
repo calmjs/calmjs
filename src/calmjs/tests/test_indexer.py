@@ -330,25 +330,49 @@ class IndexerTestCase(unittest.TestCase):
                 to_os_sep_path('calmjs/testing/module2/mod/helper.js'),
         })
 
-    def test_module3_multi_path(self):
+    def test_module3_multi_path_all(self):
         """
         For modules that have multiple paths.  This is typically caused
         by specifying a module that is typically used as a namespace for
         other Python modules.  Normally this can interfere with imports
         but as long as a module is produced and the multiple path
-        modpath method is used, the mapper will fulfil the order.
+        modpath method is used, the 'all' mapper will fulfil the order.
         """
 
         # See setup method for how it's built.
         module, index_js = make_multipath_module3(self)
 
         def join_mod3(*a):
-            return join(calmjs_dist_dir, 'calmjs', 'testing', 'module3', *a)
+            # use the actual value provided by the dummy module (which
+            # references the real version.
+            from calmjs.testing import module3
+            mod3_dir = module3.__path__[0]
+            return join(mod3_dir, *a)
 
         results = indexer.mapper(
             module, calmjs_ep, modpath='all', globber='recursive')
         self.assertEqual(results, {
             'calmjs/testing/module3/index': index_js,
+            'calmjs/testing/module3/math': join_mod3('math.js'),
+            'calmjs/testing/module3/mod/index': join_mod3('mod', 'index.js'),
+        })
+
+    def test_module3_multi_path_pkg_resources(self):
+        """
+        With the usage of pkg_resources modpath, the extra paths must be
+        available somehow to this framework, but given that this is not
+        setup through the framework proper the custom path provided by
+        the mocked module object will never be used.
+        """
+
+        module, index_js = make_multipath_module3(self)
+
+        def join_mod3(*a):
+            return join(calmjs_dist_dir, 'calmjs', 'testing', 'module3', *a)
+
+        results = indexer.mapper(
+            module, calmjs_ep, modpath='pkg_resources', globber='recursive')
+        self.assertEqual(results, {
             'calmjs/testing/module3/math': join_mod3('math.js'),
             'calmjs/testing/module3/mod/index': join_mod3('mod', 'index.js'),
         })
