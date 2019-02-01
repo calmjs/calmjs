@@ -174,7 +174,7 @@ def which(cmd, mode=os.F_OK | os.X_OK, path=None):
 
 
 def pdb_post_mortem(*a, **kw):
-    post_mortem()
+    post_mortem(*a, **kw)
 
 
 def pdb_set_trace(*a, **kw):
