@@ -831,11 +831,15 @@ using a debug flag (either ``-d`` or ``--debug``).
 
 Specifying the debug flag twice will enable the ``post_mortem`` mode,
 where a debugger will be fired at the point of failure.  Authors of
-runtime modules may find this useful during their development cycles.
-Do note that the default debugger is set up to only be triggered only on
-this termination; if errors and/or exceptions occur during the setup
-stage of the |calmjs| runtime, any errors will only simply be logged,
-while warnings will be discarded (unless extra verbose flags are used).
+packages that implement runtime classes that provide subcommands to the
+|calmjs| command may find this useful during their development cycles.
+Do note that the default debugger is only triggered if the top level
+runtime class enable the usage (which the runtime class that implement
+the |calmjs| command does) and if the failure occur during the
+invocation of the runtime class.  Any other errors or exceptions that
+occur during the setup stage of the |calmjs| runtime will simply be
+logged at a lower priority level (e.g. to make warnings generated during
+the setup stage visible, additional verbose flags must be provided).
 
 ERROR bad 'calmjs.runtime' entry point
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
