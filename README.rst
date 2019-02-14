@@ -197,7 +197,7 @@ system/environment/platform.
 To install |calmjs| into a given Python environment, the following
 command can be executed to install directly from PyPI:
 
-.. code:: sh
+.. code:: console
 
     $ pip install calmjs
 
@@ -209,7 +209,7 @@ Alternative installation methods (for developers, advanced users)
 Development is still ongoing with |calmjs|, for the latest features and
 bug fixes, the development version can be installed through git like so:
 
-.. code:: sh
+.. code:: console
 
     $ # standard installation mode
     $ pip install git+https://github.com/calmjs/calmjs.git#egg=calmjs
@@ -235,7 +235,7 @@ Testing the installation
 To ensure that the |calmjs| installation is functioning correctly, the
 built-in testsuite can be executed by the following:
 
-.. code:: sh
+.. code:: console
 
     $ python -m unittest calmjs.tests.make_suite
 
@@ -252,7 +252,7 @@ Usage and description of key features
 When installed to a particular Python environment, the |calmjs|
 command-line utility will become available within there.
 
-.. code::
+.. code:: console
 
     $ calmjs
     usage: calmjs [-h] [-d] [-q] [-v] [-V] <command> ...
@@ -321,7 +321,7 @@ the given package.  The ``package.json`` will be generated if the
 provided data is either a valid JSON string or a dictionary without
 incompatible data types.  For example:
 
-.. code:: sh
+.. code:: console
 
     $ python setup.py egg_info
     running egg_info
@@ -364,7 +364,7 @@ usage of ``extras_require`` flag, for example:
 Then to fully install the package as an editable package with the
 dependencies listed under the ``dev`` extras:
 
-.. code:: shell
+.. code:: console
 
     $ pip install -e .[dev]
     Obtaining file://example/package
@@ -685,7 +685,7 @@ As mentioned, it is possible to make use of the ``package.json``
 generation capabilities from outside of |setuptools|.  Users can easily
 do the same through the built-in ``calmjs npm`` tool:
 
-.. code::
+.. code:: console
 
     $ calmjs npm --help
     usage: calmjs npm [-h] [-d] [-q] [-v] [-V] [--view] [--init] [--install]
@@ -723,7 +723,7 @@ required packages installed.  For instance, if the Node.js packages for
 ``example.package`` is to be installed, this can be invoked to view the
 ``package.json`` that would be generated:
 
-.. code::
+.. code:: console
 
     $ calmjs -v npm --view example.package
     2016-09-01 16:37:18,398 INFO calmjs.cli generating a flattened
@@ -814,7 +814,7 @@ CRITICAL calmjs.runtime terminating due to a critical error
 
 If |calmjs| encounters any unexpected situation, it may abort like so:
 
-.. code:: sh
+.. code:: console
 
     $ calmjs npm --install calmjs.dev
     CRITICAL calmjs.runtime terminating due to a critical error
@@ -822,7 +822,7 @@ If |calmjs| encounters any unexpected situation, it may abort like so:
 If no useful ERROR message is listed before, please try running again
 using a debug flag (either ``-d`` or ``--debug``).
 
-.. code:: sh
+.. code:: console
 
     $ calmjs -d npm --install calmjs.dev
     CRITICAL calmjs.runtime terminating due to exception
@@ -887,7 +887,7 @@ under the |calmjs| namespace.  As an example:
 It could also manifest differently, such as an ``AttributeError``, which
 may be triggered through the execution of unittests for |calmjs|:
 
-.. code::
+.. code:: console
 
     $ coverage run --include=src/* -m unittest calmjs.tests.make_suite
     Traceback (most recent call last):
@@ -900,7 +900,7 @@ may be triggered through the execution of unittests for |calmjs|:
 To resolve this issue, ensure that |setuptools| is upgraded to v31 or
 greater, which may be installed/upgraded through ``pip`` like so:
 
-.. code::
+.. code:: console
 
     $ pip install --upgrade setuptools
 
@@ -931,7 +931,7 @@ from being able to quickly locate the misplaced argument flags.
 For instance, if the |calmjs| command was executed like so resulting in
 error message may look like this:
 
-.. code:: sh
+.. code:: console
 
     $ calmjs subcmd1 subcmd2 --flag item
     usage: calmjs subcmd1 ... [--flag FLAG]
