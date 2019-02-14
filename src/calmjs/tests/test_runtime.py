@@ -2296,7 +2296,7 @@ class PackageManagerRuntimeAlternativeIntegrationTestCase(unittest.TestCase):
 @unittest.skipIf(which_npm is None, 'npm not found.')
 class RuntimeIntegrationTestCase(unittest.TestCase):
 
-    def setup_runtime(self):
+    def setup_runtime(self, cls=runtime.Runtime):
         make_dummy_dist(self, (
             ('package.json', json.dumps({
                 'name': 'site',
@@ -2342,7 +2342,7 @@ class RuntimeIntegrationTestCase(unittest.TestCase):
                 'foo = calmjs.npm:npm.runtime',
             ],
         })
-        return runtime.Runtime(working_set=working_set)
+        return cls(working_set=working_set)
 
     def test_npm_init_integration(self):
         remember_cwd(self)
@@ -2562,12 +2562,7 @@ class RuntimeIntegrationTestCase(unittest.TestCase):
         self.assertIn("Traceback ", stderr)
         self.assertNotIn("(Pdb)", stderr)
 
-    def test_npm_binary_not_found_debugger(self):
-        from calmjs import utils
-
-        def fake_post_mortem(*a, **kw):
-            sys.stdout.write('(Pdb) ')
-
+    def test_npm_binary_not_found_debugger_disabled(self):
         remember_cwd(self)
         tmpdir = mkdtemp(self)
         os.chdir(tmpdir)
@@ -2577,6 +2572,40 @@ class RuntimeIntegrationTestCase(unittest.TestCase):
 
         # ensure the binary is not found.
         stub_mod_call(self, cli, fake_error(IOError))
+        rt(['-dd', 'foo', '--install', 'example.package2'])
+
+        stderr = sys.stderr.getvalue()
+        self.assertIn("ERROR", stderr)
+        self.assertIn(
+            "invocation of the 'npm' binary failed;", stderr)
+        self.assertIn("terminating due to unexpected error", stderr)
+        self.assertIn("Traceback ", stderr)
+        # Note that since 3.4.0, post_mortem must be explicitly enabled
+        # for the runtime class/instance
+        self.assertNotIn("(Pdb)", sys.stdout.getvalue())
+        self.assertIn(
+            "instances of 'calmjs.runtime.Runtime' has disabled post_mortem "
+            "debugger", sys.stderr.getvalue()
+        )
+
+    def test_npm_binary_not_found_debugger_enabled(self):
+        from calmjs import utils
+
+        def fake_post_mortem(*a, **kw):
+            sys.stdout.write('(Pdb) ')
+
+        remember_cwd(self)
+        tmpdir = mkdtemp(self)
+        os.chdir(tmpdir)
+        # use the CalmJSRuntime which has the post_mortem debugger
+        # enabled.
+        rt = self.setup_runtime(runtime.CalmJSRuntime)
+        stub_stdouts(self)
+
+        # ensure the binary is not found.
+        stub_mod_call(self, cli, fake_error(IOError))
+        # utils.post_mortem references pbd.post_mortem, stub that to
+        # avoid triggering certain issues.
         stub_item_attr_value(self, utils, 'post_mortem', fake_post_mortem)
         rt(['-dd', 'foo', '--install', 'example.package2'])
 

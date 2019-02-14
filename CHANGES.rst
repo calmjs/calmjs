@@ -1,7 +1,7 @@
 Changelog
 =========
 
-3.3.2 (20??-??-??)
+3.4.0 (20??-??-??)
 ------------------
 
 - Clean up a failing test case on Windows due to failure to use normcase
@@ -9,6 +9,11 @@ Changelog
   answers.  [
   `#53 <https://github.com/calmjs/calmjs/issues/53>`_
   `#54 <https://github.com/calmjs/calmjs/issues/54>`_
+  ]
+- Provide a means to enable/disable the invocation of the post_mortem
+  debugger at the class level, such that this feature is not forcibly
+  enabled for all subclasses of Runtime.  [
+  `#55 <https://github.com/calmjs/calmjs/issues/55>`_
   ]
 
 3.3.1 (2018-08-20)

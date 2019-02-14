@@ -111,6 +111,17 @@ def norm_args(args):
     return sys.argv[1:] if args is None else (args or [])
 
 
+def disable_post_mortem(*a, **kw):
+    if a and isinstance(a[0], BootstrapRuntime):
+        logger.warning(
+            "instances of '%s.%s' has disabled post_mortem debugger",
+            a[0].__class__.__module__, a[0].__class__.__name__,
+        )
+
+
+enable_post_mortem = staticmethod(pdb_post_mortem)
+
+
 class BootstrapRuntime(object):
     """
     calmjs bootstrap runtime.
@@ -190,6 +201,8 @@ class BaseRuntime(BootstrapRuntime):
     """
     calmjs runtime collection
     """
+
+    post_mortem = disable_post_mortem
 
     def __init__(
             self, logger='calmjs', action_key=DEST_RUNTIME,
@@ -317,7 +330,7 @@ class BaseRuntime(BootstrapRuntime):
                     logger.critical(
                         'terminating due to %s', reason, exc_info=1)
                     if self.debug > 1:
-                        pdb_post_mortem(sys.exc_info()[2])
+                        self.post_mortem(sys.exc_info()[2])
                 elif isinstance(e, RuntimeAbort):
                     logger.critical('terminating due to %s', reason)
                 elif not self.debug:
@@ -701,6 +714,8 @@ class RequiredCommandRuntime(Runtime):
 
 class CalmJSRuntime(RequiredCommandRuntime):
 
+    post_mortem = enable_post_mortem
+
     def __init__(self, package_name=CALMJS, *a, **kw):
         """
         The main CalmJS runtime
@@ -708,7 +723,8 @@ class CalmJSRuntime(RequiredCommandRuntime):
         package_name is provided a default of 'calmjs'.
         """
 
-        super(CalmJSRuntime, self).__init__(package_name=package_name)
+        super(CalmJSRuntime, self).__init__(
+            package_name=package_name, *a, **kw)
 
 
 class DriverRuntime(BaseRuntime):
