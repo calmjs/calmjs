@@ -902,7 +902,7 @@ class ToolchainRuntime(DriverRuntime):
             default_key=1,
         )
         if not overwrite:
-            raise ToolchainCancel('cancelation initiated by user')
+            raise ToolchainCancel('cancellation initiated by user')
 
     def prepare_spec_debug_flag(self, spec, **kwargs):
         spec[DEBUG] = self.debug

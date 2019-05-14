@@ -100,14 +100,15 @@ def resource_filename_mod_entry_point(module_name, entry_point):
 
     if not result:
         logger.warning(
-            "resource path cannot be found for module '%s' and entry_point "
-            "'%s'", module_name, entry_point
+            "fail to resolve the resource path for module '%s' and "
+            "entry_point '%s'", module_name, entry_point
         )
         return None
     if not exists(result):
         logger.warning(
-            "resource path found at '%s' for module '%s' and entry_point "
-            "'%s', but it does not exist", result, module_name, entry_point,
+            "resource path resolved to be '%s' for module '%s' and "
+            "entry_point '%s', but it does not exist",
+            result, module_name, entry_point,
         )
         return None
     return result
