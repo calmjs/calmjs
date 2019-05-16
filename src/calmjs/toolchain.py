@@ -1550,6 +1550,23 @@ class Toolchain(BaseDriver):
         self.link(spec)
         self.finalize(spec)
 
+    def setup_apply_advice_packages(self, spec):
+        """
+        This method sets up the advices that have been specified in the
+        ADVICE_PACKAGES key, and apply the advices to the spec.
+        """
+
+        advice_packages = spec.get(ADVICE_PACKAGES) or []
+        if isinstance(advice_packages, (list, tuple)) and advice_packages:
+            advice_registry = get_registry(CALMJS_TOOLCHAIN_ADVICE)
+            logger.debug(
+                'prepare spec with optional advices from packages %r',
+                advice_packages
+            )
+            for pkg_name in advice_packages:
+                advice_registry.process_toolchain_spec_package(
+                    self, spec, pkg_name)
+
     def calf(self, spec):
         """
         Typical safe usage is this, which sets everything that could be
@@ -1561,6 +1578,13 @@ class Toolchain(BaseDriver):
         if not isinstance(spec, Spec):
             raise TypeError('spec must be of type Spec')
 
+        # The following ensure steps really should be formalised into
+        # some form of setup.  This may be a version 4+ item to consider
+        # for integration, where the current SETUP advice is changed to
+        # BEFORE_SETUP and have the following ensure step be part of the
+        # default setup.
+
+        # ensure build directory is defined and sane.
         if not spec.get(BUILD_DIR):
             tempdir = realpath(mkdtemp())
             spec.advise(CLEANUP, shutil.rmtree, tempdir)
@@ -1573,7 +1597,11 @@ class Toolchain(BaseDriver):
                 logger.error("build_dir '%s' is not a directory", build_dir)
                 raise_os_error(errno.ENOTDIR, build_dir)
 
+        # ensure export target is sane
         self.realpath(spec, EXPORT_TARGET)
+
+        # ensure advices specific to packages are applied
+        self.setup_apply_advice_packages(spec)
 
         # Finally, handle setup which may set up the deferred advices,
         # as all the toolchain (and its runtime and/or its parent

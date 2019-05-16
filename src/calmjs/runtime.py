@@ -28,7 +28,6 @@ from calmjs.argparse import metavar
 from calmjs.artifact import ArtifactBuilder
 from calmjs.artifact import ARTIFACT_REGISTRY_NAME
 from calmjs.exc import RuntimeAbort
-from calmjs.registry import get
 from calmjs.toolchain import Spec
 from calmjs.toolchain import ToolchainCancel
 from calmjs.toolchain import ADVICE_PACKAGES
@@ -36,11 +35,9 @@ from calmjs.toolchain import AFTER_PREPARE
 from calmjs.toolchain import BUILD_DIR
 from calmjs.toolchain import CALMJS_MODULE_REGISTRY_NAMES
 from calmjs.toolchain import CALMJS_LOADERPLUGIN_REGISTRY_NAME
-from calmjs.toolchain import CALMJS_TOOLCHAIN_ADVICE
 from calmjs.toolchain import DEBUG
 from calmjs.toolchain import EXPORT_TARGET
 from calmjs.toolchain import EXPORT_TARGET_OVERWRITE
-from calmjs.toolchain import SETUP
 from calmjs.toolchain import SOURCE_PACKAGE_NAMES
 from calmjs.toolchain import WORKING_DIR
 from calmjs.ui import prompt_overwrite_json
@@ -912,16 +909,12 @@ class ToolchainRuntime(DriverRuntime):
         spec.advise(AFTER_PREPARE, self.check_export_target_exists, spec)
 
     def prepare_spec_advice_packages(self, spec, **kwargs):
-        reg = get(CALMJS_TOOLCHAIN_ADVICE)
-        advice_packages = kwargs.get(ADVICE_PACKAGES) or []
-        if isinstance(advice_packages, (list, tuple)):
+        spec[ADVICE_PACKAGES] = kwargs.get(ADVICE_PACKAGES, [])
+        if spec[ADVICE_PACKAGES]:
             logger.debug(
-                'prepare spec with optional advices from packages %r',
-                advice_packages
+                'preparing spec to apply optional advices from packages %r',
+                spec[ADVICE_PACKAGES]
             )
-            for pkg_name in advice_packages:
-                reg.process_toolchain_spec_package(
-                    self.toolchain, spec, pkg_name)
 
     def prepare_spec(self, spec, **kwargs):
         """
@@ -933,8 +926,7 @@ class ToolchainRuntime(DriverRuntime):
 
         self.prepare_spec_debug_flag(spec, **kwargs)
         self.prepare_spec_export_target_checks(spec, **kwargs)
-        # defer the setup till the actual toolchain invocation
-        spec.advise(SETUP, self.prepare_spec_advice_packages, spec, **kwargs)
+        self.prepare_spec_advice_packages(spec, **kwargs)
 
     def create_spec(self, **kwargs):
         """
