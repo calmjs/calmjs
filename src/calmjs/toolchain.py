@@ -1559,11 +1559,9 @@ class Toolchain(BaseDriver):
         advice_packages = spec.get(ADVICE_PACKAGES) or []
         if isinstance(advice_packages, (list, tuple)) and advice_packages:
             advice_registry = get_registry(CALMJS_TOOLCHAIN_ADVICE)
-            logger.debug(
-                'prepare spec with optional advices from packages %r',
-                advice_packages
-            )
             for pkg_name in advice_packages:
+                logger.debug(
+                    "applying toolchain advice for package '%s'" % pkg_name)
                 advice_registry.process_toolchain_spec_package(
                     self, spec, pkg_name)
 

@@ -912,7 +912,7 @@ class ToolchainRuntime(DriverRuntime):
         spec[ADVICE_PACKAGES] = kwargs.get(ADVICE_PACKAGES, [])
         if spec[ADVICE_PACKAGES]:
             logger.debug(
-                'preparing spec to apply optional advices from packages %r',
+                'sourcing optional advices from packages %r as specified',
                 spec[ADVICE_PACKAGES]
             )
 

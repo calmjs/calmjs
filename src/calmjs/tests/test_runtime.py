@@ -778,9 +778,13 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
 
         self.assertEqual(result['dummy'], ['dummy', 'bad'])
         err = sys.stderr.getvalue()
+        err_lines = err.splitlines()
 
-        self.assertIn('prepare spec with optional advices from packages', err)
-        self.assertIn('example.package', err)
+        self.assertIn('sourcing optional advices from ', err_lines[0])
+        self.assertIn('example.package', err_lines[0])
+        self.assertIn('as specified', err_lines[0])
+        self.assertIn(
+            "applying toolchain advice for package 'example.package'", err)
         self.assertIn('failure encountered while setting up advices', err)
 
         # Doing it normally should not result in that optional key.
@@ -864,6 +868,10 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         packages should NOT be added immediately, as it is executed
         before a number of very important advices were added by the
         toolchain itself.
+
+        However, given that the functionality has been moved from the
+        runtime to the toolchain itself, this should be less of an issue
+        but this test will remain as a check against regression of sort.
         """
 
         from calmjs.registry import _inst as root_registry
