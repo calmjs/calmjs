@@ -108,6 +108,13 @@ class BaseRuntimeTestCase(unittest.TestCase):
         self.assertEqual(runtime.norm_args([]), [])
         self.assertEqual(runtime.norm_args(['arg']), ['arg'])
 
+    def test_base_runtime_unknown_args(self):
+        stub_stdouts(self)
+        bt = runtime.BaseRuntime()
+        with self.assertRaises(SystemExit):
+            bt(['unknown'])
+        self.assertIn('unrecognized arguments: unknown', sys.stderr.getvalue())
+
     def test_global_flags(self):
         def fake_parse(args):
             warnings.warn('fake deprecation', DeprecationWarning)

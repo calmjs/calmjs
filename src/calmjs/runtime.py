@@ -267,6 +267,61 @@ class BaseRuntime(BootstrapRuntime):
 
         self.argparser.error(message)
 
+    def unrecognized_arguments_error(self, args, parsed, extras):
+        """
+        This exists because argparser is dumb and naive and doesn't
+        fail unrecognized arguments early.
+        """
+
+        # loop variants
+        kwargs = vars(parsed)
+        failed = list(extras)
+        # initial values
+        runtime, subparser, idx = (self, self.argparser, 0)
+        # recursion not actually needed when it can be flattened.
+        while isinstance(runtime, Runtime):
+            cmd = kwargs.pop(runtime.action_key)
+            # can happen if it wasn't set, or is set but from a default
+            # value (thus not provided by args)
+            action_idx = None if cmd not in args else args.index(cmd)
+            if cmd not in args and cmd is not None:
+                # this normally shouldn't happen, and the test case
+                # showed that the parsing will not flip down to the
+                # forced default subparser - this can remain a debug
+                # message until otherwise.
+                logger.debug(
+                    "command for prog=%r is set to %r without being specified "
+                    "as part of the input arguments - the following error "
+                    "message may contain misleading references",
+                    subparser.prog, cmd
+                )
+            subargs = args[idx:action_idx]
+            subparsed, subextras = subparser.parse_known_args(subargs)
+            if subextras:
+                subparser.unrecognized_arguments_error(subextras)
+                # since the failed arguments are in order
+                failed = failed[len(subextras):]
+                if not failed:
+                    # have taken everything, quit now.
+                    # also note that if cmd was really None it would
+                    # cause KeyError below, but fortunately it also
+                    # forced action_idx to be None which took all
+                    # remaining tokens from failed, so definitely get
+                    # out of here.
+                    break
+
+            # advance the values
+            # note that any internal consistency will almost certainly
+            # result in KeyError being raised.
+            details = runtime.get_argparser_details(subparser)
+            runtime = details.runtimes[cmd]
+            subparser = details.subparsers[cmd]
+            idx = action_idx + 1
+
+        if failed:
+            subparser.unrecognized_arguments_error(failed)
+        sys.exit(2)
+
     def __call__(self, args=None):
         args = norm_args(args)
         # MUST use the bootstrap runtime class to process all the common
@@ -612,61 +667,6 @@ class Runtime(BaseRuntime):
             'provided argparser (prog=%r) not associated with this '
             'runtime (%r)', argparser.prog, self
         )
-
-    def unrecognized_arguments_error(self, args, parsed, extras):
-        """
-        This exists because argparser is dumb and naive and doesn't
-        fail unrecognized arguments early.
-        """
-
-        # loop variants
-        kwargs = vars(parsed)
-        failed = list(extras)
-        # initial values
-        runtime, subparser, idx = (self, self.argparser, 0)
-        # recursion not actually needed when it can be flattened.
-        while isinstance(runtime, Runtime):
-            cmd = kwargs.pop(runtime.action_key)
-            # can happen if it wasn't set, or is set but from a default
-            # value (thus not provided by args)
-            action_idx = None if cmd not in args else args.index(cmd)
-            if cmd not in args and cmd is not None:
-                # this normally shouldn't happen, and the test case
-                # showed that the parsing will not flip down to the
-                # forced default subparser - this can remain a debug
-                # message until otherwise.
-                logger.debug(
-                    "command for prog=%r is set to %r without being specified "
-                    "as part of the input arguments - the following error "
-                    "message may contain misleading references",
-                    subparser.prog, cmd
-                )
-            subargs = args[idx:action_idx]
-            subparsed, subextras = subparser.parse_known_args(subargs)
-            if subextras:
-                subparser.unrecognized_arguments_error(subextras)
-                # since the failed arguments are in order
-                failed = failed[len(subextras):]
-                if not failed:
-                    # have taken everything, quit now.
-                    # also note that if cmd was really None it would
-                    # cause KeyError below, but fortunately it also
-                    # forced action_idx to be None which took all
-                    # remaining tokens from failed, so definitely get
-                    # out of here.
-                    break
-
-            # advance the values
-            # note that any internal consistency will almost certainly
-            # result in KeyError being raised.
-            details = runtime.get_argparser_details(subparser)
-            runtime = details.runtimes[cmd]
-            subparser = details.subparsers[cmd]
-            idx = action_idx + 1
-
-        if failed:
-            subparser.unrecognized_arguments_error(failed)
-        sys.exit(2)
 
     def error(self, argparser, target, message):
         """
