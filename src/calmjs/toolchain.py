@@ -95,6 +95,7 @@ from calmjs.parse.sourcemap import encode_sourcemap
 from calmjs.base import BaseDriver
 from calmjs.base import BaseRegistry
 from calmjs.base import BaseLoaderPluginRegistry
+from calmjs.base import PackageKeyMapping
 from calmjs.registry import get as get_registry
 from calmjs.exc import AdviceAbort
 from calmjs.exc import AdviceCancel
@@ -119,7 +120,7 @@ __all__ = [
 
     'toolchain_spec_compile_entries', 'ToolchainSpecCompileEntry',
 
-    'CALMJS_TOOLCHAIN_ADVICE',
+    'CALMJS_TOOLCHAIN_ADVICE', 'CALMJS_TOOLCHAIN_ADVICE_APPLY',
 
     'SETUP', 'CLEANUP', 'SUCCESS',
 
@@ -142,6 +143,7 @@ __all__ = [
 ]
 
 CALMJS_TOOLCHAIN_ADVICE = 'calmjs.toolchain.advice'
+CALMJS_TOOLCHAIN_ADVICE_APPLY = 'calmjs.toolchain.advice.apply'
 
 # define these as reserved advice names
 SETUP = 'setup'
@@ -217,6 +219,10 @@ TEST_PACKAGE_NAMES = 'test_package_names'
 TOOLCHAIN_BIN_PATH = 'toolchain_bin_path'
 # the working directory
 WORKING_DIR = 'working_dir'
+
+
+def cls_to_name(cls):
+    return '%s:%s' % (cls.__module__, cls.__name__)
 
 
 def _opener(*a):
@@ -833,9 +839,29 @@ class Spec(dict):
 
 class AdviceRegistry(BaseRegistry):
     """
-    Registry for package level optional setup for advices.
+    Registry for Spec.advise application functions.
 
-    These are specific to one given toolchain.
+    The declaration is specific to one given toolchain, and they are
+    declared as EntryPoints by packages.  Once defined, the package may
+    be refernced as an Advice Package and it may be specified by the
+    spec key ADVICE_PACKAGES.
+
+    For example, if 'example.package' declares the following::
+
+        [calmjs.toolchain.advice]
+        example.package.toolchain:Toolchain = example.package.spec:apply
+
+    And if that toolchain was invoked with a Spec that has the following
+    definition:
+
+        Spec({ADVICE_PACKAGES: ['example.package[extra1,extra2]']})
+
+    Then the target specified by that entry_point will then be invoked
+    with the spec and the extras passed as an unordered list.
+
+    For the implementation to function as expected, it requires the
+    Toolchain to invoke process_toolchain_spec_package of instances of
+    this registry.
     """
 
     def _init(self):
@@ -846,9 +872,6 @@ class AdviceRegistry(BaseRegistry):
 
     def get_record(self, name):
         return self.records.get(name)
-
-    def _to_name(self, cls):
-        return '%s:%s' % (cls.__module__, cls.__name__)
 
     def process_toolchain_spec_package(self, toolchain, spec, value):
         if not isinstance(toolchain, Toolchain):
@@ -879,7 +902,7 @@ class AdviceRegistry(BaseRegistry):
 
         logger.debug(
             "found advice setup steps registered for package/requirement "
-            "'%s' for toolchain '%s'", value, self._to_name(toolchain_cls)
+            "'%s' for toolchain '%s'", value, cls_to_name(toolchain_cls)
         )
 
         for cls in getattr(toolchain_cls, '__mro__'):
@@ -887,7 +910,7 @@ class AdviceRegistry(BaseRegistry):
             if not issubclass(cls, Toolchain):
                 continue
 
-            entry_point = toolchain_advices.get(self._to_name(cls))
+            entry_point = toolchain_advices.get(cls_to_name(cls))
             if entry_point:
                 try:
                     f = entry_point.load()
@@ -906,6 +929,67 @@ class AdviceRegistry(BaseRegistry):
                         "entry_point '%s' in group '%s'",
                         entry_point, self.registry_name,
                     )
+
+
+class AdviceApplyRegistry(BaseRegistry):
+    """
+    Registry to automatically set up the the list of ADVICE_PACKAGES for
+    a given Toolchain execution.  If a package has entries declared in
+    this registry, the default Toolchain will apply those declarations
+    onto the list of ADVICE_PACKAGES whenever it appears as a member of
+    SOURCE_PACKAGE_NAMES.  For example (continuing on from the example
+    in AdviceRegistry), if 'example.demo' declares the following:
+
+        [calmjs.toolchain.advice.apply]
+        example.demo = example.package[extra3,extra4]
+
+    Whenever 'example.demo' appears as an entry in SOURCE_PACKAGE_NAMES
+    in a spec, the following additional flags will be applied to the
+    spec.
+
+        {ADVICE_PACKAGES: ['example.package[extra1,extra2]']}
+
+    Naturally, this would not be carried across dependents - if
+    dependents also need that exact advice setup applied, it needs to
+    also declare the same entry in this registry.  Also, in order for
+    the implementation to function as expected, the standard Toolchain
+    must be used, and the relevant functionality should be invoked and
+    not be overridden.
+
+    Note that the key is ignored under the current implementation.
+    """
+
+    def _init(self):
+        # since the record keys are package names
+        self.records = PackageKeyMapping()
+        for entry_point in self.raw_entry_points:
+            self._init_entry_point(entry_point)
+
+    def _init_entry_point(self, entry_point):
+        if not entry_point.dist:
+            logger.warning(
+                'entry_points passed to %s for registration must provide a '
+                'distribution with a project name; registration of %s skipped',
+                cls_to_name(type(self)), entry_point,
+            )
+            return
+        key = entry_point.dist.project_name
+        self.records.setdefault(key, [])
+        # have to cast the entry point into
+        try:
+            requirement = str(Requirement.parse(
+                str(entry_point).split('=', 1)[1]))
+        except ValueError as e:
+            logger.warning(
+                "entry_point '%s' cannot be registered to %s due to the "
+                "following error: %s",
+                entry_point, cls_to_name(type(self)), e
+            )
+        else:
+            self.records[key].append(requirement)
+
+    def get_record(self, name):
+        return self.records.get(name)
 
 
 class Toolchain(BaseDriver):
@@ -1556,7 +1640,20 @@ class Toolchain(BaseDriver):
         ADVICE_PACKAGES key, and apply the advices to the spec.
         """
 
+        advice_apply_registry = get_registry(CALMJS_TOOLCHAIN_ADVICE_APPLY)
+
         advice_packages = spec.get(ADVICE_PACKAGES) or []
+        for pkg_name in spec.get(SOURCE_PACKAGE_NAMES, []):
+            applied_ap = advice_apply_registry.get_record(pkg_name)
+            if not applied_ap:
+                continue
+            logger.info(
+                "source package '%s' specified advice packages %r to be "
+                "applied",
+                pkg_name, applied_ap
+            )
+            advice_packages.extend(applied_ap)
+
         if isinstance(advice_packages, (list, tuple)) and advice_packages:
             advice_registry = get_registry(CALMJS_TOOLCHAIN_ADVICE)
             for pkg_name in advice_packages:
@@ -1564,6 +1661,9 @@ class Toolchain(BaseDriver):
                     "applying toolchain advice for package '%s'" % pkg_name)
                 advice_registry.process_toolchain_spec_package(
                     self, spec, pkg_name)
+            # ensure the value is persisted into the spec when this is
+            # applicable.
+            spec[ADVICE_PACKAGES] = advice_packages
 
     def calf(self, spec):
         """

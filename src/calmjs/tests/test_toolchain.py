@@ -29,7 +29,9 @@ from calmjs.loaderplugin import BaseLoaderPluginRegistry
 from calmjs.loaderplugin import BaseLoaderPluginHandler
 
 from calmjs.toolchain import CALMJS_TOOLCHAIN_ADVICE
+from calmjs.toolchain import CALMJS_TOOLCHAIN_ADVICE_APPLY
 from calmjs.toolchain import AdviceRegistry
+from calmjs.toolchain import AdviceApplyRegistry
 from calmjs.toolchain import Spec
 from calmjs.toolchain import Toolchain
 from calmjs.toolchain import NullToolchain
@@ -858,6 +860,58 @@ class AdviceRegistryTestCase(unittest.TestCase):
     def test_toolchain_advice_integration(self):
         reg = get(CALMJS_TOOLCHAIN_ADVICE)
         self.assertTrue(isinstance(reg, AdviceRegistry))
+
+
+class AdviceApplyRegistryTestCase(unittest.TestCase):
+
+    def test_get_record_key_normalised(self):
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.toolchain.advice.apply]\n'
+            'example = example.advice[extra]\n'
+        ),), 'example_namespace_package', '1.0')
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+        reg = AdviceApplyRegistry(
+            CALMJS_TOOLCHAIN_ADVICE_APPLY, _working_set=working_set)
+        # key will be normalized
+        record = reg.get_record('example-namespace-package')
+        self.assertEqual(1, len(record))
+        self.assertEqual('example.advice[extra]', record[0])
+
+    def test_manual_registration(self):
+        reg = AdviceApplyRegistry('demo', _working_set=WorkingSet({}))
+        entry_point = pkg_resources.EntryPoint.parse('key = value[extra]')
+        entry_point.dist = pkg_resources.Distribution(
+            project_name='package', version='1.0')
+        with pretty_logging(stream=StringIO()) as s:
+            reg._init_entry_point(entry_point)
+        record = reg.get_record('package')
+        self.assertEqual(1, len(record))
+        self.assertEqual('value[extra]', record[0])
+        self.assertEqual(s.getvalue(), '')
+
+    def test_manual_incomplete_entry_point(self):
+        reg = AdviceApplyRegistry('demo', _working_set=WorkingSet({}))
+        with pretty_logging(stream=StringIO()) as s:
+            reg._init_entry_point(
+                pkg_resources.EntryPoint.parse('package = demo[extra]'))
+        self.assertEqual(0, len(reg.records))
+        self.assertIn('must provide a distribution', s.getvalue())
+
+    def test_incompatible_entry_point(self):
+        # one that is not compatible for use as a requirement.
+        with pretty_logging(stream=StringIO()) as s:
+            reg = AdviceApplyRegistry('demo', _working_set=WorkingSet({
+                'demo': [
+                    'example1 = some.package:welp[foo]',
+                ],
+            }, dist=pkg_resources.Distribution(project_name='package')))
+        self.assertIn(
+            'cannot be registered to calmjs.toolchain:AdviceApplyRegistry '
+            'due to the following error:', s.getvalue())
+        # this one actually does have a record, but without entries.
+        self.assertEqual([], reg.get_record('package'))
 
 
 class ToolchainTestCase(unittest.TestCase):

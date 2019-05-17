@@ -101,11 +101,13 @@ setup(
             'calmjs.module = calmjs.module:ModuleRegistry',
             'calmjs.module.loader = calmjs.loaderplugin:ModuleLoaderRegistry',
             'calmjs.module.tests = calmjs.module:ModuleRegistry',
-            'calmjs.module.tests.loader'
-            ' = calmjs.loaderplugin:ModuleLoaderRegistry',
+            ('calmjs.module.tests.loader'
+                ' = calmjs.loaderplugin:ModuleLoaderRegistry'),
             'calmjs.py.module = calmjs.module:PythonicModuleRegistry',
             'calmjs.py.module.tests = calmjs.module:PythonicModuleRegistry',
             'calmjs.toolchain.advice = calmjs.toolchain:AdviceRegistry',
+            ('calmjs.toolchain.advice.apply'
+                ' = calmjs.toolchain:AdviceApplyRegistry'),
         ],
         'calmjs.reserved': [
             'calmjs.artifacts = calmjs',
@@ -124,6 +126,7 @@ setup(
             'calmjs.py.module = calmjs',
             'calmjs.py.module.tests = calmjs',
             'calmjs.toolchain.advice = calmjs',
+            'calmjs.toolchain.advice.apply = calmjs',
             'calmjs.webpack.loaderplugins = calmjs.webpack',
             'calmjs.webpack.static.loaderplugins = calmjs.webpack',
         ],
