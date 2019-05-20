@@ -770,7 +770,7 @@ class Spec(dict):
 
         while advices:
             try:
-                # cleanup basically done lifo (last in first out)
+                # advice processing is done lifo (last in first out)
                 values = advices.pop()
                 advice, a, kw = values
                 if not ((callable(advice)) and
@@ -1701,13 +1701,13 @@ class Toolchain(BaseDriver):
         # ensure advices specific to packages are applied
         self.setup_apply_advice_packages(spec)
 
-        # Finally, handle setup which may set up the deferred advices,
-        # as all the toolchain (and its runtime and/or its parent
-        # runtime and related toolchains) spec advises should have been
-        # done.
-        spec.handle(SETUP)
-
         try:
+            # Finally, handle setup which may set up the deferred
+            # advices, as all the toolchain (and its runtime and/or its
+            # parent runtime and related toolchains) spec advises should
+            # have been done.
+            spec.handle(SETUP)
+
             process = ('prepare', 'compile', 'assemble', 'link', 'finalize')
             for p in process:
                 spec.handle('before_' + p)

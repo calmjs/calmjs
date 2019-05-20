@@ -45,6 +45,7 @@ from calmjs.toolchain import spec_update_loaderplugin_registry
 from calmjs.toolchain import toolchain_spec_compile_entries
 from calmjs.toolchain import toolchain_spec_prepare_loaderplugins
 
+from calmjs.toolchain import SETUP
 from calmjs.toolchain import CLEANUP
 from calmjs.toolchain import SUCCESS
 from calmjs.toolchain import AFTER_FINALIZE
@@ -1345,6 +1346,18 @@ class ToolchainTestCase(unittest.TestCase):
         self.assertTrue(exists(join(build_dir, target2)))
         self.assertTrue(exists(join(build_dir, target3)))
         self.assertTrue(exists(join(build_dir, target4)))
+
+    def test_toolchain_setup_advice_abort_does_cleanup(self):
+        spec = Spec()
+
+        def abort(*a, **kw):
+            raise ToolchainAbort()
+
+        spec.advise(SETUP, abort)
+        with pretty_logging(stream=StringIO()):
+            with self.assertRaises(ToolchainAbort):
+                self.toolchain(spec)
+        self.assertFalse(exists(spec.get('build_dir')))
 
 
 class MockLPHandler(BaseLoaderPluginHandler):

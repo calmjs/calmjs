@@ -22,6 +22,10 @@ Changelog
   level advice applied by the standard toolchain runtime, to the default
   sequence within the default toolchain itself.
 
+  - As a consequence of this feature, any setup advice that trigger a
+    toolchain abort or cancel will not leave the cleanup advices not
+    handled.
+
 3.3.1 (2018-08-20)
 ------------------
 
