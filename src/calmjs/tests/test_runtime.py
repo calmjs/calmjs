@@ -790,8 +790,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         self.assertIn('sourcing optional advices from ', err_lines[0])
         self.assertIn('example.package', err_lines[0])
         self.assertIn('as specified', err_lines[0])
-        self.assertIn(
-            "applying toolchain advice for package 'example.package'", err)
+        self.assertIn("applying advice package 'example.package'", err)
         self.assertIn('failure encountered while setting up advices', err)
 
         # Doing it normally should not result in that optional key.
@@ -804,7 +803,7 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         # advice is applied without any arguments.
         from calmjs.registry import _inst as root_registry
         key_t_a = toolchain.CALMJS_TOOLCHAIN_ADVICE
-        key_t_a_a = toolchain.CALMJS_TOOLCHAIN_ADVICE_APPLY
+        key_t_a_a = toolchain.CALMJS_TOOLCHAIN_ADVICE + '.apply'
         stub_stdouts(self)
 
         self.addCleanup(root_registry.records.pop, key_t_a, None)
@@ -855,8 +854,8 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         err_lines = err.splitlines()
 
         self.assertIn(
-            "source package 'example.package' specified advice packages",
-            err_lines[0])
+            "source package 'example.package' specified 1 advice package(s) "
+            "to be applied", err_lines[0])
         self.assertIn('example.package', err_lines[0])
         self.assertIn('to be applied', err_lines[0])
 
@@ -878,10 +877,8 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
 
         err_lines = s.getvalue().splitlines()
         self.assertIn(
-            "source package 'example.other_package' specified advice packages",
-            err_lines[0])
-        self.assertIn('example.package[argument]', err_lines[0])
-        self.assertIn('to be applied', err_lines[0])
+            "source package 'example.other_package' specified 1 advice "
+            "package(s) to be applied", err_lines[0])
 
         # This tests the dependent case where the dependent package
         # declares both as dependents, but it doesn't declare the
@@ -896,6 +893,44 @@ class ToolchainRuntimeTestCase(unittest.TestCase):
         self.assertNotIn('marker_too_soon', result)
         self.assertNotIn('marker_delayed', result)
         self.assertEqual('', s.getvalue())
+
+    def test_spec_toolchain_advice_apply_missing_requirement(self):
+        # This mostly just run through the toolchain to ensure that the
+        # advice is applied without any arguments.
+        from calmjs.registry import _inst as root_registry
+        key_t_a = toolchain.CALMJS_TOOLCHAIN_ADVICE
+        key_t_a_a = toolchain.CALMJS_TOOLCHAIN_ADVICE + '.apply'
+        stub_stdouts(self)
+
+        self.addCleanup(root_registry.records.pop, key_t_a, None)
+        self.addCleanup(root_registry.records.pop, key_t_a_a, None)
+
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.toolchain.advice.apply]\n'
+            'example.package = example.package[argument]\n'
+        ),), 'example.other_package', '1.0')
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+
+        root_registry.records[key_t_a] = toolchain.AdviceRegistry(
+            key_t_a, _working_set=working_set)
+        root_registry.records[key_t_a_a] = toolchain.AdviceApplyRegistry(
+            key_t_a_a, _working_set=working_set)
+
+        tc = toolchain.NullToolchain()
+        rt = runtime.SourcePackageToolchainRuntime(tc)
+
+        # Doing it normally should not result in that optional key.
+        with pretty_logging(logger='calmjs', stream=mocks.StringIO()):
+            result = rt([
+                '--export-target', join(self.cwd, 'dummy_export'),
+                'example.other_package', '-v',
+            ])
+
+        # shouldn't have anything.
+        self.assertNotIn('marker_too_soon', result)
+        self.assertNotIn('marker_delayed', result)
 
     def test_spec_advise_debugger(self):
         # this is meant for advanced usage, thus undocumented.

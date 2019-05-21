@@ -84,6 +84,7 @@ from os.path import realpath
 from tempfile import mkdtemp
 
 from pkg_resources import Requirement
+from pkg_resources import working_set as default_working_set
 
 from calmjs.parse.io import read
 from calmjs.parse.io import write
@@ -120,7 +121,7 @@ __all__ = [
 
     'toolchain_spec_compile_entries', 'ToolchainSpecCompileEntry',
 
-    'CALMJS_TOOLCHAIN_ADVICE', 'CALMJS_TOOLCHAIN_ADVICE_APPLY',
+    'CALMJS_TOOLCHAIN_ADVICE',
 
     'SETUP', 'CLEANUP', 'SUCCESS',
 
@@ -142,8 +143,11 @@ __all__ = [
     'WORKING_DIR',
 ]
 
+# these are the only non-key entities that should be in this module, as
+# they currently reference auxilary registry classes that are currently
+# residing in this module.
 CALMJS_TOOLCHAIN_ADVICE = 'calmjs.toolchain.advice'
-CALMJS_TOOLCHAIN_ADVICE_APPLY = 'calmjs.toolchain.advice.apply'
+CALMJS_TOOLCHAIN_ADVICE_APPLY_SUFFIX = '.apply'
 
 # define these as reserved advice names
 SETUP = 'setup'
@@ -167,11 +171,16 @@ BEFORE_PREPARE = 'before_prepare'
 # packages that have extra _optional_ advices supplied that have to be
 # manually included.
 ADVICE_PACKAGES = 'advice_packages'
+# advice packages that have been applied to the spec via advice registry
+# apply_toolchain_spec method.
+ADVICE_PACKAGES_APPLIED_REQUIREMENTS = 'advice_packages_applied_requirements'
 # listing of absolute locations on the file system where these bundled
 # artifact files are.
 ARTIFACT_PATHS = 'artifact_paths'
 # build directory
 BUILD_DIR = 'build_dir'
+# the key for overriding the advice registry to be use
+CALMJS_TOOLCHAIN_ADVICE_REGISTRY = 'calmjs_toolchain_advice_registry'
 # source registries that have been used
 CALMJS_MODULE_REGISTRY_NAMES = 'calmjs_module_registry_names'
 CALMJS_TEST_REGISTRY_NAMES = 'calmjs_test_registry_names'
@@ -870,65 +879,219 @@ class AdviceRegistry(BaseRegistry):
             records = self.records[key] = self.records.get(key, {})
             records[entry_point.name] = entry_point
 
-    def get_record(self, name):
-        return self.records.get(name)
-
-    def process_toolchain_spec_package(self, toolchain, spec, value):
-        if not isinstance(toolchain, Toolchain):
-            logger.debug(
-                'must call process_toolchain_spec_package with a toolchain, '
-                'not %s', toolchain,
-            )
-            return
-
-        toolchain_cls = type(toolchain)
+    def _to_requirement(self, value):
         try:
-            req = Requirement.parse(value)
+            return Requirement.parse(value)
         except ValueError as e:
             logger.error(
                 "the specified value '%s' for advice setup is not valid for "
                 "a package/requirement: %s", value, e,
             )
+            raise
+
+    def get_record(self, name):
+        return self.records.get(name)
+
+    def applied_requirements_map_from_spec(self, toolchain, spec):
+        # it may be good to warn about requirements that have been
+        # replaced by the standalone method.
+        return {
+            req.name: req
+            for req in spec.get(ADVICE_PACKAGES_APPLIED_REQUIREMENTS, [])
+        }
+
+    def apply_toolchain_spec(self, toolchain, spec):
+        """
+        Apply the advice packages as defined by this registry to the
+        provided toolchain and spec.
+
+        This implementation will first apply whatever ADVICE_PACKAGES
+        are provided by the spec, before applying whatever else that may
+        be applied by this registry instance.  Before application of the
+        advice packages, the ADVICE_PACKAGES_APPLIED_REQUIREMENTS key
+        from the spec will also be checked first to prevent the
+        application of advice with the same requirement name.
+
+        As the ADVICE_PACKAGES feature was originally implemented as a
+        part of the SETUP advice applied by the Runtime class, and the
+        implementation allowed multiple copies of the same requirement
+        be applied, this feature will be maintained as this method
+        implements a fully contained version of that along with the
+        version that applies the ones recorded by the registry.
+        However, multiple execution of this method will not reapply
+        the ones that have been recorded as applied.
+        """
+
+        # first step: apply all the advice packages as found in the
+        # provided spec, as these are specified to be necessary which
+        # may override whatever other requirements might be specified
+        # in the accompanied apply registry.
+        spec_advice_packages = spec.get(ADVICE_PACKAGES, [])
+        # construct a mapping based on the list of applied requirements
+        # that have been also recorded on this spec by the common apply
+        # standalone method.
+        applied_req_map = self.applied_requirements_map_from_spec(
+            toolchain, spec)
+        newly_applied_req_map = {}
+
+        logger.debug(
+            "invoking apply_toolchain_spec using instance of %s named '%s'",
+            cls_to_name(type(self)), self.registry_name,
+        )
+
+        for value in spec_advice_packages:
+            try:
+                req = self._to_requirement(value)
+            except ValueError:
+                # error log entry already generated by the above method.
+                continue
+
+            if req.name in applied_req_map:
+                logger.warning(
+                    "advice package '%s' already applied as '%s'; skipping",
+                    req, applied_req_map[req.name]
+                )
+                continue
+
+            if req.name in newly_applied_req_map:
+                logger.warning(
+                    "advice package '%s' was previously applied as '%s'; "
+                    "the recommended usage manner is to only specify any "
+                    "given advice package once complete with all the required "
+                    "extras, and that underlying implementation be structured "
+                    "in a manner that support this one-shot invocation "
+                    "format",
+                    req, newly_applied_req_map[req.name]
+                )
+
+            logger.debug("applying advice package '%s'", value)
+            self._process_toolchain_spec_requirement(toolchain, spec, req)
+            # still going to warn
+            newly_applied_req_map[req.name] = req
+
+        # finally, find the accompanied apply registry for the package
+        # definitions
+        advice_apply_registry_key = (
+            self.registry_name + CALMJS_TOOLCHAIN_ADVICE_APPLY_SUFFIX)
+        advice_apply_registry = get_registry(advice_apply_registry_key)
+
+        if not isinstance(advice_apply_registry, AdviceApplyRegistry):
+            logger.warning(
+                "registry key '%s' resulted in %r which is not a valid advice "
+                "apply registry; no package level advice apply steps will be "
+                "applied", advice_apply_registry_key, advice_apply_registry
+            )
+            return
+
+        # combine the newly applied ones with existing ones.
+        applied_req_map.update(newly_applied_req_map)
+
+        for pkg_name in spec.get(SOURCE_PACKAGE_NAMES, []):
+            requirements = advice_apply_registry.get_record(pkg_name)
+            if not requirements:
+                continue
+            logger.info(
+                "source package '%s' specified %d advice package(s) to be "
+                "applied", pkg_name, len(requirements)
+            )
+
+            for req in requirements:
+                if req.name in applied_req_map:
+                    logger.debug(
+                        "skipping specified advice package '%s' as '%s' was "
+                        "already applied", req, applied_req_map[req.name]
+                    )
+                    continue
+                logger.debug("apply advice package '%s'", req)
+                self._process_toolchain_spec_requirement(toolchain, spec, req)
+                applied_req_map[req.name] = req
+
+    def process_toolchain_spec_package(self, toolchain, spec, value):
+        # the original one-shot method.
+        try:
+            req = self._to_requirement(value)
+        except ValueError:
+            pass
+        else:
+            return self._process_toolchain_spec_requirement(
+                toolchain, spec, req)
+
+    def _process_toolchain_spec_requirement(self, toolchain, spec, req):
+        if not isinstance(toolchain, Toolchain):
+            logger.debug(
+                'apply_toolchain_spec or process_toolchain_spec_package '
+                'must be invoked with a toolchain instance, not %s', toolchain,
+            )
             return
 
         pkg_name = req.project_name
+        toolchain_cls = type(toolchain)
         toolchain_advices = self.get_record(pkg_name)
 
-        if not toolchain_advices:
+        if toolchain_advices is None and not default_working_set.find(req):
+            logger.warning(
+                "advice setup steps required from package/requirement "
+                "'%s', however it is not found or not installed in this "
+                "environment; build may continue; if there are errors or "
+                "unexpected behavior that occur, it may be corrected by "
+                "providing the missing requirement into this environment "
+                "by installing the relevant package", req
+            )
+            return
+        elif not toolchain_advices:
             logger.debug(
                 "no advice setup steps registered for package/requirement "
-                "'%s'", value)
+                "'%s'", req)
             return
 
         logger.debug(
             "found advice setup steps registered for package/requirement "
-            "'%s' for toolchain '%s'", value, cls_to_name(toolchain_cls)
+            "'%s'; checking for compatibility with toolchain '%s'",
+            req, cls_to_name(toolchain_cls)
         )
 
-        for cls in getattr(toolchain_cls, '__mro__'):
-            # traverse the entire subclass for relevant registration.
-            if not issubclass(cls, Toolchain):
+        entry_points = [
+            toolchain_advices.get(cls_name) for cls_name in (
+                cls_to_name(cls) for cls in toolchain_cls.__mro__
+                if issubclass(cls, Toolchain)
+            ) if cls_name in toolchain_advices
+        ]
+
+        if not entry_points:
+            logger.debug("no compatible advice setup steps found")
+
+        for entry_point in entry_points:
+            try:
+                f = entry_point.load()
+            except ImportError:
+                logger.error(
+                    "ImportError: entry_point '%s' in group '%s' while "
+                    "processing toolchain spec advice setup step "
+                    "registered under advice package '%s'",
+                    entry_point, self.registry_name, req
+                )
                 continue
 
-            entry_point = toolchain_advices.get(cls_to_name(cls))
-            if entry_point:
-                try:
-                    f = entry_point.load()
-                except ImportError:
-                    logger.error(
-                        "ImportError: entry_point '%s' in group '%s'",
-                        entry_point, self.registry_name,
-                    )
-                    return None
+            try:
+                f(spec, sorted(req.extras))
+            except Exception:
+                logger.exception(
+                    "failure encountered while setting up advices through "
+                    "entry_point '%s' in group '%s' "
+                    "registered under advice package '%s'",
+                    entry_point, self.registry_name, req
+                )
+            else:
+                logger.debug(
+                    "entry_point '%s' registered by advice package '%s' "
+                    "applied as an advice setup step by %s '%s'",
+                    entry_point, req,
+                    cls_to_name(type(self)), self.registry_name,
+                )
 
-                try:
-                    f(spec, sorted(req.extras))
-                except Exception:
-                    logger.exception(
-                        "failure encountered while setting up advices through "
-                        "entry_point '%s' in group '%s'",
-                        entry_point, self.registry_name,
-                    )
+        # will just simply be applied regardless.
+        spec.setdefault(ADVICE_PACKAGES_APPLIED_REQUIREMENTS, [])
+        spec[ADVICE_PACKAGES_APPLIED_REQUIREMENTS].append(req)
 
 
 class AdviceApplyRegistry(BaseRegistry):
@@ -977,8 +1140,7 @@ class AdviceApplyRegistry(BaseRegistry):
         self.records.setdefault(key, [])
         # have to cast the entry point into
         try:
-            requirement = str(Requirement.parse(
-                str(entry_point).split('=', 1)[1]))
+            requirement = Requirement.parse(str(entry_point).split('=', 1)[1])
         except ValueError as e:
             logger.warning(
                 "entry_point '%s' cannot be registered to %s due to the "
@@ -1634,36 +1796,28 @@ class Toolchain(BaseDriver):
         self.link(spec)
         self.finalize(spec)
 
-    def setup_apply_advice_packages(self, spec):
+    def setup_apply_advice_packages(
+            self, spec, default_advice_registry=CALMJS_TOOLCHAIN_ADVICE):
         """
         This method sets up the advices that have been specified in the
         ADVICE_PACKAGES key, and apply the advices to the spec.
         """
 
-        advice_apply_registry = get_registry(CALMJS_TOOLCHAIN_ADVICE_APPLY)
-
-        advice_packages = spec.get(ADVICE_PACKAGES) or []
-        for pkg_name in spec.get(SOURCE_PACKAGE_NAMES, []):
-            applied_ap = advice_apply_registry.get_record(pkg_name)
-            if not applied_ap:
-                continue
-            logger.info(
-                "source package '%s' specified advice packages %r to be "
-                "applied",
-                pkg_name, applied_ap
+        advice_registry_key = spec.get(
+            CALMJS_TOOLCHAIN_ADVICE_REGISTRY, default_advice_registry)
+        advice_registry = get_registry(advice_registry_key)
+        if not isinstance(advice_registry, AdviceRegistry):
+            logger.warning(
+                "registry key '%s' resulted in %r which is not a valid advice "
+                "registry; all package advice steps will be skipped",
+                advice_registry_key, advice_registry
             )
-            advice_packages.extend(applied_ap)
-
-        if isinstance(advice_packages, (list, tuple)) and advice_packages:
-            advice_registry = get_registry(CALMJS_TOOLCHAIN_ADVICE)
-            for pkg_name in advice_packages:
-                logger.debug(
-                    "applying toolchain advice for package '%s'" % pkg_name)
-                advice_registry.process_toolchain_spec_package(
-                    self, spec, pkg_name)
-            # ensure the value is persisted into the spec when this is
-            # applicable.
-            spec[ADVICE_PACKAGES] = advice_packages
+            return
+        logger.debug(
+            "setting up advices using %s '%s'",
+            cls_to_name(type(advice_registry)), advice_registry_key
+        )
+        advice_registry.apply_toolchain_spec(self, spec)
 
     def calf(self, spec):
         """
@@ -1698,8 +1852,11 @@ class Toolchain(BaseDriver):
         # ensure export target is sane
         self.realpath(spec, EXPORT_TARGET)
 
-        # ensure advices specific to packages are applied
-        self.setup_apply_advice_packages(spec)
+        # ensure advices specific to packages are applied, and applied
+        # using the advice to maintain the feature as it was when
+        # initially implemented as part of the runtime.  This also allow
+        # advice setup exceptions be handled as expected.
+        spec.advise(SETUP, self.setup_apply_advice_packages, spec)
 
         try:
             # Finally, handle setup which may set up the deferred
