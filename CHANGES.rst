@@ -1,7 +1,7 @@
 Changelog
 =========
 
-3.4.0 (20??-??-??)
+3.4.0 (2019-05-22)
 ------------------
 
 - Clean up a failing test case on Windows due to failure to use normcase
