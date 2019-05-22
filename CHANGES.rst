@@ -1,6 +1,15 @@
 Changelog
 =========
 
+3.4.1 (2019-05-22)
+------------------
+
+- Avoid breaking an existing manner of assignment of advice_packages in
+  related projects - ensure that a None value that was provided be
+  treated as an empty list. [
+  `#57 <https://github.com/calmjs/calmjs/issues/57>`_
+  ]
+
 3.4.0 (2019-05-22)
 ------------------
 

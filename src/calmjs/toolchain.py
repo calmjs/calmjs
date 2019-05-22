@@ -926,7 +926,7 @@ class AdviceRegistry(BaseRegistry):
         # provided spec, as these are specified to be necessary which
         # may override whatever other requirements might be specified
         # in the accompanied apply registry.
-        spec_advice_packages = spec.get(ADVICE_PACKAGES, [])
+        spec_advice_packages = spec.get(ADVICE_PACKAGES) or []
         # construct a mapping based on the list of applied requirements
         # that have been also recorded on this spec by the common apply
         # standalone method.

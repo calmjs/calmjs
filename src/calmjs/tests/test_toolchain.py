@@ -882,6 +882,16 @@ class AdviceRegistryTestCase(unittest.TestCase):
         )
         self.assertNotIn('advice_packages_applied_requirements', spec)
 
+    def test_standard_toolchain_advice_with_none_value(self):
+        reg = AdviceRegistry(CALMJS_TOOLCHAIN_ADVICE)
+        toolchain = Toolchain()
+        spec = Spec(advice_packages=None)
+        with pretty_logging(stream=StringIO()) as s:
+            reg.apply_toolchain_spec(toolchain, spec)
+        self.assertIn(
+            "invoking apply_toolchain_spec using instance", s.getvalue())
+        self.assertNotIn('advice_packages_applied_requirements', spec)
+
     def test_apply_toolchain_spec_apply_incompatible_toolchain(self):
         make_dummy_dist(self, ((
             'entry_points.txt',
