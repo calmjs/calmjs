@@ -15,6 +15,21 @@ Changelog
   enabled for all subclasses of Runtime.  [
   `#55 <https://github.com/calmjs/calmjs/issues/55>`_
   ]
+- Provide a registry for packages to specify which requirement (package)
+  to acquire toolchain advice from to apply by default for the relevant
+  toolchains.  This also necessitated some changes to where the optional
+  advices are applied, from the previous location applied as a setup
+  level advice applied by the standard toolchain runtime, to the default
+  sequence within the default toolchain itself.  [
+  `#56 <https://github.com/calmjs/calmjs/issues/56>`_
+  ]
+
+  - As a consequence of this feature, any setup advice that trigger a
+    toolchain abort or cancel will not leave the cleanup advices not
+    handled.
+  - This feature is implemented in a manner that allow manual invocation
+    of a toolchain with a list of manually provided advice_package be
+    able to always override the default specified ones.
 
 3.3.1 (2018-08-20)
 ------------------

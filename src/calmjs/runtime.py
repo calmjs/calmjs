@@ -28,7 +28,6 @@ from calmjs.argparse import metavar
 from calmjs.artifact import ArtifactBuilder
 from calmjs.artifact import ARTIFACT_REGISTRY_NAME
 from calmjs.exc import RuntimeAbort
-from calmjs.registry import get
 from calmjs.toolchain import Spec
 from calmjs.toolchain import ToolchainCancel
 from calmjs.toolchain import ADVICE_PACKAGES
@@ -36,11 +35,9 @@ from calmjs.toolchain import AFTER_PREPARE
 from calmjs.toolchain import BUILD_DIR
 from calmjs.toolchain import CALMJS_MODULE_REGISTRY_NAMES
 from calmjs.toolchain import CALMJS_LOADERPLUGIN_REGISTRY_NAME
-from calmjs.toolchain import CALMJS_TOOLCHAIN_ADVICE
 from calmjs.toolchain import DEBUG
 from calmjs.toolchain import EXPORT_TARGET
 from calmjs.toolchain import EXPORT_TARGET_OVERWRITE
-from calmjs.toolchain import SETUP
 from calmjs.toolchain import SOURCE_PACKAGE_NAMES
 from calmjs.toolchain import WORKING_DIR
 from calmjs.ui import prompt_overwrite_json
@@ -269,6 +266,61 @@ class BaseRuntime(BootstrapRuntime):
         """
 
         self.argparser.error(message)
+
+    def unrecognized_arguments_error(self, args, parsed, extras):
+        """
+        This exists because argparser is dumb and naive and doesn't
+        fail unrecognized arguments early.
+        """
+
+        # loop variants
+        kwargs = vars(parsed)
+        failed = list(extras)
+        # initial values
+        runtime, subparser, idx = (self, self.argparser, 0)
+        # recursion not actually needed when it can be flattened.
+        while isinstance(runtime, Runtime):
+            cmd = kwargs.pop(runtime.action_key)
+            # can happen if it wasn't set, or is set but from a default
+            # value (thus not provided by args)
+            action_idx = None if cmd not in args else args.index(cmd)
+            if cmd not in args and cmd is not None:
+                # this normally shouldn't happen, and the test case
+                # showed that the parsing will not flip down to the
+                # forced default subparser - this can remain a debug
+                # message until otherwise.
+                logger.debug(
+                    "command for prog=%r is set to %r without being specified "
+                    "as part of the input arguments - the following error "
+                    "message may contain misleading references",
+                    subparser.prog, cmd
+                )
+            subargs = args[idx:action_idx]
+            subparsed, subextras = subparser.parse_known_args(subargs)
+            if subextras:
+                subparser.unrecognized_arguments_error(subextras)
+                # since the failed arguments are in order
+                failed = failed[len(subextras):]
+                if not failed:
+                    # have taken everything, quit now.
+                    # also note that if cmd was really None it would
+                    # cause KeyError below, but fortunately it also
+                    # forced action_idx to be None which took all
+                    # remaining tokens from failed, so definitely get
+                    # out of here.
+                    break
+
+            # advance the values
+            # note that any internal consistency will almost certainly
+            # result in KeyError being raised.
+            details = runtime.get_argparser_details(subparser)
+            runtime = details.runtimes[cmd]
+            subparser = details.subparsers[cmd]
+            idx = action_idx + 1
+
+        if failed:
+            subparser.unrecognized_arguments_error(failed)
+        sys.exit(2)
 
     def __call__(self, args=None):
         args = norm_args(args)
@@ -616,61 +668,6 @@ class Runtime(BaseRuntime):
             'runtime (%r)', argparser.prog, self
         )
 
-    def unrecognized_arguments_error(self, args, parsed, extras):
-        """
-        This exists because argparser is dumb and naive and doesn't
-        fail unrecognized arguments early.
-        """
-
-        # loop variants
-        kwargs = vars(parsed)
-        failed = list(extras)
-        # initial values
-        runtime, subparser, idx = (self, self.argparser, 0)
-        # recursion not actually needed when it can be flattened.
-        while isinstance(runtime, Runtime):
-            cmd = kwargs.pop(runtime.action_key)
-            # can happen if it wasn't set, or is set but from a default
-            # value (thus not provided by args)
-            action_idx = None if cmd not in args else args.index(cmd)
-            if cmd not in args and cmd is not None:
-                # this normally shouldn't happen, and the test case
-                # showed that the parsing will not flip down to the
-                # forced default subparser - this can remain a debug
-                # message until otherwise.
-                logger.debug(
-                    "command for prog=%r is set to %r without being specified "
-                    "as part of the input arguments - the following error "
-                    "message may contain misleading references",
-                    subparser.prog, cmd
-                )
-            subargs = args[idx:action_idx]
-            subparsed, subextras = subparser.parse_known_args(subargs)
-            if subextras:
-                subparser.unrecognized_arguments_error(subextras)
-                # since the failed arguments are in order
-                failed = failed[len(subextras):]
-                if not failed:
-                    # have taken everything, quit now.
-                    # also note that if cmd was really None it would
-                    # cause KeyError below, but fortunately it also
-                    # forced action_idx to be None which took all
-                    # remaining tokens from failed, so definitely get
-                    # out of here.
-                    break
-
-            # advance the values
-            # note that any internal consistency will almost certainly
-            # result in KeyError being raised.
-            details = runtime.get_argparser_details(subparser)
-            runtime = details.runtimes[cmd]
-            subparser = details.subparsers[cmd]
-            idx = action_idx + 1
-
-        if failed:
-            subparser.unrecognized_arguments_error(failed)
-        sys.exit(2)
-
     def error(self, argparser, target, message):
         """
         This was used as part of the original non-recursive lookup for
@@ -902,7 +899,7 @@ class ToolchainRuntime(DriverRuntime):
             default_key=1,
         )
         if not overwrite:
-            raise ToolchainCancel('cancelation initiated by user')
+            raise ToolchainCancel('cancellation initiated by user')
 
     def prepare_spec_debug_flag(self, spec, **kwargs):
         spec[DEBUG] = self.debug
@@ -912,16 +909,12 @@ class ToolchainRuntime(DriverRuntime):
         spec.advise(AFTER_PREPARE, self.check_export_target_exists, spec)
 
     def prepare_spec_advice_packages(self, spec, **kwargs):
-        reg = get(CALMJS_TOOLCHAIN_ADVICE)
-        advice_packages = kwargs.get(ADVICE_PACKAGES) or []
-        if isinstance(advice_packages, (list, tuple)):
+        spec[ADVICE_PACKAGES] = kwargs.get(ADVICE_PACKAGES, [])
+        if spec[ADVICE_PACKAGES]:
             logger.debug(
-                'prepare spec with optional advices from packages %r',
-                advice_packages
+                'sourcing optional advices from packages %r as specified',
+                spec[ADVICE_PACKAGES]
             )
-            for pkg_name in advice_packages:
-                reg.process_toolchain_spec_package(
-                    self.toolchain, spec, pkg_name)
 
     def prepare_spec(self, spec, **kwargs):
         """
@@ -933,8 +926,7 @@ class ToolchainRuntime(DriverRuntime):
 
         self.prepare_spec_debug_flag(spec, **kwargs)
         self.prepare_spec_export_target_checks(spec, **kwargs)
-        # defer the setup till the actual toolchain invocation
-        spec.advise(SETUP, self.prepare_spec_advice_packages, spec, **kwargs)
+        self.prepare_spec_advice_packages(spec, **kwargs)
 
     def create_spec(self, **kwargs):
         """

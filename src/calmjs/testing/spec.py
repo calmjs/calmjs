@@ -29,3 +29,26 @@ def advice_order(spec, extras):
             raise toolchain.ToolchainAbort()  # pragma: no cover
 
     spec.advise(toolchain.CLEANUP, verify_build_dir)
+
+
+def str_list(items):
+    return [str(item) for item in items]
+
+
+def advice_marker(spec, extras):
+    # this documents the behavior if the implementation of a toolchain
+    # advice that was registered had acted immediately on the spec
+    from calmjs import toolchain
+
+    spec.setdefault('marker_too_soon', [])
+    spec['marker_too_soon'].append((str_list(
+        spec.get('advice_packages_applied_requirements', [])), extras))
+
+    # to properly manage the process, it should register a function as
+    # an advice.
+    def advice():
+        spec.setdefault('marker_delayed', [])
+        spec['marker_delayed'].append((str_list(
+            spec.get('advice_packages_applied_requirements', [])), extras))
+
+    spec.advise(toolchain.BEFORE_PREPARE, advice)

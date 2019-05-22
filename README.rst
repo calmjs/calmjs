@@ -755,6 +755,17 @@ are, however).  For a working example on how this may be achieved please
 refer to the implementations provided by |calmjs.rjs|_ or
 |calmjs.webpack|_.
 
+Toolchain Advice
+~~~~~~~~~~~~~~~~
+
+For package developers that need to provide additional instructions to
+a toolchain execution (e.g. for compatibility between RequireJS and also
+webpack for specific use case of features to a given package), the
+toolchain system will also make use of the advice system such that
+additional instructions may be created and registered for use and reuse
+by their dependents.  Much like the Toolchain, this feature is currently
+lacking in documentation outside of the test cases.
+
 Pre-defined artifact generation through |setuptools|
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

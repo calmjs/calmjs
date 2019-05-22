@@ -29,7 +29,9 @@ from calmjs.loaderplugin import BaseLoaderPluginRegistry
 from calmjs.loaderplugin import BaseLoaderPluginHandler
 
 from calmjs.toolchain import CALMJS_TOOLCHAIN_ADVICE
+from calmjs.toolchain import CALMJS_TOOLCHAIN_ADVICE_APPLY_SUFFIX
 from calmjs.toolchain import AdviceRegistry
+from calmjs.toolchain import AdviceApplyRegistry
 from calmjs.toolchain import Spec
 from calmjs.toolchain import Toolchain
 from calmjs.toolchain import NullToolchain
@@ -43,6 +45,7 @@ from calmjs.toolchain import spec_update_loaderplugin_registry
 from calmjs.toolchain import toolchain_spec_compile_entries
 from calmjs.toolchain import toolchain_spec_prepare_loaderplugins
 
+from calmjs.toolchain import SETUP
 from calmjs.toolchain import CLEANUP
 from calmjs.toolchain import SUCCESS
 from calmjs.toolchain import AFTER_FINALIZE
@@ -733,7 +736,8 @@ class AdviceRegistryTestCase(unittest.TestCase):
             self.assertIsNone(
                 reg.process_toolchain_spec_package(object(), Spec(), 'calmjs'))
         self.assertIn(
-            "must call process_toolchain_spec_package with a toolchain",
+            "apply_toolchain_spec or process_toolchain_spec_package must be "
+            "invoked with a toolchain instance, not <object",
             s.getvalue(),
         )
 
@@ -764,10 +768,11 @@ class AdviceRegistryTestCase(unittest.TestCase):
             reg.process_toolchain_spec_package(
                 toolchain, spec, 'example.package')
 
-        self.assertEqual(spec, {'dummy': ['dummy']})
+        self.assertEqual(spec['dummy'], ['dummy'])
         self.assertIn(
             "found advice setup steps registered for package/requirement "
-            "'example.package' for toolchain 'calmjs.toolchain:Toolchain'",
+            "'example.package'; checking for compatibility with toolchain "
+            "'calmjs.toolchain:Toolchain'",
             s.getvalue(),
         )
 
@@ -812,8 +817,8 @@ class AdviceRegistryTestCase(unittest.TestCase):
         # inheritance applies.
         self.assertIn(
             "found advice setup steps registered for package/requirement "
-            "'example.package' for toolchain 'calmjs.toolchain:NullToolchain'",
-            err,
+            "'example.package'; checking for compatibility with toolchain "
+            "'calmjs.toolchain:NullToolchain'", err,
         )
         self.assertIn("ERROR", err)
         self.assertIn(
@@ -821,7 +826,9 @@ class AdviceRegistryTestCase(unittest.TestCase):
             err)
 
         # partial execution will be done, so do test stuff.
-        self.assertEqual(spec, {'dummy': ['dummy', 'bad']})
+        self.assertEqual(spec['dummy'], ['dummy', 'bad'])
+        self.assertEqual(spec['advice_packages_applied_requirements'], [
+            pkg_resources.Requirement.parse('example.package')])
 
     def test_standard_toolchain_advice_extras(self):
         make_dummy_dist(self, ((
@@ -841,8 +848,17 @@ class AdviceRegistryTestCase(unittest.TestCase):
         self.assertEqual(spec['extras'], ['a', 'bc', 'd'])
         self.assertIn(
             "found advice setup steps registered for package/requirement "
-            "'example.package[a,bc,d]' for toolchain ", s.getvalue()
+            "'example.package[a,bc,d]'", s.getvalue()
         )
+        self.assertIn(
+            "entry_point 'calmjs.toolchain:NullToolchain = "
+            "calmjs.tests.test_toolchain:dummy' registered by advice package "
+            "'example.package[a,bc,d]' applied as an advice setup step by "
+            "calmjs.toolchain:AdviceRegistry 'calmjs.toolchain.advice'",
+            s.getvalue()
+        )
+        self.assertEqual(spec['advice_packages_applied_requirements'], [
+            pkg_resources.Requirement.parse('example.package[a,bc,d]')])
 
     def test_standard_toolchain_advice_malformed(self):
         reg = AdviceRegistry(CALMJS_TOOLCHAIN_ADVICE)
@@ -854,10 +870,295 @@ class AdviceRegistryTestCase(unittest.TestCase):
             "the specified value 'calmjs:thing' for advice setup is not valid",
             s.getvalue(),
         )
+        self.assertNotIn('advice_packages_applied_requirements', spec)
+
+        spec = Spec()
+        spec['advice_packages'] = ['calmjs:thing']
+        with pretty_logging(stream=StringIO()) as s:
+            reg.apply_toolchain_spec(toolchain, spec)
+        self.assertIn(
+            "the specified value 'calmjs:thing' for advice setup is not valid",
+            s.getvalue(),
+        )
+        self.assertNotIn('advice_packages_applied_requirements', spec)
+
+    def test_apply_toolchain_spec_apply_incompatible_toolchain(self):
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[demo.registry]\n'
+            'calmjs.toolchain:NullToolchain = '
+            'calmjs.tests.test_toolchain:dummy\n'
+        ),), 'example.package', '1.0')
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+        reg = AdviceRegistry('demo.registry', _working_set=working_set)
+        # Step registered for NullToolchain
+        toolchain = Toolchain()
+        spec = Spec()
+        spec['advice_packages'] = ['example.package']
+
+        with pretty_logging(stream=StringIO()) as s:
+            reg.apply_toolchain_spec(toolchain, spec)
+
+        self.assertIn(
+            "'example.package'; checking for compatibility with toolchain "
+            "'calmjs.toolchain:Toolchain'", s.getvalue(),
+        )
+        self.assertIn("no compatible advice setup steps found", s.getvalue())
+        # also verify the warning log entry when missing .apply registry
+        self.assertIn(
+            "registry key 'demo.registry.apply' resulted in None which is not "
+            "a valid advice apply registry; no package level advice apply "
+            "steps will be applied", s.getvalue()
+        )
+
+    def test_apply_toolchain_spec_multiple_specified(self):
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.toolchain.advice]\n'
+            'calmjs.toolchain:NullToolchain = '
+            'calmjs.tests.test_toolchain:dummy\n'
+        ),), 'example.package', '1.0')
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+        reg = AdviceRegistry(CALMJS_TOOLCHAIN_ADVICE, _working_set=working_set)
+        toolchain = NullToolchain()
+        spec = Spec()
+        spec['advice_packages'] = [
+            'example.package[foo]', 'example.package[bar]']
+
+        with pretty_logging(stream=StringIO()) as s:
+            reg.apply_toolchain_spec(toolchain, spec)
+
+        self.assertIn(
+            "entry_point 'calmjs.toolchain:NullToolchain = "
+            "calmjs.tests.test_toolchain:dummy' registered by advice package "
+            "'example.package[foo]' applied as an advice setup step by "
+            "calmjs.toolchain:AdviceRegistry 'calmjs.toolchain.advice'",
+            s.getvalue(),
+        )
+        self.assertIn(
+            "entry_point 'calmjs.toolchain:NullToolchain = "
+            "calmjs.tests.test_toolchain:dummy' registered by advice package "
+            "'example.package[bar]' applied as an advice setup step by "
+            "calmjs.toolchain:AdviceRegistry 'calmjs.toolchain.advice'",
+            s.getvalue(),
+        )
+        self.assertIn(
+            "advice package 'example.package[bar]' was previously applied as "
+            "'example.package[foo]'; the recommended usage manner is to only "
+            "specify any given advice package once complete with all the "
+            "required extras, and that underlying implementation be "
+            "structured in a manner that support this one-shot invocation "
+            "format", s.getvalue(),
+        )
+        self.assertEqual(spec['advice_packages_applied_requirements'], [
+            pkg_resources.Requirement.parse('example.package[foo]'),
+            pkg_resources.Requirement.parse('example.package[bar]'),
+        ])
+
+        # applying again, will trigger the warning showing that was blocked
+        with pretty_logging(stream=StringIO(), level=logging.WARNING) as s:
+            reg.apply_toolchain_spec(toolchain, spec)
+
+        self.assertIn(
+            "advice package 'example.package[foo]' already applied as "
+            "'example.package[bar]'; skipping", s.getvalue(),
+        )
+        self.assertIn(
+            "advice package 'example.package[bar]' already applied as "
+            "'example.package[bar]'; skipping", s.getvalue(),
+        )
+        # show that no additional application was done.
+        self.assertEqual(2, len(spec['advice_packages_applied_requirements']))
+        # manual step will still increase it
+        with pretty_logging(stream=StringIO()):
+            reg.process_toolchain_spec_package(
+                toolchain, spec, 'example.package[bar]')
+        self.assertEqual(3, len(spec['advice_packages_applied_requirements']))
+
+    def test_apply_spec_toolchain_not_installed(self):
+        reg = AdviceRegistry('demo.advice', _working_set=WorkingSet({}))
+        toolchain = NullToolchain()
+        spec = Spec()
+
+        with pretty_logging(stream=StringIO()) as s:
+            reg.process_toolchain_spec_package(toolchain, spec, 'example')
+
+        self.assertIn(
+            "advice setup steps required from package/requirement 'example', "
+            "however it is not found or not installed in this environment",
+            s.getvalue()
+        )
+
+    def test_apply_spec_toolchain_override_apply(self):
+        from calmjs.registry import _inst as root_registry
+
+        self.addCleanup(root_registry.records.pop, 'demo.advice', None)
+        self.addCleanup(root_registry.records.pop, 'demo.advice.apply', None)
+
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[demo.advice]\n'
+            'calmjs.toolchain:NullToolchain'
+            ' = calmjs.testing.spec:advice_marker\n'
+            '\n'
+            '[demo.advice.apply]\n'
+            'example.package = example.package[main]\n'
+        ),), 'example.package', '1.0')
+
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[demo.advice.apply]\n'
+            'example.package = example.package[other]\n'
+        ),), 'example.other_package', '1.0')
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+
+        reg = root_registry.records['demo.advice'] = AdviceRegistry(
+            'demo.advice', _working_set=working_set)
+        root_registry.records['demo.advice.apply'] = AdviceApplyRegistry(
+            'demo.advice.apply', _working_set=working_set)
+
+        toolchain = NullToolchain()
+        spec = Spec(
+            advice_packages=['example.package[manual]'],
+            source_package_names=['example.package', 'example.other_package'],
+        )
+
+        with pretty_logging(stream=StringIO()) as s:
+            reg.apply_toolchain_spec(toolchain, spec)
+
+        self.assertIn(
+            "invoking apply_toolchain_spec using instance of "
+            "calmjs.toolchain:AdviceRegistry named 'demo.advice'",
+            s.getvalue(),
+        )
+        self.assertIn(
+            "skipping specified advice package 'example.package[main]' as "
+            "'example.package[manual]' was already applied", s.getvalue(),
+        )
+        self.assertIn(
+            "skipping specified advice package 'example.package[other]' as "
+            "'example.package[manual]' was already applied", s.getvalue(),
+        )
+        self.assertEqual(spec['advice_packages_applied_requirements'], [
+            pkg_resources.Requirement.parse('example.package[manual]'),
+        ])
 
     def test_toolchain_advice_integration(self):
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[demo.advice]\n'
+            'calmjs.toolchain:NullToolchain'
+            ' = calmjs.testing.spec:advice_marker\n'
+            '\n'
+            '[demo.advice.apply]\n'
+            'example.package = example.package[main]\n'
+        ),), 'example.package', '1.0')
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+
+        stub_item_attr_value(self, calmjs_toolchain, 'get_registry', {
+            'demo.advice': AdviceRegistry(
+                'demo.advice', _working_set=working_set),
+            'demo.advice.apply': AdviceApplyRegistry(
+                'demo.advice.apply', _working_set=working_set),
+        }.get)
+
+        toolchain = NullToolchain()
+        spec = Spec(source_package_names=['example.package'])
+        with pretty_logging(stream=StringIO()) as s:
+            toolchain.setup_apply_advice_packages(spec)
+
+        self.assertIn(
+            "registry key 'calmjs.toolchain.advice' resulted in None which is "
+            "not a valid advice registry; all package advice steps will be "
+            "skipped",
+            s.getvalue(),
+        )
+        self.assertNotIn('advice_packages_applied_requirements', spec)
+
+        spec = Spec(
+            source_package_names=['example.package'],
+            calmjs_toolchain_advice_registry='demo.advice',
+        )
+        with pretty_logging(stream=StringIO()) as s:
+            toolchain.setup_apply_advice_packages(spec)
+
+        self.assertIn(
+            "setting up advices using calmjs.toolchain:AdviceRegistry "
+            "'demo.advice'",
+            s.getvalue(),
+        )
+        self.assertNotIn(spec['advice_packages_applied_requirements'], [
+            pkg_resources.Requirement.parse('example.package[main]'),
+        ])
+
+    def test_toolchain_advice_registry_registration(self):
         reg = get(CALMJS_TOOLCHAIN_ADVICE)
         self.assertTrue(isinstance(reg, AdviceRegistry))
+        reg = get(
+            CALMJS_TOOLCHAIN_ADVICE + CALMJS_TOOLCHAIN_ADVICE_APPLY_SUFFIX)
+        self.assertTrue(isinstance(reg, AdviceApplyRegistry))
+
+
+class AdviceApplyRegistryTestCase(unittest.TestCase):
+
+    def test_get_record_key_normalised(self):
+        make_dummy_dist(self, ((
+            'entry_points.txt',
+            '[calmjs.toolchain.advice.apply]\n'
+            'example = example.advice[extra]\n'
+        ),), 'example_namespace_package', '1.0')
+
+        working_set = pkg_resources.WorkingSet([self._calmjs_testing_tmpdir])
+        reg = AdviceApplyRegistry(
+            CALMJS_TOOLCHAIN_ADVICE + CALMJS_TOOLCHAIN_ADVICE_APPLY_SUFFIX,
+            _working_set=working_set
+        )
+        # key will be normalized
+        record = reg.get_record('example-namespace-package')
+        self.assertEqual(1, len(record))
+        self.assertEqual(
+            pkg_resources.Requirement.parse('example.advice[extra]'),
+            record[0],
+        )
+
+    def test_manual_registration(self):
+        reg = AdviceApplyRegistry('demo', _working_set=WorkingSet({}))
+        entry_point = pkg_resources.EntryPoint.parse('key = value[extra]')
+        entry_point.dist = pkg_resources.Distribution(
+            project_name='package', version='1.0')
+        with pretty_logging(stream=StringIO()) as s:
+            reg._init_entry_point(entry_point)
+        record = reg.get_record('package')
+        self.assertEqual(1, len(record))
+        self.assertEqual(
+            pkg_resources.Requirement.parse('value[extra]'), record[0])
+        self.assertEqual(s.getvalue(), '')
+
+    def test_manual_incomplete_entry_point(self):
+        reg = AdviceApplyRegistry('demo', _working_set=WorkingSet({}))
+        with pretty_logging(stream=StringIO()) as s:
+            reg._init_entry_point(
+                pkg_resources.EntryPoint.parse('package = demo[extra]'))
+        self.assertEqual(0, len(reg.records))
+        self.assertIn('must provide a distribution', s.getvalue())
+
+    def test_incompatible_entry_point(self):
+        # one that is not compatible for use as a requirement.
+        with pretty_logging(stream=StringIO()) as s:
+            reg = AdviceApplyRegistry('demo', _working_set=WorkingSet({
+                'demo': [
+                    'example1 = some.package:welp[foo]',
+                ],
+            }, dist=pkg_resources.Distribution(project_name='package')))
+        self.assertIn(
+            'cannot be registered to calmjs.toolchain:AdviceApplyRegistry '
+            'due to the following error:', s.getvalue())
+        # this one actually does have a record, but without entries.
+        self.assertEqual([], reg.get_record('package'))
 
 
 class ToolchainTestCase(unittest.TestCase):
@@ -1291,6 +1592,18 @@ class ToolchainTestCase(unittest.TestCase):
         self.assertTrue(exists(join(build_dir, target2)))
         self.assertTrue(exists(join(build_dir, target3)))
         self.assertTrue(exists(join(build_dir, target4)))
+
+    def test_toolchain_setup_advice_abort_does_cleanup(self):
+        spec = Spec()
+
+        def abort(*a, **kw):
+            raise ToolchainAbort()
+
+        spec.advise(SETUP, abort)
+        with pretty_logging(stream=StringIO()):
+            with self.assertRaises(ToolchainAbort):
+                self.toolchain(spec)
+        self.assertFalse(exists(spec.get('build_dir')))
 
 
 class MockLPHandler(BaseLoaderPluginHandler):

@@ -276,8 +276,8 @@ class IndexerTestCase(unittest.TestCase):
         self.assertIn(
             "module 'nothing' and entry_point 'demo = demo'", err)
         # the input is fetched using a working entry_point, after all
-        self.assertIn("path found at '" + calmjs_dist_dir, err)
-        self.assertIn("it does not exist", fd.getvalue())
+        self.assertIn("resource path resolved to be '" + calmjs_dist_dir, err)
+        self.assertIn("but it does not exist", fd.getvalue())
 
     def test_get_modpath_pkg_resources_invalid(self):
         # fake both module and entry point, which will trigger an import
@@ -298,7 +298,7 @@ class IndexerTestCase(unittest.TestCase):
         with pretty_logging(stream=StringIO()) as fd:
             self.assertEqual([], indexer.modpath_pkg_resources(nothing, ep))
         self.assertIn(
-            "resource path cannot be found for module 'nothing' and "
+            "fail to resolve the resource path for module 'nothing' and "
             "entry_point 'nothing = nothing'", fd.getvalue())
 
     def test_module1_loader_es6(self):
