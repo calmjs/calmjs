@@ -889,7 +889,7 @@ under the |calmjs| namespace.  As an example:
 
 .. __: https://setuptools.readthedocs.io/en/latest/history.html#v31-0-0
 
-.. code:: python
+.. code:: pycon
 
     >>> from calmjs import tests
     Traceback (most recent call last):
