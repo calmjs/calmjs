@@ -1,7 +1,7 @@
 Changelog
 =========
 
-3.4.1 (2019-05-??)
+3.4.1 (2019-05-23)
 ------------------
 
 - If a toolchain execution raised the abort or cancel exception, there
