@@ -285,6 +285,21 @@ def dict_update_overwrite_check(base, fresh):
     return result
 
 
+def log_exc_reason(
+        etype, value, tb,
+        msg="{etype} raised at {filename}:{lineno}; reason: {value}",
+        log=logger.debug):
+    while tb.tb_next is not None:
+        tb = tb.tb_next
+    frame = tb.tb_frame
+    log(msg.format(
+        etype=etype.__name__,
+        filename=frame.f_code.co_filename,
+        lineno=frame.f_lineno,
+        value=value
+    ))
+
+
 # Spec functions for interfacing with loaderplugins
 #
 # The following functions (named in the format spec_*_loaderplugin_*)
@@ -926,7 +941,7 @@ class AdviceRegistry(BaseRegistry):
         # provided spec, as these are specified to be necessary which
         # may override whatever other requirements might be specified
         # in the accompanied apply registry.
-        spec_advice_packages = spec.get(ADVICE_PACKAGES, [])
+        spec_advice_packages = spec.get(ADVICE_PACKAGES) or []
         # construct a mapping based on the list of applied requirements
         # that have been also recorded on this spec by the common apply
         # standalone method.
@@ -1872,8 +1887,12 @@ class Toolchain(BaseDriver):
                 spec.handle('after_' + p)
             spec.handle(SUCCESS)
         except ToolchainCancel:
-            # quietly handle the issue and move on out of here.
-            pass
+            if spec.get(DEBUG):
+                log_exc_reason(*sys.exc_info())
+        except ToolchainAbort:
+            if spec.get(DEBUG):
+                log_exc_reason(*sys.exc_info())
+            raise
         finally:
             spec.handle(CLEANUP)
 

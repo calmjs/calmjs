@@ -1,6 +1,17 @@
 Changelog
 =========
 
+3.4.1 (2019-05-23)
+------------------
+
+- If a toolchain execution raised the abort or cancel exception, there
+  will now be an appropriate debug log entry if debug mode is enabled.
+- Avoid breaking an existing manner of assignment of advice_packages in
+  related projects - ensure that a None value that was provided be
+  treated as an empty list. [
+  `#57 <https://github.com/calmjs/calmjs/issues/57>`_
+  ]
+
 3.4.0 (2019-05-22)
 ------------------
 
