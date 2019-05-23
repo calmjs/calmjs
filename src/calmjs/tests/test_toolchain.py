@@ -882,6 +882,16 @@ class AdviceRegistryTestCase(unittest.TestCase):
         )
         self.assertNotIn('advice_packages_applied_requirements', spec)
 
+    def test_standard_toolchain_advice_with_none_value(self):
+        reg = AdviceRegistry(CALMJS_TOOLCHAIN_ADVICE)
+        toolchain = Toolchain()
+        spec = Spec(advice_packages=None)
+        with pretty_logging(stream=StringIO()) as s:
+            reg.apply_toolchain_spec(toolchain, spec)
+        self.assertIn(
+            "invoking apply_toolchain_spec using instance", s.getvalue())
+        self.assertNotIn('advice_packages_applied_requirements', spec)
+
     def test_apply_toolchain_spec_apply_incompatible_toolchain(self):
         make_dummy_dist(self, ((
             'entry_points.txt',
@@ -2157,13 +2167,25 @@ class NullToolchainTestCase(unittest.TestCase):
         def abort():
             raise ToolchainAbort('forced abort')
 
-        self._check_toolchain_advice(abort, True)
+        with pretty_logging(stream=StringIO()) as s:
+            self._check_toolchain_advice(abort, True)
+        self.assertNotIn('ToolchainAbort raised at', s.getvalue())
+
+        with pretty_logging(stream=StringIO()) as s:
+            self._check_toolchain_advice(abort, True, debug=True)
+        self.assertIn('ToolchainAbort raised at', s.getvalue())
 
     def test_null_toolchain_advice_cancel(self):
         def cancel():
             raise ToolchainCancel('toolchain cancel')
 
-        self._check_toolchain_advice(cancel, False)
+        with pretty_logging(stream=StringIO()) as s:
+            self._check_toolchain_advice(cancel, False)
+        self.assertNotIn('ToolchainCancel raised at', s.getvalue())
+
+        with pretty_logging(stream=StringIO()) as s:
+            self._check_toolchain_advice(cancel, False, debug=True)
+        self.assertIn('ToolchainCancel raised at', s.getvalue())
 
     def test_null_toolchain_advice_abort_itself(self):
         def abort():
