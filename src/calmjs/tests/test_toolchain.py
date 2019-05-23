@@ -2167,13 +2167,25 @@ class NullToolchainTestCase(unittest.TestCase):
         def abort():
             raise ToolchainAbort('forced abort')
 
-        self._check_toolchain_advice(abort, True)
+        with pretty_logging(stream=StringIO()) as s:
+            self._check_toolchain_advice(abort, True)
+        self.assertNotIn('ToolchainAbort raised at', s.getvalue())
+
+        with pretty_logging(stream=StringIO()) as s:
+            self._check_toolchain_advice(abort, True, debug=True)
+        self.assertIn('ToolchainAbort raised at', s.getvalue())
 
     def test_null_toolchain_advice_cancel(self):
         def cancel():
             raise ToolchainCancel('toolchain cancel')
 
-        self._check_toolchain_advice(cancel, False)
+        with pretty_logging(stream=StringIO()) as s:
+            self._check_toolchain_advice(cancel, False)
+        self.assertNotIn('ToolchainCancel raised at', s.getvalue())
+
+        with pretty_logging(stream=StringIO()) as s:
+            self._check_toolchain_advice(cancel, False, debug=True)
+        self.assertIn('ToolchainCancel raised at', s.getvalue())
 
     def test_null_toolchain_advice_abort_itself(self):
         def abort():
