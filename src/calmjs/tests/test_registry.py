@@ -153,7 +153,8 @@ class RegistryIntegrationTestCase(unittest.TestCase):
         with pretty_logging(stream=mocks.StringIO()) as stream:
             self.assertIsNone(registry.get_record('failure'))
         # exact error message differs between Python versions.
-        self.assertIn('TypeError: __init__() ', stream.getvalue())
+        self.assertIn('TypeError', stream.getvalue())
+        self.assertIn('__init__()', stream.getvalue())
 
     def test_registry_fresh_from_entrypoint(self):
         working_set = mocks.WorkingSet({'calmjs.registry': [
