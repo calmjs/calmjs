@@ -4,12 +4,12 @@ calmjs
 A Python framework for building toolchains and utilities for working
 with the Node.js ecosystem from within a Python environment.
 
-.. image:: https://github.com/calmjs/calmjs/actions/workflows/build.yml/badge.svg?branch=3.4.x
-    :target: https://github.com/calmjs/calmjs/actions/workflows/build.yml?query=branch:3.4.x
-.. image:: https://ci.appveyor.com/api/projects/status/45054tm9cfk7ryam/branch/3.4.x?svg=true
-    :target: https://ci.appveyor.com/project/metatoaster/calmjs/branch/3.4.x
-.. image:: https://coveralls.io/repos/github/calmjs/calmjs/badge.svg?branch=3.4.x
-    :target: https://coveralls.io/github/calmjs/calmjs?branch=3.4.x
+.. image:: https://github.com/calmjs/calmjs/actions/workflows/build.yml/badge.svg?branch=3.4.2
+    :target: https://github.com/calmjs/calmjs/actions/workflows/build.yml?query=branch:3.4.2
+.. image:: https://ci.appveyor.com/api/projects/status/45054tm9cfk7ryam/branch/3.4.2?svg=true
+    :target: https://ci.appveyor.com/project/metatoaster/calmjs/branch/3.4.2
+.. image:: https://coveralls.io/repos/github/calmjs/calmjs/badge.svg?branch=3.4.2
+    :target: https://coveralls.io/github/calmjs/calmjs?branch=3.4.2
 
 .. |AMD| replace:: AMD (Asynchronous Module Definition)
 .. |calmjs.bower| replace:: ``calmjs.bower``
