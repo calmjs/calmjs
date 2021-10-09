@@ -1,0 +1,105 @@
+name: build
+
+on:
+  push:
+    branches:
+      - master
+      - testing
+      - 3.4.x
+    tags:
+      - 3.4.0
+      - 3.4.1
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: [3.9, "3.10"]
+        node-version: [12, 14]
+        include:
+          - os: ubuntu-latest
+            python-version: 2.7
+            node-version: 4
+          # No idea why OS X would trigger that specific error, when it
+          # passes on other platforms.
+          # See: https://github.com/calmjs/calmjs/runs/3844830329
+          # - os: macos-latest
+          #   python-version: 2.7
+          #   node-version: 4
+          - os: windows-latest
+            python-version: 2.7
+            node-version: 4
+
+          - os: ubuntu-latest
+            python-version: 3.6
+            node-version: 8
+          - os: macos-latest
+            python-version: 3.6
+            node-version: 8
+          - os: windows-latest
+            python-version: 3.6
+            node-version: 8
+
+          - os: ubuntu-latest
+            python-version: 3.7
+            node-version: 10
+          - os: macos-latest
+            python-version: 3.7
+            node-version: 10
+          - os: windows-latest
+            python-version: 3.7
+            node-version: 10
+
+          - os: ubuntu-latest
+            python-version: 3.8
+            node-version: 12
+          - os: macos-latest
+            python-version: 3.8
+            node-version: 12
+          - os: windows-latest
+            python-version: 3.8
+            node-version: 12
+
+          - os: ubuntu-latest
+            python-version: pypy2
+            node-version: 12
+          - os: ubuntu-latest
+            python-version: pypy3
+            node-version: 12
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Set up Node ${{ matrix.node-version }}
+      uses: actions/setup-node@v2
+      with:
+        node-version: ${{ matrix.node-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install coverage flake8
+        python -m pip install -e .
+    - name: Lint with flake8
+      run: |
+        flake8
+    # TODO need to include tests that will FAIL if not properly integrated
+    - name: Test with unittest
+      run: |
+        coverage run --include=src/* -m unittest calmjs.tests.make_suite
+        coverage report -m
+    - name: Coveralls
+      if: ${{ matrix.os == 'ubuntu-latest' && matrix.python-version != '2.7' && matrix.python-version != 'pypy2' }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        python -m pip install coveralls
+        coveralls --service=github

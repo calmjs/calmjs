@@ -20,7 +20,10 @@ from os.path import realpath
 from os.path import sep
 
 from collections import OrderedDict
-from collections import MutableMapping
+try:
+    from collections.abc import MutableMapping
+except ImportError:  # pragma: no cover
+    from collections import MutableMapping
 from logging import getLogger
 from pkg_resources import Distribution
 from pkg_resources import working_set

@@ -200,12 +200,12 @@ def prompt_overwrite_json(original, new, target_path, dumps=json_dumps):
     """
 
     # generate compacted ndiff output.
-    diff = '\n'.join(l for l in (
+    diff = '\n'.join(li for li in (
         line.rstrip() for line in difflib.ndiff(
             json_dumps(original).splitlines(),
             json_dumps(new).splitlines(),
         ))
-        if l[:1] in '?+-' or l[-1:] in '{}' or l[-2:] == '},')
+        if li[:1] in '?+-' or li[-1:] in '{}' or li[-2:] == '},')
     basename_target = basename(target_path)
     return prompt(
         "Generated '%(basename_target)s' differs with '%(target_path)s'.\n\n"

@@ -31,7 +31,7 @@ from calmjs.testing.utils import stub_os_environ
 from calmjs.testing.utils import stub_stdin
 from calmjs.testing.utils import stub_stdouts
 
-which_yarn = which('yarn')
+which_yarn = cli.get_bin_version_str(which('yarn'))
 
 
 class YarnTestCase(unittest.TestCase):
