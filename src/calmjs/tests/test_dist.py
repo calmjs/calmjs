@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import unittest
 import json
+import os
 import sys
 import textwrap
 from os.path import join
@@ -22,6 +23,8 @@ from calmjs.testing.mocks import StringIO
 from calmjs.testing.utils import make_dummy_dist
 from calmjs.testing.utils import mkdtemp
 from calmjs.testing.utils import stub_stdouts
+
+skip_integration = os.environ.get('CALMJS_SKIP_INTEGRATION')
 
 
 class DistTestCase(unittest.TestCase):
@@ -985,6 +988,7 @@ class DistTestCase(unittest.TestCase):
             ['nothing'], working_set=working_set), [])
 
 
+@unittest.skipIf(skip_integration, 'integration tests skipped')
 class ArtifactIntegrationTestCase(unittest.TestCase):
 
     def test_calmjs_artifact_declarations(self):
@@ -1066,6 +1070,7 @@ class ArtifactIntegrationTestCase(unittest.TestCase):
         )
 
 
+@unittest.skipIf(skip_integration, 'integration tests skipped')
 class DistIntegrationTestCase(unittest.TestCase):
     """
     Testing integration of dist with the rest of calmjs and setuptools.
