@@ -5,7 +5,7 @@ Changelog
 ------------------
 
 - This is a maintenance release for Python 3.10; no substantial changes
-  were been made.
+  were made.
 - Provided a check for disabling integration tests using the
   ``CALMJS_SKIP_INTEGRATION`` environment variable, when set to a non-
   empty string, the integration tests found in ``test_dist`` will be
