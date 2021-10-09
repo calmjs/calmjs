@@ -1,6 +1,18 @@
 Changelog
 =========
 
+3.4.2 (2021-10-09)
+------------------
+
+- This is a maintenance release for Python 3.10; no substantial changes
+  were been made.
+- Provided a check for disabling integration tests using the
+  ``CALMJS_SKIP_INTEGRATION`` environment variable, when set to a non-
+  empty string, the integration tests found in ``test_dist`` will be
+  skipped.  [
+  `#60 <https://github.com/calmjs/calmjs/issues/60>`_
+  ]
+
 3.4.1 (2019-05-23)
 ------------------
 
