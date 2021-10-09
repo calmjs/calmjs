@@ -34,16 +34,6 @@ jobs:
             node-version: 4
 
           - os: ubuntu-latest
-            python-version: 3.5
-            node-version: 6
-          - os: macos-latest
-            python-version: 3.5
-            node-version: 6
-          - os: windows-latest
-            python-version: 3.5
-            node-version: 6
-
-          - os: ubuntu-latest
             python-version: 3.6
             node-version: 8
           - os: macos-latest
