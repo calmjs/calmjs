@@ -35,7 +35,7 @@ class CliCheckInteractiveTestCase(unittest.TestCase):
             self.assertFalse(ui._check_interactive(fd2, fd1))
 
     @unittest.skipIf(not isatty, 'stdin is not a tty')
-    def test_check_interactive_good(self):
+    def test_check_interactive_good(self):  # pragma: no cover
         # kind of unnecessary because test relies on low level function
         self.assertTrue(ui._check_interactive(sys.__stdin__))
 
