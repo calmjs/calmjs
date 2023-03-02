@@ -487,6 +487,14 @@ class Runtime(BaseRuntime):
             return '%s:%s' % (ep.module_name, '.'.join(ep.attrs))
 
         def register(name, runtime, entry_point):
+            if name in subparsers:
+                logger.critical(
+                    "another subparser was already registered as %r; "
+                    "aborting the registration of its associated runtime",
+                    name
+                )
+                return
+
             subparser = commands.add_parser(
                 name, help=inst.description,
             )

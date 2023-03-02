@@ -1,11 +1,21 @@
 Changelog
 =========
 
+3.4.3 (2023-03-02)
+------------------
+
+- This is a maintenance release for Python 3.11
+- The registration of subparser of the same name will now be blocked,
+  rather than cascade to result into a ``ArgumentError`` that cannot be
+  recovered from.  [
+  `#64 <https://github.com/calmjs/calmjs/issues/64>`_
+  ]
+
 3.4.2 (2021-10-09)
 ------------------
 
 - This is a maintenance release for Python 3.10; no substantial changes
-  were been made.
+  were made.
 - Provided a check for disabling integration tests using the
   ``CALMJS_SKIP_INTEGRATION`` environment variable, when set to a non-
   empty string, the integration tests found in ``test_dist`` will be
