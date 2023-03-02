@@ -5,3 +5,4 @@ include *.txt
 include *.rst
 recursive-exclude src *.pyc
 recursive-exclude src *.pyo
+recursive-exclude .github *
