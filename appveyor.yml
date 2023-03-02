@@ -2,8 +2,6 @@ environment:
   matrix:
     - PYTHON: "C:\\Python36"
       nodejs_version: "8"
-    - PYTHON: "C:\\Python37"
-      nodejs_version: "10"
 
 # adding an uppercase element in the path to test #54
 clone_folder: c:\projects\SomeLONGPath\calmjs
