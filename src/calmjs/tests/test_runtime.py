@@ -1883,9 +1883,14 @@ class RuntimeGoingWrongTestCase(unittest.TestCase):
 
         # EXPLOSION
         msg = stderr.getvalue()
-        self.assertIn("CRITICAL", msg)
         self.assertIn(
             "Runtime instance has been used or initialized improperly.", msg)
+        # The actual duplicated runtime may be non-deterministic as the
+        # order of which the registration are run that will result in
+        # the duplicate is derived from an unordered set.
+        self.assertIn(
+            "CRITICAL calmjs.runtime another subparser was already registered "
+            "as", msg)
         # Naisu Bakuretsu - Megumin.
 
     @unittest.skipIf(currentframe() is None, 'stack frame not supported')
