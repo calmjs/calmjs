@@ -1,6 +1,16 @@
 Changelog
 =========
 
+3.4.3 (2023-03-02)
+------------------
+
+- This is a maintenance release for Python 3.11
+- The registration of subparser of the same name will now be blocked,
+  rather than cascade to result into a ``ArgumentError`` that cannot be
+  recovered from.  [
+  `#64 <https://github.com/calmjs/calmjs/issues/64>`_
+  ]
+
 3.4.2 (2021-10-09)
 ------------------
 
