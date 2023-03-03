@@ -2,8 +2,8 @@
 import logging
 import unittest
 import sys
-from distutils.dist import Distribution
 from distutils.errors import DistutilsModuleError
+from setuptools.dist import Distribution
 
 from calmjs.command import distutils_log_handler
 from calmjs.command import BuildArtifactCommand
