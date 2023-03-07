@@ -43,7 +43,7 @@ class DistutilsLogHandler(logging.Handler):
         try:
             msg = self.format(record)
             self.log.log(level, msg)
-        except Exception:
+        except Exception:  # pragma: no cover
             # LogRecord.__str__ shouldn't fail... probably.
             self.log.warn('Failed to convert %s' % record)
 
