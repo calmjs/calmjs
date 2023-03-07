@@ -14,6 +14,8 @@ Changelog
   be provided on an even more reactive (rather than proactive) basis.  [
   `#66 <https://github.com/calmjs/calmjs/issues/66>`_
   ]
+- Minimum ``setuptools`` set to ``31.0.0``, due to the namespace
+  package fix; this should have been included long ago.
 
 3.4.3 (2023-03-02)
 ------------------
