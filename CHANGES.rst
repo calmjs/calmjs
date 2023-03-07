@@ -1,6 +1,20 @@
 Changelog
 =========
 
+3.4.4 (2023-03-07)
+------------------
+
+- Upgrading to ``setuptools-65.6.0`` and beyond will result in a new
+  version of ``distutils`` that "fixed" how logging works, but now the
+  hooks and expected workarounds no longer work.  Given that the
+  deprecation of ``distutils`` is in the works, no fixes will be done
+  until ``setuptools`` fully replaces it beyond the release of Python
+  3.12, as the author no longer trust Python to provide a stable
+  platform to develop software on.  Thus, any future "fixes" will only
+  be provided on an even more reactive (rather than proactive) basis.  [
+  `#66 <https://github.com/calmjs/calmjs/issues/66>`_
+  ]
+
 3.4.3 (2023-03-02)
 ------------------
 
