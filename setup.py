@@ -56,7 +56,9 @@ setup(
     namespace_packages=['calmjs'],
     zip_safe=False,
     install_requires=[
-        'setuptools>=31',
+        'setuptools>=61.1.0; python_version>="3.12"',
+        'setuptools>=36.2.0; python_version>="3.3" and python_version<"3.12"',
+        'setuptools>=36.2.0,<=44.1.1; python_version<"3"',
         'calmjs.types',
         'calmjs.parse>=1.0.0,!=1.1.0,!=1.1.1,<2',
     ],

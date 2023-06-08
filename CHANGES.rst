@@ -1,6 +1,15 @@
 Changelog
 =========
 
+3.4.5 (2023-??-??)
+------------------
+
+- Testing with Python 3.12b2 and latest versions of ``setuptools`` /
+  ``pip`` (though with manual patches) show that this package will still
+  work due to ``distutils`` being provided via the first.  The version
+  requirements have been amended for Python 2, Python 3 up to 3.11, and
+  Python 3.12 onwards.
+
 3.4.4 (2023-03-07)
 ------------------
 
