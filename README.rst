@@ -1,3 +1,14 @@
+   [!NOTE]
+
+   This package depends on ``setuptools<81`` due to its reliance on the
+   now deprecated ``pkg_resources.WorkingSet``.  Given that there is no
+   migration path forward using that particular class, a significant
+   amount of core functionality provided by ``calmjs.dist`` will need to
+   be rewritten to use ``importlib.metadata`` instead.  For more details
+   refer to `calmjs/calmjs#70`_.
+
+   .. _calmjs/calmjs#70: https://github.com/calmjs/calmjs/issues/70
+
 calmjs
 ======
 
