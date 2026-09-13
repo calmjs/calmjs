@@ -4,8 +4,8 @@ import sys
 import tempfile
 import warnings
 
-from pkg_resources import WorkingSet
-from pkg_resources import Requirement
+from calmjs.pkg_compat import WorkingSet
+from calmjs.pkg_compat import Requirement
 
 import os
 from os.path import exists

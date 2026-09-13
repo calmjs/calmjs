@@ -343,7 +343,7 @@ class BaseArtifactRegistry(BaseRegistry):
 
     def get_artifact_filename(self, package_name, artifact_name):
         """
-        Similar to pkg_resources.resource_filename, however this works
+        Similar to the resource_filename API, however this works
         with the information cached in this registry instance, and
         arguments are not quite the same.
 

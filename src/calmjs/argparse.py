@@ -16,8 +16,8 @@ from os.path import pathsep
 from argparse import _
 from argparse import Action
 from argparse import HelpFormatter
-from pkg_resources import working_set as default_working_set
-from pkg_resources import Requirement
+from calmjs.pkg_compat import Requirement
+from calmjs.pkg_compat import working_set as default_working_set
 
 from calmjs.utils import requirement_comma_list
 

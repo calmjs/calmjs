@@ -10,7 +10,7 @@ from os.path import relpath
 from os.path import sep
 
 from types import ModuleType
-import pkg_resources
+from calmjs import pkg_compat as pkg_resources
 
 from calmjs import indexer
 from calmjs.utils import pretty_logging

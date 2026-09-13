@@ -11,7 +11,7 @@ from distutils.errors import DistutilsSetupError
 from distutils import dist as distutils_dist
 from setuptools.dist import Distribution
 
-import pkg_resources
+from calmjs import pkg_compat as pkg_resources
 
 from calmjs.module import ModuleRegistry
 from calmjs import dist as calmjs_dist

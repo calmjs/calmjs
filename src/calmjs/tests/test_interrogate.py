@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 import unittest
 from codecs import open
 from os.path import join
-from pkg_resources import resource_filename
+from calmjs.pkg_compat import resource_filename
 
 from calmjs.parse.asttypes import String
 from calmjs.parse.asttypes import Object

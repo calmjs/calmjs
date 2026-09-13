@@ -16,7 +16,7 @@ from argparse import SUPPRESS
 from inspect import currentframe
 from os.path import exists
 
-from pkg_resources import working_set as default_working_set
+from calmjs.pkg_compat import working_set as default_working_set
 
 from calmjs.argparse import ArgumentParser
 from calmjs.argparse import StoreRequirementList
@@ -222,7 +222,7 @@ class BaseRuntime(BootstrapRuntime):
         working_set
             The working_set to use for this instance.
 
-            Default: pkg_resources.working_set
+            Default: calmjs.pkg_compat.working_set
 
         package_name
             The package name that this instance of runtime is for.  Used

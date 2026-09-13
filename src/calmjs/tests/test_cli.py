@@ -9,7 +9,7 @@ from os.path import exists
 from os.path import join
 from os.path import normcase
 from os.path import pathsep
-import pkg_resources
+from calmjs import pkg_compat as pkg_resources
 import warnings
 
 from calmjs import cli

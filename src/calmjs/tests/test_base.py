@@ -5,10 +5,10 @@ from os.path import join
 from os.path import normcase
 from os.path import pathsep
 
-from pkg_resources import EntryPoint
-from pkg_resources import Distribution
-from pkg_resources import WorkingSet
-from pkg_resources import safe_name
+from calmjs.pkg_compat import EntryPoint
+from calmjs.pkg_compat import Distribution
+from calmjs.pkg_compat import WorkingSet
+from calmjs.pkg_compat import safe_name
 
 from calmjs import base
 from calmjs.utils import pretty_logging

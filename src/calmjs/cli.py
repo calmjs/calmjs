@@ -16,7 +16,7 @@ from os.path import exists
 
 from subprocess import check_output
 from subprocess import call
-from pkg_resources import Requirement
+from calmjs.pkg_compat import Requirement
 
 from calmjs.dist import convert_package_names
 from calmjs.dist import find_packages_requirements_dists

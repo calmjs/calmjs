@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import unittest
 
-import pkg_resources
+from calmjs import pkg_compat as pkg_resources
 
 import calmjs.base
 import calmjs.registry

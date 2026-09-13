@@ -13,7 +13,7 @@ from logging import INFO
 from logging import WARNING
 from types import ModuleType
 
-import pkg_resources
+from calmjs import pkg_compat as pkg_resources
 
 from calmjs import argparse as calmjs_argparse
 from calmjs import cli

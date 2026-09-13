@@ -1,6 +1,20 @@
 Changelog
 =========
 
+Unreleased
+----------
+
+- Removed all usages of the deprecated ``pkg_resources`` module; the
+  required subset of its interface is now provided by the new
+  ``calmjs.pkg_compat`` module, which is implemented on top of
+  ``importlib.metadata`` and ``packaging``.  The ``packaging`` library
+  is now a dependency of this package, and the ``setuptools`` runtime
+  requirement has been dropped.
+- The ``calmjs`` namespace package is now a native/implicit namespace
+  package (PEP 420); the ``declare_namespace`` invocation within
+  ``calmjs/__init__.py`` and the ``namespace_packages`` setup argument
+  are gone.
+
 3.4.4 (2023-03-07)
 ------------------
 
