@@ -11,10 +11,10 @@ from os.path import join
 from os.path import normcase
 from types import ModuleType
 
-from pkg_resources import Distribution
-from pkg_resources import EntryPoint
-from pkg_resources import WorkingSet
-from pkg_resources import safe_name
+from calmjs.pkg_compat import Distribution
+from calmjs.pkg_compat import EntryPoint
+from calmjs.pkg_compat import WorkingSet
+from calmjs.pkg_compat import safe_name
 
 from calmjs import artifact
 from calmjs import dist

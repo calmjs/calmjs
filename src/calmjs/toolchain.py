@@ -83,8 +83,8 @@ from os.path import normpath
 from os.path import realpath
 from tempfile import mkdtemp
 
-from pkg_resources import Requirement
-from pkg_resources import working_set as default_working_set
+from calmjs.pkg_compat import Requirement
+from calmjs.pkg_compat import working_set as default_working_set
 
 from calmjs.parse.io import read
 from calmjs.parse.io import write

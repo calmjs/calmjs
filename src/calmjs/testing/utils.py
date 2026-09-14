@@ -16,10 +16,10 @@ from types import ModuleType
 from unittest import TestCase
 from unittest import SkipTest
 
-import pkg_resources
-from pkg_resources import PathMetadata
-from pkg_resources import Distribution
-from pkg_resources import WorkingSet
+from calmjs.pkg_compat import Distribution
+from calmjs.pkg_compat import PathMetadata
+from calmjs.pkg_compat import WorkingSet
+from calmjs import pkg_compat as pkg_resources
 
 # Do not invoke/import the root calmjs namespace here.  If modules from
 # there are needed, the import must be done from within the scope that

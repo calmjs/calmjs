@@ -15,8 +15,8 @@ from logging import getLogger
 from distutils.command.build import build as BuildCommand
 from distutils.errors import DistutilsSetupError
 
-from pkg_resources import Requirement
-from pkg_resources import working_set as default_working_set
+from calmjs.pkg_compat import Requirement
+from calmjs.pkg_compat import working_set as default_working_set
 
 from calmjs.registry import get
 from calmjs.base import BaseModuleRegistry
@@ -255,7 +255,7 @@ def flatten_dist_egginfo_json(
     and generate a flattened version package.json, returned as a dict,
     from the resolved distributions.
 
-    Default working set is the one from pkg_resources.
+    Default working set is the default one from calmjs.pkg_compat.
 
     The generated package.json dict is done by grabbing all package.json
     metadata from all parent Python packages, starting from the highest
@@ -312,7 +312,7 @@ def flatten_egginfo_json(
     Generate a flattened package.json with packages `pkg_names` that are
     already installed within the current Python environment (defaults
     to the current global working_set which should have been set up
-    correctly by pkg_resources).
+    correctly upon installation of this framework).
     """
 
     working_set = working_set or default_working_set

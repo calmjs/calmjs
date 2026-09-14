@@ -22,8 +22,8 @@ into the usable final form.
 
 from __future__ import absolute_import
 
-from pkg_resources import working_set
-from pkg_resources import Requirement
+from calmjs.pkg_compat import Requirement
+from calmjs.pkg_compat import working_set
 
 from logging import getLogger
 from calmjs.base import BaseRegistry

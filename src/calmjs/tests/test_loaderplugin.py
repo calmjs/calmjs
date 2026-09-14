@@ -4,10 +4,10 @@ import unittest
 from os.path import join
 from os import chdir
 from os import makedirs
-from pkg_resources import Distribution
-from pkg_resources import Requirement
-from pkg_resources import resource_filename
-from pkg_resources import working_set as root_working_set
+from calmjs.pkg_compat import Distribution
+from calmjs.pkg_compat import Requirement
+from calmjs.pkg_compat import resource_filename
+from calmjs.pkg_compat import working_set as root_working_set
 
 import calmjs.base
 from calmjs.registry import Registry

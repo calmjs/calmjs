@@ -12,7 +12,7 @@ from os.path import join
 from os.path import exists
 
 from setuptools.dist import Distribution
-from pkg_resources import WorkingSet
+from calmjs.pkg_compat import WorkingSet
 
 from calmjs import npm
 from calmjs import cli

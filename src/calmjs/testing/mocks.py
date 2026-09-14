@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 import io
 
-from pkg_resources import Distribution
-from pkg_resources import EntryPoint
-from pkg_resources import EmptyProvider
+from calmjs.pkg_compat import Distribution
+from calmjs.pkg_compat import EntryPoint
 
 from setuptools.command.egg_info import egg_info
 
@@ -44,9 +43,10 @@ class Mock_egg_info(egg_info):
         self.called[filename] = data
 
 
-class MockProvider(EmptyProvider):
+class MockProvider(object):
     """
-    Extends upon the emptiness of that.
+    A metadata provider that reads from an in-memory mapping, for the
+    mocking up of distributions within tests.
     """
 
     def __init__(self, metadata):

@@ -6,7 +6,7 @@ Various loaders.
 from __future__ import absolute_import
 
 import fnmatch
-import pkg_resources
+from calmjs import pkg_compat as pkg_resources
 
 from logging import getLogger
 from glob import iglob

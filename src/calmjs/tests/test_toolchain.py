@@ -14,7 +14,7 @@ from os.path import join
 from os.path import pardir
 from os.path import realpath
 
-import pkg_resources
+from calmjs import pkg_compat as pkg_resources
 
 from calmjs.exc import ValueSkip
 from calmjs.exc import AdviceAbort

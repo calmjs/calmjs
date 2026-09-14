@@ -25,9 +25,9 @@ try:
 except ImportError:  # pragma: no cover
     from collections import MutableMapping
 from logging import getLogger
-from pkg_resources import Distribution
-from pkg_resources import working_set
-from pkg_resources import safe_name
+from calmjs.pkg_compat import Distribution
+from calmjs.pkg_compat import safe_name
+from calmjs.pkg_compat import working_set
 
 from calmjs.utils import which
 from calmjs.utils import finalize_env
@@ -80,7 +80,7 @@ def _get_exec_binary(binary, kw):
 
 class PackageKeyMapping(MutableMapping):
     """
-    A mapping where keys are pkg_resources.Distribution.project_names
+    A mapping where keys are Distribution.project_names
     mapping to some value.  As project_names are stored, lookup using
     the de-normalized values must go through the safe_name normalization
     such that the resolution will work as expected.
@@ -122,8 +122,8 @@ class PackageKeyMapping(MutableMapping):
 
 class BaseRegistry(object):
     """
-    A base registry implementation that make use of ``pkg_resources``
-    entry points for its definitions.
+    A base registry implementation that make use of the entry points
+    provided by installed distributions for its definitions.
     """
 
     def __init__(self, registry_name, *a, **kw):

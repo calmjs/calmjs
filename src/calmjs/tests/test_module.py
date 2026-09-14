@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import unittest
-from pkg_resources import Distribution
-from pkg_resources import EntryPoint
+from calmjs.pkg_compat import Distribution
+from calmjs.pkg_compat import EntryPoint
 
 import calmjs.base
 from calmjs.base import BaseModuleRegistry
